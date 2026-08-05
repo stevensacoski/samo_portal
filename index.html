@@ -43,7 +43,8 @@
   .breadcrumb { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
   .breadcrumb a { color: var(--primary); cursor: pointer; text-decoration: none; }
   .breadcrumb a:hover { text-decoration: underline; }
-  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 16px; }
+  /* overflow-x permite que las tablas anchas (acumulador por par, morosidad) scrolleen en vez de recortarse */
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 16px; overflow-x: auto; }
   .card-title { font-size: 15px; font-weight: 600; margin: 0 0 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px; }
   .kpi { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
@@ -141,6 +142,23 @@
   .toast.show { opacity: 1; transform: translateY(0); }
   .action-required-banner { background: var(--danger-soft); border: 1px solid #e8b0a5; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
   .action-required-banner strong { color: var(--danger); }
+  .jus-bar { height: 8px; background: var(--neutral-soft); border-radius: 4px; overflow: hidden; margin-top: 5px; min-width: 130px; }
+  .jus-bar span { display: block; height: 100%; background: var(--warn); border-radius: 4px; }
+  .jus-bar.superado span { background: var(--danger); }
+  .exp-card { border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+  .exp-card.pendiente { border-left: 4px solid var(--warn); }
+  .exp-card.presentado { border-left: 4px solid var(--purple); }
+  .exp-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  .exp-gdeba { font-family: "SF Mono", Monaco, monospace; font-size: 12px; background: var(--purple-soft); color: var(--purple); padding: 3px 8px; border-radius: 4px; display: inline-block; }
+  .nota-modelo { background: #fdfdfb; border: 1px solid var(--border); border-radius: 6px; padding: 16px 18px; font-size: 12.5px; line-height: 1.7; max-height: 260px; overflow-y: auto; }
+  .nota-modelo h5 { margin: 0 0 10px; font-size: 13px; text-align: center; text-transform: uppercase; letter-spacing: 0.5px; }
+  .nota-modelo .campo { background: var(--info-soft); padding: 0 4px; border-radius: 3px; font-weight: 600; }
+  .sel-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--primary-soft); border: 1px solid #a8c5e8; border-radius: 6px; padding: 10px 14px; margin-bottom: 10px; font-size: 13px; color: var(--primary-dark); }
+  tr.row-sel td { background: var(--primary-soft); }
+  .paciente-item { border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; display: flex; gap: 10px; align-items: flex-start; }
+  .paciente-item.checked { border-color: var(--warn); background: var(--warn-soft); }
+  .decision-abierta { border: 1px dashed #b39ddb; background: #f7f4fc; border-radius: 6px; padding: 10px 12px; font-size: 12px; color: #4a3269; }
+  .decision-abierta strong { color: #35204f; }
 </style>
 </head>
 <body>
@@ -177,6 +195,9 @@ const FINANCIADORES = [
   { id: "F004", nombre: "Swiss Medical", tipo: "Prepaga" },
   { id: "F005", nombre: "OSECAC", tipo: "Obra Social Sindical" },
 ];
+// Unidad de medida judicial (mock, configurable) y umbral para habilitar expediente — ver 3.3/3.4 del brief.
+const JUS = 150000;
+const UMBRAL_JUS = 6;
 const FACTURAS = [
   { nro: "0001-00042189", hospital: "H001", financiador: "F001", fecha: "2026-07-15", monto: 1845320, montoPagado: 0, estado: "aceptada", pacientes: 12 },
   { nro: "0001-00042190", hospital: "H001", financiador: "F001", fecha: "2026-07-15", monto: 2310500, montoPagado: 0, estado: "esperando_financiador", pacientes: 8, montoDebate: 280400 },
@@ -184,8 +205,8 @@ const FACTURAS = [
   { nro: "0001-00042192", hospital: "H001", financiador: "F004", fecha: "2026-07-15", monto: 1250000, montoPagado: 0, estado: "esperando_hospital", pacientes: 6, montoDebate: 210000 },
   { nro: "0001-00042193", hospital: "H001", financiador: "F002", fecha: "2026-07-15", monto: 3100000, montoPagado: 0, estado: "esperando_hospital", pacientes: 14, montoDebate: 450000 },
   { nro: "0001-00042194", hospital: "H001", financiador: "F005", fecha: "2026-07-15", monto: 780000, montoPagado: 0, estado: "aceptada", pacientes: 3 },
-  { nro: "0001-00042195", hospital: "H001", financiador: "F001", fecha: "2026-06-10", monto: 1500000, montoPagado: 0, estado: "notificada", pacientes: 7 },
-  { nro: "0001-00041000", hospital: "H001", financiador: "F002", fecha: "2026-05-15", monto: 2800000, montoPagado: 0, estado: "morosa", pacientes: 11 },
+  { nro: "0001-00042195", hospital: "H001", financiador: "F001", fecha: "2026-06-10", monto: 2900220, montoPagado: 0, estado: "notificada", pacientes: 8 },
+  { nro: "0001-00041000", hospital: "H001", financiador: "F002", fecha: "2026-05-15", monto: 2800000, montoPagado: 0, estado: "notificada", pacientes: 11 },
   { nro: "0001-00040500", hospital: "H001", financiador: "F003", fecha: "2026-06-01", monto: 1100000, montoPagado: 550000, estado: "pago_parcial", pacientes: 5 },
   { nro: "0001-00040000", hospital: "H001", financiador: "F001", fecha: "2026-04-15", monto: 1200000, montoPagado: 1200000, estado: "cerrada", pacientes: 6 },
   { nro: "0004-00028112", hospital: "H002", financiador: "F001", fecha: "2026-07-15", monto: 1120800, montoPagado: 0, estado: "esperando_hospital", pacientes: 6, montoDebate: 145200 },
@@ -194,18 +215,73 @@ const FACTURAS = [
   { nro: "0007-00019845", hospital: "H003", financiador: "F001", fecha: "2026-07-15", monto: 780600, montoPagado: 0, estado: "notificada", pacientes: 5 },
   { nro: "0012-00010203", hospital: "H004", financiador: "F001", fecha: "2026-07-15", monto: 2050300, montoPagado: 1000000, estado: "pago_parcial", pacientes: 9 },
   { nro: "0015-00007712", hospital: "H005", financiador: "F001", fecha: "2026-07-15", monto: 4120700, montoPagado: 0, estado: "esperando_financiador", pacientes: 18, montoDebate: 620800 },
-  { nro: "0004-00027000", hospital: "H002", financiador: "F001", fecha: "2026-05-20", monto: 1650000, montoPagado: 0, estado: "morosa", pacientes: 8 },
+  { nro: "0004-00027000", hospital: "H002", financiador: "F001", fecha: "2026-05-20", monto: 1650000, montoPagado: 0, estado: "aceptada", pacientes: 8 },
   { nro: "0001-00042250", hospital: "H001", financiador: "F001", fecha: "2026-08-01", monto: 950000, montoPagado: 0, estado: "en_cola", pacientes: 5 },
+
+  // --- Par OSDE (F003) – Hospital Evita (H003): ejemplo canónico de acumulación por tandas (brief 3.3) ---
+  // Tanda 1 — vencida a fines de junio, saldo moroso 1.500.000 = 10 JUS. Ya judicializada (EXP-2026-0001).
+  { nro: "0007-00019801", hospital: "H003", financiador: "F003", fecha: "2026-04-10", monto: 900000, montoPagado: 0, estado: "notificada", pacientes: 6, expediente: "EXP-2026-0001" },
+  { nro: "0007-00019802", hospital: "H003", financiador: "F003", fecha: "2026-04-10", monto: 800000, montoPagado: 300000, estado: "pago_parcial", pacientes: 4, expediente: "EXP-2026-0001" },
+  { nro: "0007-00019803", hospital: "H003", financiador: "F003", fecha: "2026-04-25", monto: 400000, montoPagado: 200000, notasCredito: 100000, estado: "pago_parcial", pacientes: 3, expediente: "EXP-2026-0001" },
+  // Tanda 2 — vencida en julio, saldo moroso acumulado 1.050.000 = 7 JUS
+  { nro: "0007-00019810", hospital: "H003", financiador: "F003", fecha: "2026-05-20", monto: 700000, montoPagado: 0, estado: "aceptada", pacientes: 5 },
+  { nro: "0007-00019811", hospital: "H003", financiador: "F003", fecha: "2026-05-28", monto: 600000, montoPagado: 250000, estado: "pago_parcial", pacientes: 4 },
+  // Vencida con saldo 0 por pago parcial + nota de crédito → cierra, no cae en mora (D7 abierta)
+  { nro: "0007-00019820", hospital: "H003", financiador: "F003", fecha: "2026-05-10", monto: 500000, montoPagado: 400000, notasCredito: 100000, estado: "pago_parcial", pacientes: 3 },
+
+  // Par por debajo del umbral: saldo moroso 500.000 = 3,3 JUS — no habilita expediente
+  { nro: "0012-00010150", hospital: "H004", financiador: "F004", fecha: "2026-05-25", monto: 700000, montoPagado: 200000, estado: "pago_parcial", pacientes: 4 },
+  // Vigente con nota de crédito parcial — el saldo baja pero el reloj sigue corriendo
+  { nro: "0001-00042196", hospital: "H001", financiador: "F005", fecha: "2026-06-20", monto: 1400000, montoPagado: 0, notasCredito: 300000, estado: "aceptada", pacientes: 7 },
+
+  // --- Historial 2025 de IOMA (F001) — alimenta el filtro de temporalidad del panel del financiador ---
+  { nro: "0001-00038010", hospital: "H001", financiador: "F001", fecha: "2025-03-12", monto: 2450000, montoPagado: 2450000, estado: "cerrada", pacientes: 14 },
+  { nro: "0001-00038450", hospital: "H001", financiador: "F001", fecha: "2025-06-20", monto: 1780000, montoPagado: 1780000, estado: "cerrada", pacientes: 9 },
+  { nro: "0001-00039100", hospital: "H001", financiador: "F001", fecha: "2025-09-05", monto: 3120000, montoPagado: 3120000, estado: "cerrada", pacientes: 16 },
+  { nro: "0004-00024300", hospital: "H002", financiador: "F001", fecha: "2025-05-08", monto: 1950000, montoPagado: 1950000, estado: "cerrada", pacientes: 11 },
+  { nro: "0004-00025900", hospital: "H002", financiador: "F001", fecha: "2025-10-14", monto: 2340000, montoPagado: 2340000, estado: "cerrada", pacientes: 12 },
+  { nro: "0012-00008800", hospital: "H004", financiador: "F001", fecha: "2025-07-22", monto: 1420000, montoPagado: 1420000, estado: "cerrada", pacientes: 8 },
+  { nro: "0015-00006050", hospital: "H005", financiador: "F001", fecha: "2025-11-03", monto: 1660000, montoPagado: 1660000, estado: "cerrada", pacientes: 10 },
+  // Morosas 2025 del par Evita–IOMA, ya judicializadas en su momento (EXP-2025-0007)
+  { nro: "0007-00017200", hospital: "H003", financiador: "F001", fecha: "2025-04-18", monto: 1650000, montoPagado: 400000, estado: "pago_parcial", pacientes: 10, expediente: "EXP-2025-0007" },
+  { nro: "0007-00017450", hospital: "H003", financiador: "F001", fecha: "2025-08-30", monto: 1280000, montoPagado: 0, estado: "notificada", pacientes: 7, expediente: "EXP-2025-0007" },
 ];
+// `fecha` es la fecha de NOTIFICACIÓN (desde ahí corren los 60 días). La emisión del hospital es anterior:
+// se deriva para poder mostrar ambas sin duplicar datos a mano en cada factura.
+const DIAS_EMISION_A_NOTIF = 5;
+FACTURAS.forEach(f => {
+  if (f.fechaEmision) return;
+  const d = new Date(f.fecha); d.setDate(d.getDate() - DIAS_EMISION_A_NOTIF);
+  f.fechaEmision = d.toISOString().split("T")[0];
+});
 const ITEMS_FACTURA = {
   "0001-00042189": [
-    { paciente: "González, María (DNI 25.312.***)", afiliado: "IOMA 4-501-023***", prestacion: "Consulta guardia + estudios", codigo: "420101", monto: 145200 },
-    { paciente: "Pérez, Juan (DNI 30.812.***)", afiliado: "IOMA 4-503-819***", prestacion: "Internación clínica 3 días", codigo: "620301", monto: 480500 },
-    { paciente: "Rodríguez, Ana (DNI 42.101.***)", afiliado: "IOMA 4-509-102***", prestacion: "Cirugía menor + insumos", codigo: "710422", monto: 620800 },
-    { paciente: "López, Carlos (DNI 28.445.***)", afiliado: "IOMA 4-502-777***", prestacion: "Estudios de laboratorio", codigo: "310105", monto: 98400 },
-    { paciente: "Martínez, Elena (DNI 33.222.***)", afiliado: "IOMA 4-510-345***", prestacion: "Diagnóstico por imágenes", codigo: "340210", monto: 500420 },
+    { id: "I-89-1", paciente: "González, María", dni: "25.312.***", afiliado: "IOMA 4-501-023***", prestacion: "Consulta guardia + estudios", codigo: "420101", fecha: "2026-07-04", monto: 145200 },
+    { id: "I-89-2", paciente: "Pérez, Juan", dni: "30.812.***", afiliado: "IOMA 4-503-819***", prestacion: "Internación clínica 3 días", codigo: "620301", fecha: "2026-07-06", monto: 480500 },
+    { id: "I-89-3", paciente: "Rodríguez, Ana", dni: "42.101.***", afiliado: "IOMA 4-509-102***", prestacion: "Cirugía menor + insumos", codigo: "710422", fecha: "2026-07-08", monto: 620800 },
+    { id: "I-89-4", paciente: "López, Carlos", dni: "28.445.***", afiliado: "IOMA 4-502-777***", prestacion: "Estudios de laboratorio", codigo: "310105", fecha: "2026-07-09", monto: 98400 },
+    { id: "I-89-5", paciente: "Martínez, Elena", dni: "33.222.***", afiliado: "IOMA 4-510-345***", prestacion: "Diagnóstico por imágenes", codigo: "340210", fecha: "2026-07-11", monto: 500420 },
+  ],
+  // Factura con pacientes repetidos y 6 prestaciones del mismo nomenclador (420101):
+  // sirve para objetar un ítem suelto de un paciente y para objetar en lote por código.
+  "0001-00042195": [
+    { id: "I-95-1", paciente: "González, María", dni: "25.312.***", afiliado: "IOMA 4-501-023***", prestacion: "Consulta guardia", codigo: "420101", fecha: "2026-05-28", monto: 145200 },
+    { id: "I-95-2", paciente: "González, María", dni: "25.312.***", afiliado: "IOMA 4-501-023***", prestacion: "Estudios de laboratorio", codigo: "310105", fecha: "2026-05-28", monto: 98400 },
+    { id: "I-95-3", paciente: "González, María", dni: "25.312.***", afiliado: "IOMA 4-501-023***", prestacion: "Diagnóstico por imágenes", codigo: "340210", fecha: "2026-05-29", monto: 250420 },
+    { id: "I-95-4", paciente: "Pérez, Juan", dni: "30.812.***", afiliado: "IOMA 4-503-819***", prestacion: "Consulta guardia", codigo: "420101", fecha: "2026-05-30", monto: 145200 },
+    { id: "I-95-5", paciente: "Pérez, Juan", dni: "30.812.***", afiliado: "IOMA 4-503-819***", prestacion: "Internación clínica 3 días", codigo: "620301", fecha: "2026-05-30", monto: 480500 },
+    { id: "I-95-6", paciente: "Rodríguez, Ana", dni: "42.101.***", afiliado: "IOMA 4-509-102***", prestacion: "Consulta guardia", codigo: "420101", fecha: "2026-06-01", monto: 145200 },
+    { id: "I-95-7", paciente: "López, Carlos", dni: "28.445.***", afiliado: "IOMA 4-502-777***", prestacion: "Consulta guardia", codigo: "420101", fecha: "2026-06-02", monto: 145200 },
+    { id: "I-95-8", paciente: "Martínez, Elena", dni: "33.222.***", afiliado: "IOMA 4-510-345***", prestacion: "Consulta guardia", codigo: "420101", fecha: "2026-06-02", monto: 145200 },
+    { id: "I-95-9", paciente: "Suárez, Roberto", dni: "27.908.***", afiliado: "IOMA 4-504-661***", prestacion: "Consulta guardia", codigo: "420101", fecha: "2026-06-03", monto: 145200 },
+    { id: "I-95-10", paciente: "Suárez, Roberto", dni: "27.908.***", afiliado: "IOMA 4-504-661***", prestacion: "Cirugía menor + insumos", codigo: "710422", fecha: "2026-06-04", monto: 620800 },
+    { id: "I-95-11", paciente: "Fernández, Lucía", dni: "35.677.***", afiliado: "IOMA 4-511-208***", prestacion: "Estudios de laboratorio", codigo: "310105", fecha: "2026-06-05", monto: 98400 },
+    { id: "I-95-12", paciente: "Ibáñez, Marta", dni: "31.044.***", afiliado: "IOMA 4-506-914***", prestacion: "Internación clínica 2 días", codigo: "620301", fecha: "2026-06-06", monto: 480500 },
   ]
 };
+const itemsDe = (nro) => ITEMS_FACTURA[nro] || ITEMS_FACTURA["0001-00042189"];
+// Documentación adjunta por paciente (mock) — se consulta al revisar un paciente puntual.
+const DOCS_PACIENTE = ["Historia clínica", "Epicrisis firmada", "Consentimiento informado", "Orden médica", "Constancia de afiliación"];
 const THREADS_INITIAL = {
   "0001-00042190": [
     { who: "financiador", nombre: "IOMA", when: "28/07/2026 14:32", text: "Iniciamos discusión sobre 1 ítem por afiliado no vigente.",
@@ -241,9 +317,25 @@ let state = {
   facturas: JSON.parse(JSON.stringify(FACTURAS)),
   threads: JSON.parse(JSON.stringify(THREADS_INITIAL)),
   pagosInformados: [
-    { id: "PAG-001", financiador: "F003", hospital: "H001", facturas: ["0001-00042191"], monto: 890400, tipo: "total", comprobante: "TRF-889021", fecha: "2026-07-28", estado: "pendiente_confirmacion" }
-  ]
+    { id: "PAG-001", financiador: "F003", hospital: "H001", facturas: ["0001-00042191"], imputaciones: [{ nro: "0001-00042191", monto: 890400 }], monto: 890400, tipo: "total", comprobante: "TRF-889021", fecha: "2026-07-28", estado: "pendiente_confirmacion" },
+    { id: "PAG-002", financiador: "F001", hospital: "H001", facturas: ["0001-00042189", "0001-00042194"], imputaciones: [{ nro: "0001-00042189", monto: 800000 }, { nro: "0001-00042194", monto: 780000 }], monto: 1580000, tipo: "parcial", comprobante: "TRF-901337", fecha: "2026-08-01", estado: "pendiente_confirmacion" }
+  ],
+  // Expedientes judiciales por tanda (brief 3.3). Un par puede acumular varios a lo largo del tiempo.
+  expedientes: [
+    { id: "EXP-2025-0007", hospital: "H003", financiador: "F001", facturas: ["0007-00017200","0007-00017450"],
+      monto: 2530000, fecha: "2025-11-10", nroGDEBA: "EX-2025-19003344-GDEBA-DPSAMOMSALGP", cargaGDEBA: "manual", estado: "presentado" },
+    { id: "EXP-2026-0001", hospital: "H003", financiador: "F003", facturas: ["0007-00019801","0007-00019802","0007-00019803"],
+      monto: 1500000, fecha: "2026-07-02", nroGDEBA: "EX-2026-21445078-GDEBA-DPSAMOMSALGP", cargaGDEBA: "manual", estado: "presentado" }
+  ],
+  // Filtros del panel del financiador (hospital + temporalidad) y de su listado de facturas.
+  filtrosPanelFin: { hospital: "TODOS", periodo: "TODOS" },
+  filtrosFactFin: { hospital: "TODOS", estado: "TODOS", situacion: "TODOS", q: "" },
+  filtrosNotifFin: { hospital: "TODOS", estado: "TODOS", q: "", fecha: "TODOS" },
+  // Selección y filtrado de prestaciones dentro del detalle de una factura (objeción en lote).
+  selItems: [], filtroItems: { codigo: "TODOS", q: "" }, focusSel: null
 };
+// Objeciones cargadas sobre prestaciones concretas de una factura.
+const objecionesDe = (f) => f.objeciones || [];
 
 const NAV = {
   ministerio: [
@@ -252,6 +344,7 @@ const NAV = {
     { label: "Facturas notificadas", view: "notificadas" },
     { label: "Discusiones abiertas", view: "discusiones" },
     { label: "Morosidad → Legales", view: "morosidad" },
+    { label: "Expedientes judiciales", view: "expedientes" },
   ],
   hospital: [
     { label: "Panel", view: "panel_hospital" },
@@ -261,6 +354,7 @@ const NAV = {
       { label: "Esperando al financiador", view: "disc_h_esperan_fin" },
     ]},
     { label: "Pagos por confirmar", view: "pagos_hospital" },
+    { label: "Morosidad y legales", view: "morosidad_hospital" },
     { label: "Historial", view: "cerradas_hospital" },
   ],
   financiador: [
@@ -289,7 +383,61 @@ const chip = (e) => {
 };
 const diasRestantes = (f) => 60 - Math.floor((new Date("2026-08-03") - new Date(f)) / 86400000);
 const isImpaga = (f) => !["cerrada","pagada","rechazada_total"].includes(f.estado);
-const saldoPendiente = (f) => f.monto - (f.montoPagado||0) - (f.estado === "rechazada_parcial" ? (f.montoDebate||0) : 0);
+// saldo = monto notificado − pagos imputados − notas de crédito (brief 3.2).
+// En rechazo parcial el monto en debate se descuenta: se presume que se resolverá con NC.
+const saldoPendiente = (f) => f.monto - (f.montoPagado||0) - (f.notasCredito||0) - (f.estado === "rechazada_parcial" ? (f.montoDebate||0) : 0);
+const jus = (monto) => monto / JUS;
+
+// Rombo de vencimiento: al día 60 se evalúa el saldo. Saldo 0 → cerrada; saldo > 0 → morosa por ese saldo.
+// El reloj es único por factura: los pagos parciales no lo renuevan (decisión tomada, brief 4).
+function evaluarVencimientos() {
+  state.facturas.forEach(f => {
+    if (f.estado === "en_cola" || !isImpaga(f)) return;
+    if (diasRestantes(f.fecha) > 0) return;
+    f.estado = saldoPendiente(f) <= 0 ? "cerrada" : "morosa";
+  });
+}
+
+/* ---- Acumulador de morosidad por par hospital–financiador (brief 3.3 / 3.4) ----
+   Solo cuentan las morosas que todavía NO fueron asignadas a un expediente: cuando se
+   genera un expediente esas facturas salen del acumulador y el par vuelve a cero. */
+const UMBRAL_MONTO = JUS * UMBRAL_JUS;
+const morosasDelPar = (hospId, finId) => state.facturas.filter(f =>
+  f.estado === "morosa" && !f.expediente && f.hospital === hospId && f.financiador === finId);
+const expedienteDe = (nro) => state.expedientes.find(e => e.facturas.includes(nro));
+// Pago informado por el financiador pero todavía no confirmado por el hospital: no reduce el saldo,
+// así que no frena la mora — pero conviene señalarlo para no leerlo como un dato inconsistente.
+const pagoPendienteDe = (nro) => state.pagosInformados.find(p => p.estado === "pendiente_confirmacion" && p.facturas.includes(nro));
+const marcaPagoPendiente = (nro) => pagoPendienteDe(nro)
+  ? ` <span class="chip chip-pago-informado" title="Pago informado, pendiente de confirmación del hospital — todavía no reduce el saldo">Pago informado</span>` : '';
+const expedientesDelPar = (hospId, finId) => state.expedientes.filter(e => e.hospital === hospId && e.financiador === finId);
+
+function acumuladoPorPar(filtro = () => true) {
+  const g = {};
+  state.facturas.filter(f => f.estado === "morosa" && !f.expediente && filtro(f)).forEach(f => {
+    const key = f.hospital + "|" + f.financiador;
+    if (!g[key]) g[key] = { hospital: f.hospital, financiador: f.financiador, facturas: [], monto: 0 };
+    g[key].facturas.push(f);
+    g[key].monto += saldoPendiente(f);
+  });
+  return Object.values(g).map(p => ({
+    ...p,
+    jus: p.monto / JUS,
+    habilitado: p.monto > UMBRAL_MONTO,
+    faltante: Math.max(0, UMBRAL_MONTO - p.monto),
+    previos: expedientesDelPar(p.hospital, p.financiador).length,
+  })).sort((a, b) => b.monto - a.monto);
+}
+
+// Barra de progreso hacia el umbral de 6 JUS.
+function barraJus(monto) {
+  const pct = Math.min(100, (monto / UMBRAL_MONTO) * 100);
+  const superado = monto > UMBRAL_MONTO;
+  return `<div class="jus-bar ${superado ? 'superado' : ''}" title="${(monto/JUS).toFixed(2)} JUS de ${UMBRAL_JUS} JUS"><span style="width:${pct}%;"></span></div>`;
+}
+const etiquetaJus = (p) => p.habilitado
+  ? `<span class="chip chip-morosa">Supera ${UMBRAL_JUS} JUS</span>`
+  : `<span class="chip chip-por-vencer">Faltan ${(p.faltante/JUS).toFixed(1)} JUS</span>`;
 const esDiscYo_fin = (f) => f.estado === "esperando_financiador";
 const esDiscHosp_fin = (f) => f.estado === "esperando_hospital";
 const esDiscYo_hosp = (f) => f.estado === "esperando_hospital";
@@ -307,28 +455,57 @@ window.exportCSV = exportCSV;
 
 /* ========================================================= AGGREGATIONS ========================================================= */
 function agruparPorHospital_fin() {
-  const facts = state.facturas.filter(f => f.financiador === "F001" && isImpaga(f));
   const g = {};
-  facts.forEach(f => {
-    if (!g[f.hospital]) g[f.hospital] = { count:0, deudaTotal:0, aceptadoSinPagar:0, saldoParcial:0, espYo:0, espHosp:0, porVencer:0, vencidas:0 };
-    const d = g[f.hospital]; d.count++; d.deudaTotal += saldoPendiente(f);
+  facturasFin().forEach(f => {
+    if (!g[f.hospital]) g[f.hospital] = { count:0, pagado:0, deudaTotal:0, enDiscusion:0, aceptadoSinPagar:0, espYo:0, espHosp:0, porVencer:0, vencidas:0 };
+    const d = g[f.hospital];
+    d.count++;
+    d.pagado += (f.montoPagado || 0);
+    if (!isImpaga(f)) return;
+    d.deudaTotal += saldoPendiente(f);
     if (f.estado === "aceptada") d.aceptadoSinPagar += saldoPendiente(f);
-    if (f.estado === "pago_parcial") d.saldoParcial += saldoPendiente(f);
-    if (esDiscYo_fin(f)) d.espYo++;
-    if (esDiscHosp_fin(f)) d.espHosp++;
+    if (esDiscYo_fin(f)) { d.espYo++; d.enDiscusion++; }
+    if (esDiscHosp_fin(f)) { d.espHosp++; d.enDiscusion++; }
     if (f.estado === "morosa") d.vencidas++;
     const dias = diasRestantes(f.fecha);
     if (dias > 0 && dias <= 15 && f.estado !== "morosa") d.porVencer++;
   });
   return g;
 }
+/* Universo de facturas del financiador, acotado por los filtros del panel (hospital + período).
+   Se excluye `en_cola`: todavía no le fue notificada, así que no forma parte de su vista. */
+function facturasFin(filtros = state.filtrosPanelFin) {
+  return state.facturas.filter(f => f.financiador === "F001" && f.estado !== "en_cola"
+    && (filtros.hospital === "TODOS" || f.hospital === filtros.hospital)
+    && (filtros.periodo === "TODOS" || f.fecha.startsWith(filtros.periodo)));
+}
+const periodosFin = () => [...new Set(state.facturas.filter(f => f.financiador === "F001" && f.estado !== "en_cola")
+  .map(f => f.fecha.slice(0, 4)))].sort().reverse();
+const hospitalesFin = () => [...new Set(state.facturas.filter(f => f.financiador === "F001" && f.estado !== "en_cola")
+  .map(f => f.hospital))].sort((a, b) => hospNombre(a).localeCompare(hospNombre(b)));
+
+// Última notificación consolidada recibida — alimenta la alerta del panel.
+function ultimaNotificacionFin() {
+  const facts = state.facturas.filter(f => f.financiador === "F001" && f.estado !== "en_cola");
+  if (!facts.length) return null;
+  const fecha = facts.map(f => f.fecha).sort().reverse()[0];
+  const lote = facts.filter(f => f.fecha === fecha);
+  return { fecha, lote, monto: lote.reduce((s, f) => s + f.monto, 0),
+    hospitales: new Set(lote.map(f => f.hospital)).size,
+    sinRevisar: lote.filter(f => f.estado === "notificada").length };
+}
+
 function kpisFinanciador() {
-  const facts = state.facturas.filter(f => f.financiador === "F001" && isImpaga(f));
-  const k = { deudaTotal:0, sinPagar:0, sinPagarMonto:0, pagoParcial:0, pagoParcialSaldo:0, porVencer:0, porVencerMonto:0, vencidas:0, vencidasMonto:0, espYo:0, espYoMonto:0, espHosp:0, espHospMonto:0, total: facts.length };
+  const facts = facturasFin();
+  const k = { total: facts.length, deudaTotal:0, deudaCount:0, pagado:0, pagadoCount:0,
+    notificadas:0, notificadasMonto:0, porVencer:0, porVencerMonto:0, vencidas:0, vencidasMonto:0,
+    espYo:0, espYoMonto:0, espHosp:0, espHospMonto:0 };
   facts.forEach(f => {
-    const s = saldoPendiente(f); k.deudaTotal += s;
-    if (f.estado !== "pago_parcial") { k.sinPagar++; k.sinPagarMonto += s; }
-    if (f.estado === "pago_parcial") { k.pagoParcial++; k.pagoParcialSaldo += s; }
+    if ((f.montoPagado || 0) > 0) { k.pagado += f.montoPagado; k.pagadoCount++; }
+    if (!isImpaga(f)) return;
+    const s = saldoPendiente(f);
+    k.deudaTotal += s; k.deudaCount++;
+    if (f.estado === "notificada") { k.notificadas++; k.notificadasMonto += s; }
     if (esDiscYo_fin(f)) { k.espYo++; k.espYoMonto += (f.montoDebate || s); }
     if (esDiscHosp_fin(f)) { k.espHosp++; k.espHospMonto += (f.montoDebate || s); }
     if (f.estado === "morosa") { k.vencidas++; k.vencidasMonto += s; }
@@ -336,6 +513,14 @@ function kpisFinanciador() {
     if (dias > 0 && dias <= 15 && f.estado !== "morosa") { k.porVencer++; k.porVencerMonto += s; }
   });
   return k;
+}
+// Situación temporal de una factura — se usa para filtrar el listado desde las tarjetas del panel.
+function situacionFactura(f) {
+  if (!isImpaga(f)) return "cerrada";
+  if (f.estado === "morosa") return "vencidas";
+  const dias = diasRestantes(f.fecha);
+  if (dias > 0 && dias <= 15) return "por_vencer";
+  return "vigente";
 }
 function agruparPorFinanciador_hosp() {
   const facts = state.facturas.filter(f => f.hospital === "H001" && isImpaga(f));
@@ -522,8 +707,8 @@ function viewHospital_DetalleFinanciador(finId) {
 }
 window.exportFacturasHosp = function() {
   const facts = state.facturas.filter(f => f.hospital === "H001");
-  const rows = [["N° Factura","Financiador","Fecha","Estado","Monto","Pagado","Saldo","En debate","Días","Pacientes"]];
-  facts.forEach(f => rows.push([f.nro, finNombre(f.financiador), f.fecha, f.estado, f.monto, f.montoPagado||0, saldoPendiente(f), f.montoDebate||0, f.estado === "en_cola" ? "-" : diasRestantes(f.fecha), f.pacientes]));
+  const rows = [["N° Factura","Financiador","Fecha","Estado","Monto","Pagado","Notas de crédito","Saldo","En debate","Días","Pacientes"]];
+  facts.forEach(f => rows.push([f.nro, finNombre(f.financiador), f.fecha, f.estado, f.monto, f.montoPagado||0, f.notasCredito||0, saldoPendiente(f), f.montoDebate||0, f.estado === "en_cola" ? "-" : diasRestantes(f.fecha), f.pacientes]));
   exportCSV("facturas_hospital.csv", rows);
 };
 
@@ -626,8 +811,16 @@ function viewHospital_DetalleFactura(nro) {
             <div><span style="color:var(--muted);">Pacientes:</span> ${f.pacientes}</div>
             <div><span style="color:var(--muted);">Monto:</span> <strong>${money(f.monto)}</strong></div>
             ${f.montoPagado > 0 ? `<div><span style="color:var(--muted);">Cobrado:</span> <strong style="color:var(--success);">${money(f.montoPagado)}</strong></div>` : ''}
+            ${f.notasCredito ? `<div><span style="color:var(--muted);">Notas de crédito:</span> <strong style="color:var(--purple);">${money(f.notasCredito)}</strong></div>` : ''}
             ${f.montoDebate ? `<div><span style="color:var(--muted);">En debate:</span> <strong style="color:var(--warn);">${money(f.montoDebate)}</strong></div>` : ''}
             <div><span style="color:var(--muted);">Saldo:</span> <strong>${money(saldoPendiente(f))}</strong></div>
+            ${f.estado === "morosa" ? `<div style="margin-top:6px;color:var(--danger);font-size:12px;">Morosa por saldo — venció el ${vence} sin cancelar. El reloj no se renueva con pagos parciales.</div>` : ''}
+            ${(() => { const e = expedienteDe(f.nro); return e ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
+              <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Judicializada</div>
+              <div style="margin-top:4px;"><strong>${e.id}</strong></div>
+              ${e.nroGDEBA ? `<div style="margin-top:3px;"><span class="exp-gdeba">${e.nroGDEBA}</span></div>` : '<div style="margin-top:3px;"><span class="chip chip-por-vencer">Sin N° GDEBA</span></div>'}
+              <div style="font-size:11px;color:var(--muted);margin-top:3px;">Tanda de ${e.facturas.length} factura(s) — ${money(e.monto)}</div>
+            </div>` : ''; })()}
           </div>
         </div>
         <div class="card">
@@ -689,9 +882,17 @@ function viewHospital_Pagos() {
       ${pagos.length === 0 ? '<div style="color:var(--muted);padding:20px;text-align:center;">Sin pagos pendientes.</div>' :
         pagos.map(pago => `<div style="border:1px solid var(--border);border-radius:6px;padding:14px;margin-bottom:10px;">
           <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-            <div><strong>${finNombre(pago.financiador)}</strong> informó un pago<div style="color:var(--muted);font-size:12px;">Factura ${pago.facturas.join(', ')} — ${pago.comprobante} — ${pago.fecha}</div></div>
+            <div><strong>${finNombre(pago.financiador)}</strong> informó un pago<div style="color:var(--muted);font-size:12px;">${pago.comprobante} — ${pago.fecha} — ${pago.facturas.length} factura(s)</div></div>
             <div style="text-align:right;"><div style="font-family:monospace;font-size:16px;font-weight:700;">${money(pago.monto)}</div><div style="font-size:11px;color:var(--muted);">${pago.tipo === 'total' ? 'Pago total' : 'Pago parcial'}</div></div>
           </div>
+          <table style="font-size:12.5px;margin-bottom:8px;">
+            <thead><tr><th>Factura imputada</th><th class="money-header">Monto factura</th><th class="money-header">Se imputa</th><th class="money-header">Saldo si confirmo</th></tr></thead>
+            <tbody>${(pago.imputaciones || pago.facturas.map(nro => ({ nro, monto: pago.monto }))).map(i => {
+              const f = state.facturas.find(x => x.nro === i.nro);
+              const restante = f ? saldoPendiente(f) - i.monto : 0;
+              return `<tr><td><code>${i.nro}</code></td><td class="money">${f ? money(f.monto) : '—'}</td><td class="money">${money(i.monto)}</td><td class="money" style="color:${restante > 0 ? 'var(--warn)' : 'var(--success)'};font-weight:600;">${money(Math.max(0, restante))}${restante <= 0 ? ' ✓' : ''}</td></tr>`;
+            }).join('')}</tbody>
+          </table>
           <div class="attachments"><span class="attachment-chip">📎 comprobante_${pago.comprobante}.pdf</span></div>
           <div class="actions-row">
             <button class="btn btn-success btn-sm" data-confirmar-pago="${pago.id}">✓ Confirmar recepción</button>
@@ -702,6 +903,55 @@ function viewHospital_Pagos() {
     </div>
   `;
 }
+
+function viewHospital_Morosidad() {
+  const morosas = state.facturas.filter(f => f.hospital === "H001" && f.estado === "morosa");
+  const pares = acumuladoPorPar(f => f.hospital === "H001");
+  const exps = state.expedientes.filter(e => e.hospital === "H001");
+  const saldoTotal = morosas.reduce((s,f)=>s+saldoPendiente(f),0);
+  const habilitados = pares.filter(p => p.habilitado).length;
+  return `<div class="page-header">
+      <div><h1>Morosidad y legales</h1><div class="sub">Facturas con saldo impago al día 60 y avance hacia el umbral de judicialización</div></div>
+      <button class="btn btn-excel" onclick="exportHospMorosidad()">⬇ Excel</button>
+    </div>
+    ${habilitados > 0 ? `<div class="action-required-banner">
+      <div><strong>⚠ ${habilitados} financiador(es) superan ${UMBRAL_JUS} JUS de deuda morosa</strong> — el Ministerio puede abrir expediente judicial por esa tanda.</div>
+    </div>` : ""}
+    <div class="kpi-grid">
+      <div class="kpi action-required"><div class="label">Facturas morosas</div><div class="value danger">${morosas.length}</div></div>
+      <div class="kpi action-required"><div class="label">Saldo moroso total</div><div class="value money danger">${money(saldoTotal)}</div><div class="hint">${jus(saldoTotal).toFixed(1)} JUS</div></div>
+      <div class="kpi"><div class="label">Expedientes abiertos</div><div class="value">${exps.length}</div></div>
+    </div>
+    ${viewParesJus(pares, false)}
+    <div class="card" style="padding:0;">
+      <div class="group-header"><strong>Mis facturas morosas</strong></div>
+      <table>
+        <thead><tr><th>Factura</th><th>Financiador</th><th>Emisión</th><th>Vencida hace</th><th class="money-header">Monto</th><th class="money-header">Cobrado</th><th class="money-header">Saldo moroso</th><th>Expediente</th></tr></thead>
+        <tbody>${morosas.length === 0 ? '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--muted);">Sin facturas morosas.</td></tr>' :
+          morosas.map(f => `<tr class="clickable" data-open-fact-hosp="${f.nro}">
+            <td><code>${f.nro}</code>${marcaPagoPendiente(f.nro)}</td><td>${finNombre(f.financiador)}</td><td>${f.fecha}</td>
+            <td style="color:var(--danger);font-weight:600;">${Math.abs(diasRestantes(f.fecha))} días</td>
+            <td class="money">${money(f.monto)}</td>
+            <td class="money" style="color:${(f.montoPagado||0)>0?'var(--success)':'var(--muted)'};">${(f.montoPagado||0)>0?money(f.montoPagado):'—'}</td>
+            <td class="money" style="color:var(--danger);font-weight:700;">${money(saldoPendiente(f))}</td>
+            <td>${f.expediente ? `<span class="exp-gdeba">${f.expediente}</span>` : '<span style="color:var(--muted);font-size:12px;">En acumulador</span>'}</td>
+          </tr>`).join('')}</tbody>
+      </table>
+    </div>
+    ${exps.length > 0 ? `<div class="card">
+      <h3 class="card-title">Expedientes que involucran a este hospital</h3>
+      <table>
+        <thead><tr><th>Expediente</th><th>Financiador</th><th>Fecha</th><th style="text-align:center;">Facturas</th><th class="money-header">Monto reclamado</th><th>N° GDEBA</th></tr></thead>
+        <tbody>${exps.map(e => `<tr><td><strong>${e.id}</strong></td><td>${finNombre(e.financiador)}</td><td>${e.fecha}</td><td style="text-align:center;">${e.facturas.length}</td><td class="money">${money(e.monto)}</td><td>${e.nroGDEBA ? `<span class="exp-gdeba">${e.nroGDEBA}</span>` : '<span class="chip chip-por-vencer">Pendiente</span>'}</td></tr>`).join('')}</tbody>
+      </table>
+    </div>` : ''}`;
+}
+window.exportHospMorosidad = function() {
+  const morosas = state.facturas.filter(f => f.hospital === "H001" && f.estado === "morosa");
+  const rows = [["Factura","Financiador","Emisión","Vencida hace (días)","Monto","Cobrado","Notas de crédito","Saldo moroso","Expediente"]];
+  morosas.forEach(f => rows.push([f.nro, finNombre(f.financiador), f.fecha, Math.abs(diasRestantes(f.fecha)), f.monto, f.montoPagado||0, f.notasCredito||0, saldoPendiente(f), f.expediente || "(en acumulador)"]));
+  exportCSV("morosidad_hospital.csv", rows);
+};
 
 function viewHospital_Cerradas() {
   const cerradas = state.facturas.filter(f => f.hospital === "H001" && (f.estado === "cerrada" || f.estado === "rechazada_total"));
@@ -720,21 +970,40 @@ function viewHospital_Cerradas() {
 /* ========================================================= VISTAS FINANCIADOR ========================================================= */
 function viewFinanciador_Panel() {
   const k = kpisFinanciador(); const grouped = agruparPorHospital_fin();
+  const fl = state.filtrosPanelFin;
+  const notif = ultimaNotificacionFin();
+  const alcance = (fl.hospital === "TODOS" ? "todos los hospitales" : hospCorto(fl.hospital))
+    + " · " + (fl.periodo === "TODOS" ? "histórico completo" : fl.periodo);
   return `
     <div class="page-header">
       <div><h1>Panel — IOMA</h1><div class="sub">Situación consolidada de facturación del Ministerio de Salud PBA</div></div>
       <div class="page-actions"><button class="btn btn-excel" onclick="exportPanelFin()">⬇ Descargar Excel</button></div>
     </div>
-    ${k.espYo > 0 ? `<div class="action-required-banner">
-      <div><strong>⚠ Tenés ${k.espYo} discusión(es) esperando tu respuesta</strong> — ${money(k.espYoMonto)} en debate.</div>
-      <button class="btn btn-danger btn-sm" data-goto="disc_esperan_yo">Revisar →</button>
+    ${notif && notif.sinRevisar > 0 ? `<div class="action-required-banner">
+      <div><strong>📬 Recibiste una nueva notificación de facturas a pagar</strong> — ${notif.fecha}: ${notif.lote.length} factura(s) de ${notif.hospitales} hospital(es) por ${money(notif.monto)}. ${notif.sinRevisar} sin revisar.</div>
+      <button class="btn btn-danger btn-sm" data-goto="notificaciones">Revisar →</button>
     </div>` : ""}
+    <div class="card" style="padding:14px 16px;">
+      <div class="filter-bar" style="margin-bottom:0;">
+        <strong style="font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);">Ver</strong>
+        <select data-filtro-panel="hospital">
+          <option value="TODOS">Todos los hospitales</option>
+          ${hospitalesFin().map(h => `<option value="${h}" ${fl.hospital === h ? 'selected' : ''}>${hospNombre(h)}</option>`).join('')}
+        </select>
+        <select data-filtro-panel="periodo">
+          <option value="TODOS">Histórico (todos los años)</option>
+          ${periodosFin().map(p => `<option value="${p}" ${fl.periodo === p ? 'selected' : ''}>${p}</option>`).join('')}
+        </select>
+        <span style="font-size:12px;color:var(--muted);">Mostrando: <strong>${alcance}</strong> — ${k.total} factura(s)</span>
+        ${(fl.hospital !== "TODOS" || fl.periodo !== "TODOS") ? `<button class="btn btn-secondary btn-sm" data-filtro-panel-reset="1">Limpiar filtros</button>` : ''}
+      </div>
+    </div>
     <div class="kpi-grid">
-      <div class="kpi"><div class="label">Deuda total</div><div class="value money">${money(k.deudaTotal)}</div><div class="hint">${k.total} facturas activas</div></div>
-      <div class="kpi"><div class="label">Sin pagar</div><div class="value">${k.sinPagar}</div><div class="hint money">${money(k.sinPagarMonto)}</div></div>
-      <div class="kpi"><div class="label">Pago parcial</div><div class="value">${k.pagoParcial}</div><div class="hint money">Saldo: ${money(k.pagoParcialSaldo)}</div></div>
-      <div class="kpi warning"><div class="label">Por vencer (&lt;15d)</div><div class="value warn">${k.porVencer}</div><div class="hint money">${money(k.porVencerMonto)}</div></div>
-      <div class="kpi action-required"><div class="label">Vencidas</div><div class="value danger">${k.vencidas}</div><div class="hint money">${money(k.vencidasMonto)}</div></div>
+      <div class="kpi"><div class="label">Deuda total</div><div class="value money danger">${money(k.deudaTotal)}</div><div class="hint">${k.deudaCount} factura(s) activa(s)</div></div>
+      <div class="kpi good"><div class="label">Pagado</div><div class="value money success">${money(k.pagado)}</div><div class="hint">${k.pagadoCount} factura(s) con pagos</div></div>
+      <div class="kpi"><div class="label">Notificadas sin revisar</div><div class="value money">${money(k.notificadasMonto)}</div><div class="hint">${k.notificadas} factura(s)</div></div>
+      <div class="kpi warning" style="cursor:pointer;" data-ir-facturas="por_vencer"><div class="label">Facturas por vencer (&lt;15d)</div><div class="value warn">${k.porVencer}</div><div class="hint money">${money(k.porVencerMonto)} →</div></div>
+      <div class="kpi action-required" style="cursor:pointer;" data-ir-facturas="vencidas"><div class="label">Facturas vencidas</div><div class="value danger">${k.vencidas}</div><div class="hint money">${money(k.vencidasMonto)} →</div></div>
     </div>
     <div class="card">
       <h3 class="card-title">Discusiones abiertas</h3>
@@ -754,31 +1023,37 @@ function viewFinanciador_Panel() {
     <div class="card">
       <h3 class="card-title">Desglose por hospital <button class="btn btn-excel btn-sm" onclick="exportPanelFin()">⬇ Excel</button></h3>
       <table>
-        <thead><tr><th>Hospital</th><th>Facturas</th><th class="money-header">Deuda</th><th class="money-header">Aceptado</th><th class="money-header">Saldo parcial</th><th>Esp. yo</th><th>Esp. hosp.</th><th>Por vencer</th><th>Vencidas</th></tr></thead>
-        <tbody>${Object.entries(grouped).map(([hospId, d]) => `<tr class="clickable" data-hospital-fin="${hospId}">
+        <thead><tr><th>Hospital</th><th style="text-align:center;">Facturas</th><th class="money-header">Pagado</th><th class="money-header">Deuda</th><th style="text-align:center;">En discusión</th><th style="text-align:center;">Esp. yo</th><th style="text-align:center;">Esp. hosp.</th><th style="text-align:center;">Por vencer</th><th style="text-align:center;">Vencidas</th></tr></thead>
+        <tbody>${Object.keys(grouped).length === 0 ? '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--muted);">Sin facturas para los filtros elegidos.</td></tr>' :
+          Object.entries(grouped).map(([hospId, d]) => `<tr class="clickable" data-hospital-fin="${hospId}">
           <td><strong>${hospCorto(hospId)}</strong></td>
           <td style="text-align:center;">${d.count}</td>
-          <td class="money">${money(d.deudaTotal)}</td>
-          <td class="money" style="color:${d.aceptadoSinPagar>0?'var(--success)':'var(--muted)'};">${d.aceptadoSinPagar>0?money(d.aceptadoSinPagar):'—'}</td>
-          <td class="money" style="color:${d.saldoParcial>0?'var(--purple)':'var(--muted)'};">${d.saldoParcial>0?money(d.saldoParcial):'—'}</td>
+          <td class="money" style="color:${d.pagado>0?'var(--success)':'var(--muted)'};">${d.pagado>0?money(d.pagado):'—'}</td>
+          <td class="money" style="font-weight:600;">${money(d.deudaTotal)}</td>
+          <td style="text-align:center;">${d.enDiscusion>0?`<span class="chip chip-pago-parcial">${d.enDiscusion}</span>`:'—'}</td>
           <td style="text-align:center;">${d.espYo>0?`<span class="chip chip-esperando-financiador">${d.espYo}</span>`:'—'}</td>
           <td style="text-align:center;">${d.espHosp>0?`<span class="chip chip-esperando-hospital">${d.espHosp}</span>`:'—'}</td>
           <td style="text-align:center;">${d.porVencer>0?`<span class="chip chip-por-vencer">${d.porVencer}</span>`:'—'}</td>
           <td style="text-align:center;">${d.vencidas>0?`<span class="chip chip-morosa">${d.vencidas}</span>`:'—'}</td>
         </tr>`).join('')}</tbody>
       </table>
+      <div class="note note-blue" style="margin-top:12px;"><strong>Click en una fila</strong> para ver el detalle de facturas de ese hospital. El Excel descarga exactamente esta tabla, con los filtros aplicados.</div>
     </div>
   `;
 }
+// El Excel replica la tabla visible, con los mismos filtros y columnas.
 window.exportPanelFin = function() {
+  const fl = state.filtrosPanelFin;
   const g = agruparPorHospital_fin();
-  const rows = [["Hospital","Facturas","Deuda","Aceptado","Saldo parcial","Esp. yo","Esp. hosp.","Por vencer","Vencidas"]];
-  Object.entries(g).forEach(([hospId, d]) => rows.push([hospNombre(hospId), d.count, d.deudaTotal, d.aceptadoSinPagar, d.saldoParcial, d.espYo, d.espHosp, d.porVencer, d.vencidas]));
-  exportCSV("panel_ioma_por_hospital.csv", rows);
+  const rows = [["Hospital","Facturas","Pagado","Deuda","En discusión","Esp. yo","Esp. hosp.","Por vencer","Vencidas"]];
+  Object.entries(g).forEach(([hospId, d]) => rows.push([hospNombre(hospId), d.count, d.pagado, d.deudaTotal, d.enDiscusion, d.espYo, d.espHosp, d.porVencer, d.vencidas]));
+  const suf = `${fl.hospital === "TODOS" ? "todos" : fl.hospital}_${fl.periodo === "TODOS" ? "historico" : fl.periodo}`;
+  exportCSV(`panel_ioma_por_hospital_${suf}.csv`, rows);
 };
 
 function viewFinanciador_DetalleHospital(hospId) {
-  const facts = state.facturas.filter(f => f.financiador === "F001" && f.hospital === hospId && isImpaga(f));
+  // Respeta el filtro de período del panel para que el detalle no contradiga la fila que se clickeó.
+  const facts = facturasFin({ hospital: hospId, periodo: state.filtrosPanelFin.periodo }).filter(isImpaga);
   const g = agruparPorHospital_fin()[hospId] || {};
   return `
     <div class="breadcrumb"><a data-nav="panel_financiador">Panel</a> / ${hospNombre(hospId)}</div>
@@ -803,39 +1078,171 @@ function viewFinanciador_DetalleHospital(hospId) {
   `;
 }
 window.exportFacturasFin = function() {
-  const facts = state.facturas.filter(f => f.financiador === "F001");
-  const rows = [["Factura","Hospital","Fecha","Estado","Monto","Pagado","Saldo","En debate","Días","Pacientes"]];
-  facts.forEach(f => rows.push([f.nro, hospNombre(f.hospital), f.fecha, f.estado, f.monto, f.montoPagado||0, saldoPendiente(f), f.montoDebate||0, f.estado === "en_cola" ? "-" : diasRestantes(f.fecha), f.pacientes]));
+  const facts = facturasFinFiltradas();
+  const rows = [["Factura","Hospital","Notificada","Emisión","Estado","Situación","Días","Monto","Pagado","Notas de crédito","Saldo","En debate","Pacientes"]];
+  facts.forEach(f => rows.push([f.nro, hospNombre(f.hospital), f.fecha, f.fechaEmision, f.estado, LABEL_SITUACION[situacionFactura(f)] || situacionFactura(f),
+    diasRestantes(f.fecha), f.monto, f.montoPagado||0, f.notasCredito||0, saldoPendiente(f), f.montoDebate||0, f.pacientes]));
   exportCSV("facturas_ioma.csv", rows);
 };
 
+/* Estados agrupados en "situaciones de trabajo": con 200 hospitales, lo que importa no es el estado
+   técnico sino qué tengo que hacer con la factura. */
+const GRUPOS_ESTADO = {
+  sin_revisar: { label: "Sin revisar", estados: ["notificada"] },
+  a_pagar: { label: "Aceptadas — a pagar", estados: ["aceptada"] },
+  responder_yo: { label: "Esperan mi respuesta", estados: ["esperando_financiador"] },
+  esperando_hosp: { label: "Esperando al hospital", estados: ["esperando_hospital"] },
+  con_pago: { label: "Con pago informado / parcial", estados: ["pago_informado", "pago_parcial"] },
+  vencidas: { label: "Vencidas (morosas)", estados: ["morosa"] },
+  cerradas: { label: "Cerradas / pagadas", estados: ["cerrada", "pagada", "rechazada_total"] },
+};
+const grupoDe = (estado) => Object.keys(GRUPOS_ESTADO).find(g => GRUPOS_ESTADO[g].estados.includes(estado)) || "otros";
+const selectGrupos = (sel, attr) => `<select ${attr}>
+  <option value="TODOS">Todas las situaciones</option>
+  ${Object.entries(GRUPOS_ESTADO).map(([k, v]) => `<option value="${k}" ${sel === k ? 'selected' : ''}>${v.label}</option>`).join('')}
+</select>`;
+const selectHospitales = (sel, attr, ids) => `<select ${attr}>
+  <option value="TODOS">Todos los hospitales (${ids.length})</option>
+  ${ids.map(h => `<option value="${h}" ${sel === h ? 'selected' : ''}>${hospNombre(h)}</option>`).join('')}
+</select>`;
+
 function viewFinanciador_Notificaciones() {
+  const fl = state.filtrosNotifFin;
+  const todas = state.facturas.filter(f => f.financiador === "F001" && f.estado !== "en_cola");
+  const q = fl.q.trim().toLowerCase();
+  const facts = todas
+    .filter(f => fl.hospital === "TODOS" || f.hospital === fl.hospital)
+    .filter(f => fl.estado === "TODOS" || grupoDe(f.estado) === fl.estado)
+    .filter(f => fl.fecha === "TODOS" || f.fecha === fl.fecha)
+    .filter(f => !q || f.nro.toLowerCase().includes(q) || hospNombre(f.hospital).toLowerCase().includes(q))
+    .sort((a, b) => b.fecha.localeCompare(a.fecha) || a.nro.localeCompare(b.nro));
+  // Lotes de notificación: cada fecha es una notificación consolidada.
+  const lotes = {};
+  todas.forEach(f => { (lotes[f.fecha] = lotes[f.fecha] || []).push(f); });
+  const fechasLote = Object.keys(lotes).sort().reverse().slice(0, 4);
+  const sinRevisar = facts.filter(f => f.estado === "notificada");
   return `
-    <div class="page-header"><div><h1>Notificaciones recibidas</h1></div><button class="btn btn-excel">⬇ Excel</button></div>
-    <div class="note"><strong>Notificación fehaciente vía portal + domicilio electrónico nacional.</strong> 60 días para pagar.</div>
-    <div class="card" style="padding:0;"><table>
-      <thead><tr><th>Fecha</th><th>Período</th><th>Facturas</th><th>Hospitales</th><th class="money-header">Monto</th><th>Vencimiento</th></tr></thead>
-      <tbody><tr class="clickable" data-open-notif="1"><td><strong>15/07/2026</strong></td><td>Julio 2026</td><td>10</td><td>5</td><td class="money">${money(20297620)}</td><td>13/09/2026</td></tr></tbody>
-    </table></div>
+    <div class="page-header">
+      <div><h1>Notificaciones recibidas</h1><div class="sub">Facturas notificadas fehacientemente — el plazo de 60 días corre desde la fecha de notificación</div></div>
+      <button class="btn btn-excel" onclick="exportNotificacionesFin()">⬇ Excel</button>
+    </div>
+    <div class="note"><strong>Notificación fehaciente vía portal + domicilio electrónico nacional.</strong> 60 días corridos para pagar desde la fecha de notificación.</div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">Facturas en vista</div><div class="value">${facts.length}</div><div class="hint">de ${todas.length} notificadas</div></div>
+      <div class="kpi ${sinRevisar.length>0?'action-required':''}"><div class="label">Sin revisar</div><div class="value ${sinRevisar.length>0?'danger':''}">${sinRevisar.length}</div><div class="hint money">${money(sinRevisar.reduce((s,f)=>s+saldoPendiente(f),0))}</div></div>
+      <div class="kpi"><div class="label">Monto en vista</div><div class="value money">${money(facts.reduce((s,f)=>s+f.monto,0))}</div></div>
+      <div class="kpi"><div class="label">Hospitales en vista</div><div class="value">${new Set(facts.map(f=>f.hospital)).size}</div></div>
+    </div>
+    <div class="card">
+      <h3 class="card-title">Últimas notificaciones consolidadas</h3>
+      <table>
+        <thead><tr><th>Fecha de notificación</th><th style="text-align:center;">Facturas</th><th style="text-align:center;">Hospitales</th><th class="money-header">Monto</th><th>Vence</th><th style="text-align:center;">Sin revisar</th></tr></thead>
+        <tbody>${fechasLote.map(fe => {
+          const l = lotes[fe];
+          const vence = new Date(new Date(fe).getTime() + 60*86400000).toISOString().split("T")[0];
+          const sr = l.filter(f => f.estado === "notificada").length;
+          return `<tr class="clickable ${fl.fecha === fe ? 'row-sel' : ''}" data-lote-notif="${fe}">
+            <td><strong>${fe}</strong></td>
+            <td style="text-align:center;">${l.length}</td>
+            <td style="text-align:center;">${new Set(l.map(f=>f.hospital)).size}</td>
+            <td class="money">${money(l.reduce((s,f)=>s+f.monto,0))}</td>
+            <td>${vence}</td>
+            <td style="text-align:center;">${sr>0?`<span class="chip chip-morosa">${sr}</span>`:'<span style="color:var(--success);">✓</span>'}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>
+      <div class="note note-blue" style="margin-top:12px;"><strong>Click en una notificación</strong> para filtrar el detalle de abajo por esa fecha.</div>
+    </div>
+    <div class="card">
+      <h3 class="card-title">Detalle de facturas notificadas</h3>
+      <div class="filter-bar">
+        ${selectHospitales(fl.hospital, 'data-filtro-notif="hospital"', hospitalesFin())}
+        ${selectGrupos(fl.estado, 'data-filtro-notif="estado"')}
+        <input data-filtro-notif="q" value="${fl.q}" placeholder="Buscar por N° o hospital…" style="min-width:220px;">
+        ${fl.fecha !== "TODOS" ? `<span class="chip chip-notificada">Notificación del ${fl.fecha}</span>` : ''}
+        ${(fl.hospital!=="TODOS"||fl.estado!=="TODOS"||fl.q||fl.fecha!=="TODOS") ? `<button class="btn btn-secondary btn-sm" data-filtro-notif-reset="1">Limpiar</button>` : ''}
+      </div>
+      <table>
+        <thead><tr><th>Notificada</th><th>Factura</th><th>Hospital</th><th>Emisión</th><th>Situación</th><th>Días</th><th class="money-header">Monto</th><th class="money-header">Saldo</th></tr></thead>
+        <tbody>${facts.length === 0 ? '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--muted);">Sin facturas para estos filtros.</td></tr>' :
+          facts.map(f => {
+            const dias = diasRestantes(f.fecha);
+            return `<tr class="clickable" data-open-fact-fin="${f.nro}">
+              <td><strong>${f.fecha}</strong></td>
+              <td><code>${f.nro}</code></td>
+              <td>${hospCorto(f.hospital)}</td>
+              <td style="color:var(--muted);">${f.fechaEmision}</td>
+              <td>${chip(f.estado)}</td>
+              <td style="color:${dias<0?'var(--danger)':dias<=15?'var(--warn)':'var(--muted)'};font-weight:600;">${dias}</td>
+              <td class="money">${money(f.monto)}</td>
+              <td class="money"><strong>${money(saldoPendiente(f))}</strong></td>
+            </tr>`;
+          }).join('')}</tbody>
+      </table>
+    </div>
   `;
 }
+window.exportNotificacionesFin = function() {
+  const fl = state.filtrosNotifFin;
+  const q = fl.q.trim().toLowerCase();
+  const facts = state.facturas.filter(f => f.financiador === "F001" && f.estado !== "en_cola")
+    .filter(f => fl.hospital === "TODOS" || f.hospital === fl.hospital)
+    .filter(f => fl.estado === "TODOS" || grupoDe(f.estado) === fl.estado)
+    .filter(f => fl.fecha === "TODOS" || f.fecha === fl.fecha)
+    .filter(f => !q || f.nro.toLowerCase().includes(q) || hospNombre(f.hospital).toLowerCase().includes(q))
+    .sort((a, b) => b.fecha.localeCompare(a.fecha));
+  const rows = [["Fecha de notificación","Factura","Hospital","Emisión","Estado","Días","Monto","Pagado","Saldo"]];
+  facts.forEach(f => rows.push([f.fecha, f.nro, hospNombre(f.hospital), f.fechaEmision, f.estado, diasRestantes(f.fecha), f.monto, f.montoPagado||0, saldoPendiente(f)]));
+  exportCSV("notificaciones_recibidas.csv", rows);
+};
+
+function facturasFinFiltradas() {
+  const fl = state.filtrosFactFin;
+  const q = fl.q.trim().toLowerCase();
+  return state.facturas.filter(f => f.financiador === "F001" && f.estado !== "en_cola")
+    .filter(f => fl.hospital === "TODOS" || f.hospital === fl.hospital)
+    .filter(f => fl.estado === "TODOS" || grupoDe(f.estado) === fl.estado)
+    .filter(f => fl.situacion === "TODOS" || situacionFactura(f) === fl.situacion)
+    .filter(f => !q || f.nro.toLowerCase().includes(q) || hospNombre(f.hospital).toLowerCase().includes(q))
+    .sort((a, b) => diasRestantes(a.fecha) - diasRestantes(b.fecha));
+}
+const LABEL_SITUACION = { TODOS: "Todas", por_vencer: "Por vencer (<15 días)", vencidas: "Vencidas (morosas)", vigente: "En plazo", cerrada: "Cerradas" };
 
 function viewFinanciador_Facturas() {
-  const facts = state.facturas.filter(f => f.financiador === "F001" && isImpaga(f));
+  const fl = state.filtrosFactFin;
+  const facts = facturasFinFiltradas();
+  const hayFiltro = fl.hospital !== "TODOS" || fl.estado !== "TODOS" || fl.situacion !== "TODOS" || fl.q;
   const porHospital = {};
-  facts.forEach(f => { if (!porHospital[f.hospital]) porHospital[f.hospital] = []; porHospital[f.hospital].push(f); });
+  facts.forEach(f => { (porHospital[f.hospital] = porHospital[f.hospital] || []).push(f); });
   return `
-    <div class="page-header"><div><h1>Facturas a revisar</h1><div class="sub">${facts.length} facturas activas</div></div>
-      <button class="btn btn-excel" onclick="exportFacturasFin()">⬇ Excel</button></div>
+    <div class="page-header">
+      <div><h1>Facturas a revisar</h1><div class="sub">${facts.length} factura(s) en vista${fl.situacion !== "TODOS" ? ` — ${LABEL_SITUACION[fl.situacion]}` : ''} — ordenadas por urgencia</div></div>
+      <button class="btn btn-excel" onclick="exportFacturasFin()">⬇ Excel</button>
+    </div>
+    <div class="card" style="padding:14px 16px;">
+      <div class="filter-bar" style="margin-bottom:0;">
+        ${selectHospitales(fl.hospital, 'data-filtro-fact="hospital"', hospitalesFin())}
+        ${selectGrupos(fl.estado, 'data-filtro-fact="estado"')}
+        <select data-filtro-fact="situacion">
+          ${Object.entries(LABEL_SITUACION).map(([k, v]) => `<option value="${k}" ${fl.situacion === k ? 'selected' : ''}>${k === "TODOS" ? "Todas las situaciones temporales" : v}</option>`).join('')}
+        </select>
+        <input data-filtro-fact="q" value="${fl.q}" placeholder="Buscar por N° o hospital…" style="min-width:200px;">
+        ${hayFiltro ? `<button class="btn btn-secondary btn-sm" data-filtro-fact-reset="1">Limpiar</button>` : ''}
+      </div>
+    </div>
     <div class="card" style="padding:0;">
-      ${Object.entries(porHospital).map(([hospId, fs]) => `
-        <div class="group-header"><span class="caret">▾</span><strong>${hospNombre(hospId)}</strong><span style="color:var(--muted);font-weight:400;">— ${fs.length}</span></div>
+      ${facts.length === 0 ? '<div style="padding:36px;text-align:center;color:var(--muted);">Sin facturas para estos filtros.</div>' :
+        Object.entries(porHospital).map(([hospId, fs]) => `
+        <div class="group-header"><span class="caret">▾</span><strong>${hospNombre(hospId)}</strong><span style="color:var(--muted);font-weight:400;">— ${fs.length} factura(s) · ${money(fs.reduce((s,f)=>s+saldoPendiente(f),0))} de saldo</span></div>
         <table>
-          <thead><tr><th>Factura</th><th>Emisión</th><th>Estado</th><th>Días</th><th class="money-header">Monto</th><th class="money-header">Saldo</th></tr></thead>
-          <tbody>${fs.map(f => `<tr class="clickable" data-open-fact-fin="${f.nro}">
-            <td><code>${f.nro}</code></td><td>${f.fecha}</td><td>${chip(f.estado)}</td><td>${diasRestantes(f.fecha)}</td>
+          <thead><tr><th>Factura</th><th>Notificada</th><th>Estado</th><th>Días</th><th class="money-header">Monto</th><th class="money-header">Saldo</th></tr></thead>
+          <tbody>${fs.map(f => {
+            const dias = diasRestantes(f.fecha);
+            return `<tr class="clickable" data-open-fact-fin="${f.nro}">
+            <td><code>${f.nro}</code></td><td>${f.fecha}</td><td>${chip(f.estado)}</td>
+            <td style="color:${dias<0?'var(--danger)':dias<=15?'var(--warn)':'var(--muted)'};font-weight:600;">${dias}</td>
             <td class="money">${money(f.monto)}</td><td class="money"><strong>${money(saldoPendiente(f))}</strong></td>
-          </tr>`).join('')}</tbody>
+          </tr>`;}).join('')}</tbody>
         </table>
       `).join('')}
     </div>
@@ -844,29 +1251,75 @@ function viewFinanciador_Facturas() {
 
 function viewFinanciador_DetalleFactura(nro) {
   const f = state.facturas.find(x => x.nro === nro); if (!f) return "No encontrada.";
-  const items = ITEMS_FACTURA[nro] || ITEMS_FACTURA["0001-00042189"];
+  const items = itemsDe(nro);
   const thread = state.threads[nro];
   const vence = new Date(new Date(f.fecha).getTime() + 60*86400000).toISOString().split("T")[0];
+  const fi = state.filtroItems;
+  const codigos = [...new Set(items.map(i => i.codigo))].sort();
+  const visibles = items.filter(i => (fi.codigo === "TODOS" || i.codigo === fi.codigo)
+    && (!fi.q || (i.paciente + " " + i.prestacion + " " + i.dni).toLowerCase().includes(fi.q.toLowerCase())));
+  const sel = state.selItems;
+  const selVisibles = visibles.filter(i => sel.includes(i.id));
+  const montoSel = items.filter(i => sel.includes(i.id)).reduce((s, i) => s + i.monto, 0);
+  const objetados = objecionesDe(f);
+  const idsObjetados = objetados.flatMap(o => o.items);
+  const pacientes = [...new Set(items.map(i => i.paciente))];
   return `
     <div class="breadcrumb"><a data-nav="panel_financiador">Panel</a> / <a data-nav="facturas_financiador">Facturas</a> / ${nro}</div>
-    <div class="page-header"><div><h1>Factura ${nro}</h1><div class="sub">${hospNombre(f.hospital)} — Emitida ${f.fecha} — Vence ${vence}</div></div><div>${chip(f.estado)}</div></div>
+    <div class="page-header">
+      <div><h1>Factura ${nro}</h1><div class="sub">${hospNombre(f.hospital)} — Notificada ${f.fecha} (emitida ${f.fechaEmision}) — Vence ${vence} — ${pacientes.length} paciente(s), ${items.length} prestación(es)</div></div>
+      <div style="text-align:right;">${chip(f.estado)}
+        <div class="page-actions" style="margin-top:8px;">
+          <button class="btn btn-excel btn-sm" onclick="exportFacturaCompleta('${nro}')">⬇ Descargar factura completa</button>
+        </div>
+      </div>
+    </div>
+    ${objetados.length ? `<div class="note"><strong>${idsObjetados.length} prestación(es) objetada(s)</strong> en ${objetados.length} planteo(s), por ${money(objetados.reduce((s,o)=>s+o.monto,0))}. Quedan marcadas en la tabla.</div>` : ''}
     <div class="two-col">
       <div>
         <div class="card">
-          <h3 class="card-title">Prestaciones facturadas</h3>
+          <h3 class="card-title">Prestaciones facturadas
+            <span style="font-size:12px;font-weight:400;color:var(--muted);">${visibles.length} de ${items.length} — ${money(visibles.reduce((s,i)=>s+i.monto,0))}</span>
+          </h3>
+          <div class="note note-blue">Para objetar el mismo problema en varias prestaciones (por ejemplo, un valor de nomenclador mal cobrado en 6 pacientes): filtrá por código, tildá <em>todas</em> en el encabezado y usá <strong>Objetar seleccionadas</strong>. No hace falta ir una por una.</div>
+          <div class="filter-bar">
+            <select data-filtro-item="codigo">
+              <option value="TODOS">Todos los códigos</option>
+              ${codigos.map(c => `<option value="${c}" ${fi.codigo === c ? 'selected' : ''}>${c} (${items.filter(i=>i.codigo===c).length})</option>`).join('')}
+            </select>
+            <input data-filtro-item="q" value="${fi.q}" placeholder="Buscar paciente o prestación…" style="min-width:200px;">
+            ${(fi.codigo !== "TODOS" || fi.q) ? `<button class="btn btn-secondary btn-sm" data-filtro-item-reset="1">Limpiar</button>` : ''}
+          </div>
+          ${sel.length ? `<div class="sel-bar">
+            <div><strong>${sel.length} prestación(es) seleccionada(s)</strong> — ${money(montoSel)}</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button class="btn btn-warn btn-sm" data-objetar-items="${nro}">✎ Objetar seleccionadas</button>
+              <button class="btn btn-secondary btn-sm" data-limpiar-sel="1">Limpiar selección</button>
+            </div>
+          </div>` : ''}
           <table class="items-table">
-            <thead><tr><th><input type="checkbox"></th><th>Paciente</th><th>Prestación</th><th>Código</th><th class="money-header">Monto</th></tr></thead>
-            <tbody>${items.map(it => `<tr>
-              <td><input type="checkbox"></td>
-              <td><div>${it.paciente}</div><div style="color:var(--muted);font-size:11px;">${it.afiliado}</div></td>
-              <td>${it.prestacion}</td><td><code>${it.codigo}</code></td><td class="money">${money(it.monto)}</td>
-            </tr>`).join('')}</tbody>
+            <thead><tr>
+              <th style="width:28px;"><input type="checkbox" data-sel-todos="1" ${visibles.length > 0 && selVisibles.length === visibles.length ? 'checked' : ''} title="Seleccionar todas las visibles"></th>
+              <th>Paciente</th><th>Prestación</th><th>Código</th><th>Fecha</th><th class="money-header">Monto</th><th></th>
+            </tr></thead>
+            <tbody>${visibles.length === 0 ? '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">Sin prestaciones para este filtro.</td></tr>' :
+              visibles.map(it => {
+                const obj = objetados.find(o => o.items.includes(it.id));
+                return `<tr class="${sel.includes(it.id) ? 'row-sel' : ''}">
+                <td><input type="checkbox" data-sel-item="${it.id}" ${sel.includes(it.id) ? 'checked' : ''}></td>
+                <td><div>${it.paciente} <span style="color:var(--muted);font-size:11px;">DNI ${it.dni}</span></div>
+                    <div style="color:var(--muted);font-size:11px;">${it.afiliado}</div>
+                    ${obj ? `<div style="margin-top:3px;"><span class="chip chip-esperando-hospital" title="${obj.detalle}">Objetada: ${obj.categoria}</span></div>` : ''}</td>
+                <td>${it.prestacion}</td><td><code>${it.codigo}</code></td><td style="color:var(--muted);">${it.fecha}</td>
+                <td class="money">${money(it.monto)}</td>
+                <td><button class="btn btn-secondary btn-sm" data-ver-paciente="${encodeURIComponent(it.paciente)}">Ver paciente</button></td>
+              </tr>`;}).join('')}</tbody>
           </table>
           <div class="actions-row">
             <button class="btn btn-success" id="btn-aceptar-total">✓ Aceptar factura</button>
-            <button class="btn btn-warn" id="btn-discutir">✎ Iniciar discusión</button>
-            <button class="btn btn-danger" id="btn-rechazar-parcial">Rechazar ítems</button>
-            <button class="btn btn-danger" id="btn-rechazar-total">Rechazar todo</button>
+            <button class="btn btn-warn" id="btn-discutir">✎ Iniciar discusión (factura completa)</button>
+            <button class="btn btn-danger" id="btn-rechazar-parcial">Rechazar prestaciones seleccionadas</button>
+            <button class="btn btn-danger" id="btn-rechazar-total">Rechazar factura completa</button>
           </div>
         </div>
         ${thread ? `<div class="card">
@@ -889,13 +1342,171 @@ function viewFinanciador_DetalleFactura(nro) {
         <div style="font-size:12.5px;line-height:1.9;">
           <div><span style="color:var(--muted);">Hospital:</span> ${hospNombre(f.hospital)}</div>
           <div><span style="color:var(--muted);">Monto:</span> <strong>${money(f.monto)}</strong></div>
+          ${f.montoPagado ? `<div><span style="color:var(--muted);">Pagado:</span> <strong style="color:var(--success);">${money(f.montoPagado)}</strong></div>` : ''}
+          ${f.notasCredito ? `<div><span style="color:var(--muted);">Notas de crédito:</span> <strong style="color:var(--purple);">${money(f.notasCredito)}</strong></div>` : ''}
           ${f.montoDebate ? `<div><span style="color:var(--muted);">En debate:</span> <strong style="color:var(--warn);">${money(f.montoDebate)}</strong></div>` : ''}
           <div><span style="color:var(--muted);">Saldo:</span> <strong>${money(saldoPendiente(f))}</strong></div>
         </div>
+      </div>
+      <div class="card">
+        <h3 class="card-title">Documentación y descargas</h3>
+        <div class="attachments">
+          <span class="attachment-chip">📎 factura_${nro}.pdf</span>
+          <span class="attachment-chip">📎 detalle_prestaciones.xlsx</span>
+          <span class="attachment-chip">📎 HCs_lote.zip</span>
+          <span class="attachment-chip">📎 autorizaciones.pdf</span>
+        </div>
+        <div class="actions-row">
+          <button class="btn btn-excel btn-sm" onclick="exportFacturaCompleta('${nro}')">⬇ Factura completa (CSV)</button>
+          <button class="btn btn-secondary btn-sm" onclick="showToast('📦 Descarga del paquete completo (simulada)')">⬇ Todo el respaldo (ZIP)</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;">El CSV incluye cabecera, todas las prestaciones con paciente y código, y el estado de objeción de cada una.</div>
       </div></div>
     </div>
   `;
 }
+/* Descarga completa de la factura: cabecera + prestaciones + estado de objeciones.
+   Es lo que el financiador necesita para cruzar contra su propio sistema. */
+window.exportFacturaCompleta = function(nro) {
+  const f = state.facturas.find(x => x.nro === nro); if (!f) return;
+  const items = itemsDe(nro);
+  const objs = objecionesDe(f);
+  const rows = [
+    ["FACTURA", f.nro], ["Hospital", hospNombre(f.hospital)], ["Financiador", finNombre(f.financiador)],
+    ["Fecha de emisión", f.fechaEmision], ["Fecha de notificación", f.fecha],
+    ["Vencimiento (60 días)", new Date(new Date(f.fecha).getTime() + 60*86400000).toISOString().split("T")[0]],
+    ["Días restantes", diasRestantes(f.fecha)], ["Estado", f.estado],
+    ["Monto", f.monto], ["Pagado", f.montoPagado||0], ["Notas de crédito", f.notasCredito||0],
+    ["Saldo", saldoPendiente(f)], ["En debate", f.montoDebate||0], [],
+    ["PRESTACIONES"],
+    ["Ítem","Paciente","DNI","N° afiliado","Prestación","Código","Fecha prestación","Monto","Objetada","Motivo de objeción"]
+  ];
+  items.forEach(it => {
+    const o = objs.find(x => x.items.includes(it.id));
+    rows.push([it.id, it.paciente, it.dni, it.afiliado, it.prestacion, it.codigo, it.fecha, it.monto, o ? "SÍ" : "NO", o ? o.categoria + " — " + o.detalle : ""]);
+  });
+  rows.push([], ["DOCUMENTACIÓN ADJUNTA"], ...DOCS_PACIENTE.map(d => [d, "(archivo simulado en el prototipo)"]));
+  exportCSV(`factura_${nro}_completa.csv`, rows);
+};
+
+/* Confirmación genérica: ninguna acción sobre la factura se ejecuta sin reconfirmar. */
+function confirmarAccion({ titulo, mensaje, detalle, textoBoton, clase = "btn-primary", onOk }) {
+  window.__onOkConfirm = onOk;
+  openModal(`<h3>${titulo}</h3>
+    <p class="subtle">${mensaje}</p>
+    ${detalle ? `<div class="note">${detalle}</div>` : ''}
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn ${clase}" onclick="(window.__onOkConfirm||function(){})()">${textoBoton}</button>
+    </div>`);
+}
+
+/* Vista de un paciente: su documentación y todas sus prestaciones en esta factura,
+   para poder objetar solo una de las tres cosas que le facturan. */
+function openModalPaciente(nro, paciente) {
+  const f = state.facturas.find(x => x.nro === nro); if (!f) return;
+  const items = itemsDe(nro).filter(i => i.paciente === paciente);
+  if (!items.length) return;
+  const objs = objecionesDe(f);
+  const p = items[0];
+  openModal(`<h3>${paciente}</h3>
+    <p class="subtle">DNI ${p.dni} · ${p.afiliado} · ${items.length} prestación(es) en la factura ${nro} por ${money(items.reduce((s,i)=>s+i.monto,0))}</p>
+    <label>Documentación de respaldo</label>
+    <div class="attachments">${DOCS_PACIENTE.map(d => `<span class="attachment-chip">📎 ${d.toLowerCase().replace(/ /g,'_')}_${p.dni.replace(/\D/g,'')}.pdf</span>`).join('')}</div>
+    <label>Prestaciones facturadas — tildá las que querés objetar</label>
+    <div id="pac-items">
+      ${items.map(it => {
+        const o = objs.find(x => x.items.includes(it.id));
+        return `<div class="paciente-item">
+          <input type="checkbox" class="pac-check" data-id="${it.id}" ${o ? 'disabled' : ''}>
+          <div style="flex:1;">
+            <div><strong>${it.prestacion}</strong> <code>${it.codigo}</code></div>
+            <div style="font-size:11px;color:var(--muted);">Fecha: ${it.fecha} · ${money(it.monto)}</div>
+            ${o ? `<div style="margin-top:4px;"><span class="chip chip-esperando-hospital">Ya objetada: ${o.categoria}</span></div>` : ''}
+          </div>
+          <div style="font-family:monospace;font-size:13px;">${money(it.monto)}</div>
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cerrar</button>
+      <button class="btn btn-warn" onclick="objetarDesdePaciente('${nro}')">Objetar tildadas →</button>
+    </div>`);
+  document.querySelectorAll('.pac-check').forEach(cb => cb.addEventListener('change', () =>
+    cb.closest('.paciente-item').classList.toggle('checked', cb.checked)));
+}
+window.objetarDesdePaciente = function(nro) {
+  const ids = [...document.querySelectorAll('.pac-check')].filter(c => c.checked).map(c => c.dataset.id);
+  if (!ids.length) { showToast("⚠ Tildá al menos una prestación"); return; }
+  state.selItems = [...new Set([...state.selItems, ...ids])];
+  openModalObjetarItems(nro);
+};
+
+const CATEGORIAS_OBJECION = [
+  "Diferencia en valor de nomenclador",
+  "Diferencia en código de prestación",
+  "Afiliado no vigente / no corresponde",
+  "Falta autorización previa",
+  "Prestación no cubierta por el plan",
+  "Documentación incompleta",
+  "Prestación duplicada",
+];
+
+function openModalObjetarItems(nro) {
+  const f = state.facturas.find(x => x.nro === nro); if (!f) return;
+  const items = itemsDe(nro).filter(i => state.selItems.includes(i.id));
+  if (!items.length) { showToast("⚠ No hay prestaciones seleccionadas"); return; }
+  const total = items.reduce((s, i) => s + i.monto, 0);
+  const pacientes = [...new Set(items.map(i => i.paciente))];
+  const codigos = [...new Set(items.map(i => i.codigo))];
+  openModal(`<h3>Objetar ${items.length} prestación(es)</h3>
+    <p class="subtle">Se aplica <strong>el mismo motivo</strong> a todas las prestaciones seleccionadas — ${pacientes.length} paciente(s), ${money(total)}.</p>
+    ${codigos.length === 1 ? `<div class="note note-blue">Todas comparten el código <code>${codigos[0]}</code>. Típico de un valor de nomenclador mal aplicado en lote.</div>` : ''}
+    <label>Prestaciones alcanzadas</label>
+    <div style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;">
+      <table style="font-size:12px;"><tbody>${items.map(i => `<tr>
+        <td>${i.paciente}</td><td>${i.prestacion}</td><td><code>${i.codigo}</code></td><td class="money">${money(i.monto)}</td>
+      </tr>`).join('')}</tbody></table>
+    </div>
+    <label>Motivo de la objeción</label>
+    <select id="obj-categoria">${CATEGORIAS_OBJECION.map(c => `<option>${c}</option>`).join('')}</select>
+    <label>Detalle / fundamento</label>
+    <textarea id="obj-detalle" placeholder="Ej: el código 420101 se facturó a $145.200 y según convenio vigente corresponde $118.400."></textarea>
+    <label>Monto objetado</label>
+    <input type="number" id="obj-monto" value="${total}">
+    <div style="font-size:11px;color:var(--muted);margin-top:4px;">Por defecto, el total de las prestaciones seleccionadas. Ajustalo si solo objetás la diferencia de valor.</div>
+    <label>Adjuntar respaldo</label><input type="file" multiple>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-warn" onclick="confirmarObjecionItems('${nro}')">Enviar objeción al hospital</button>
+    </div>`);
+}
+window.confirmarObjecionItems = function(nro) {
+  const f = state.facturas.find(x => x.nro === nro); if (!f) return;
+  const ids = [...state.selItems];
+  const items = itemsDe(nro).filter(i => ids.includes(i.id));
+  if (!items.length) { showToast("⚠ No hay prestaciones seleccionadas"); return; }
+  const categoria = $("#obj-categoria").value;
+  const detalle = $("#obj-detalle").value.trim() || "(sin detalle)";
+  const monto = Math.max(0, Number($("#obj-monto").value) || 0);
+  f.objeciones = [...objecionesDe(f), { id: "OBJ-" + (objecionesDe(f).length + 1), items: ids, categoria, detalle, monto, fecha: "2026-08-03" }];
+  f.montoDebate = objecionesDe(f).reduce((s, o) => s + o.monto, 0);
+  f.estado = "esperando_hospital";
+  const pacientes = [...new Set(items.map(i => i.paciente))];
+  if (!state.threads[nro]) state.threads[nro] = [];
+  state.threads[nro].push({
+    who: "financiador", nombre: "IOMA", when: "hoy",
+    text: `Objetamos ${items.length} prestación(es) de ${pacientes.length} paciente(s) por ${money(monto)}.`,
+    accion: { tipo: "Objeción por prestación", categorias: [categoria],
+      detalles: [detalle, ...items.slice(0, 6).map(i => `${i.paciente} — ${i.prestacion} (${i.codigo}) ${money(i.monto)}`),
+        ...(items.length > 6 ? [`…y ${items.length - 6} prestación(es) más`] : [])] },
+    adjuntos: []
+  });
+  state.selItems = [];
+  closeModal(); render();
+  showToast(`✎ Objeción enviada — ${items.length} prestación(es), ${money(monto)}`);
+};
+
 window.responderDiscFin = function(nro) {
   const f = state.facturas.find(x => x.nro === nro); if (f) f.estado = "esperando_hospital";
   state.threads[nro].push({ who: "financiador", nombre: "IOMA", when: "hoy", text: "(Respuesta, pidiendo más info)", accion: { tipo: "Solicitud de info", categorias: ["Pedido de doc"], detalles: [] }, adjuntos: [] });
@@ -924,9 +1535,34 @@ function viewFinanciador_Discusiones(subestado) {
 }
 
 function viewFinanciador_InformarPagos() {
-  return `<div class="page-header"><div><h1>Informar pago</h1></div><button class="btn btn-primary" id="btn-nuevo-pago">+ Nuevo pago</button></div>
-    <div class="card"><table><thead><tr><th>Fecha</th><th>Comprobante</th><th>Facturas</th><th>Tipo</th><th class="money-header">Monto</th><th>Estado</th></tr></thead>
-      <tbody><tr><td>28/07/2026</td><td><code>TRF-889021</code></td><td>1 factura</td><td>Total</td><td class="money">${money(890400)}</td><td>${chip("pago_informado")}</td></tr></tbody></table></div>`;
+  const pagos = state.pagosInformados.filter(p => p.financiador === "F001");
+  return `<div class="page-header">
+      <div><h1>Informar pago</h1><div class="sub">Cada pago se imputa a facturas concretas de un único hospital</div></div>
+      <button class="btn btn-primary" id="btn-nuevo-pago">+ Nuevo pago</button>
+    </div>
+    <div class="note note-blue"><strong>Un pago no puede cruzar hospitales.</strong> Puede cubrir varias facturas, pero todas del mismo hospital — así queda registrado, factura por factura, cuál se canceló y cuál quedó con saldo.</div>
+    <div class="card">
+      ${pagos.length === 0 ? '<div style="color:var(--muted);padding:24px;text-align:center;">Todavía no informaste pagos.</div>' :
+        pagos.map(p => `<div style="border:1px solid var(--border);border-radius:6px;padding:14px;margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+            <div>
+              <div><strong>${hospCorto(p.hospital)}</strong> <span style="color:var(--muted);font-size:12px;">— ${p.fecha} · <code>${p.comprobante}</code></span></div>
+              <div style="font-size:12px;color:var(--muted);margin-top:2px;">${p.facturas.length} factura(s) imputada(s) · Pago ${p.tipo}</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-family:monospace;font-size:16px;font-weight:700;">${money(p.monto)}</div>
+              <div>${p.estado === "confirmado" ? '<span class="chip chip-pagada">Confirmado</span>' : chip("pago_informado")}</div>
+            </div>
+          </div>
+          <table style="margin-top:10px;font-size:12.5px;">
+            <thead><tr><th>Factura</th><th>Estado actual</th><th class="money-header">Imputado</th><th class="money-header">Saldo restante</th></tr></thead>
+            <tbody>${(p.imputaciones || p.facturas.map(nro => ({ nro, monto: p.monto }))).map(i => {
+              const f = state.facturas.find(x => x.nro === i.nro);
+              return `<tr><td><code>${i.nro}</code></td><td>${f ? chip(f.estado) : '—'}</td><td class="money">${money(i.monto)}</td><td class="money">${f ? money(saldoPendiente(f)) : '—'}</td></tr>`;
+            }).join('')}</tbody>
+          </table>
+        </div>`).join('')}
+    </div>`;
 }
 function viewFinanciador_Historial() {
   const cerradas = state.facturas.filter(f => f.financiador === "F001" && f.estado === "cerrada");
@@ -1198,35 +1834,141 @@ window.exportMinDiscusiones = function() {
 };
 function viewMinisterio_Morosidad() {
   const m = state.facturas.filter(f => f.estado === "morosa");
-  const totalMonto = m.reduce((s,f)=>s+f.monto,0);
+  const totalSaldo = m.reduce((s,f)=>s+saldoPendiente(f),0);
   const porFin = {};
-  m.forEach(f => { porFin[f.financiador] = (porFin[f.financiador]||0) + f.monto; });
+  m.forEach(f => { porFin[f.financiador] = (porFin[f.financiador]||0) + saldoPendiente(f); });
+  const parciales = m.filter(f => (f.montoPagado||0) > 0 || (f.notasCredito||0) > 0).length;
   return `<div class="page-header">
-      <div><h1>Morosidad → Legales</h1><div class="sub">Facturas vencidas (más de 60 días desde emisión sin pago)</div></div>
+      <div><h1>Morosidad → Legales</h1><div class="sub">Facturas con saldo pendiente al día 60 desde la notificación</div></div>
       <div class="page-actions">
         <button class="btn btn-excel" onclick="exportMinMorosidad()">⬇ Excel</button>
-        <button class="btn btn-danger">Derivar seleccionadas a legales</button>
+        <button class="btn btn-secondary" data-goto="expedientes">Ver expedientes →</button>
       </div>
     </div>
+    <div class="note"><strong>Regla:</strong> al día 60 se evalúa el saldo (monto notificado − pagos imputados − notas de crédito). Si el saldo es 0 la factura se cierra; si queda saldo, cae en mora <em>por ese saldo</em>. El reloj es único por factura: los pagos parciales no lo renuevan.</div>
+    <div class="decision-abierta" style="margin-bottom:16px;"><strong>D7 — a definir:</strong> cuando el saldo se cancela con una nota de crédito, falta decidir si la factura va a <em>“Factura cerrada”</em> (como hace hoy el prototipo) o a un estado propio de <em>“Cierre por nota de crédito”</em>.</div>
     <div class="kpi-grid">
-      <div class="kpi action-required"><div class="label">Facturas morosas</div><div class="value danger">${m.length}</div></div>
-      <div class="kpi action-required"><div class="label">Monto total vencido</div><div class="value money danger">${money(totalMonto)}</div></div>
+      <div class="kpi action-required"><div class="label">Facturas morosas</div><div class="value danger">${m.length}</div><div class="hint">${parciales} con pago parcial o NC</div></div>
+      <div class="kpi action-required"><div class="label">Saldo moroso total</div><div class="value money danger">${money(totalSaldo)}</div><div class="hint">${jus(totalSaldo).toFixed(1)} JUS</div></div>
       <div class="kpi"><div class="label">Financiadores con mora</div><div class="value">${Object.keys(porFin).length}</div></div>
     </div>
-    <div class="card" style="padding:0;"><table>
-      <thead><tr><th><input type="checkbox"></th><th>Factura</th><th>Hospital</th><th>Financiador</th><th>Emisión</th><th>Vencida hace</th><th class="money-header">Monto</th></tr></thead>
-      <tbody>${m.map(f => `<tr><td><input type="checkbox"></td><td><code>${f.nro}</code></td><td>${hospCorto(f.hospital)}</td><td>${finNombre(f.financiador)}</td><td>${f.fecha}</td><td style="color:var(--danger);font-weight:600;">${Math.abs(diasRestantes(f.fecha))} días</td><td class="money">${money(f.monto)}</td></tr>`).join('')}</tbody>
+    ${viewParesJus(acumuladoPorPar(), true)}
+    <div class="card" style="padding:0;">
+      <div class="group-header"><strong>Detalle de facturas morosas</strong></div>
+      <table>
+      <thead><tr><th>Factura</th><th>Hospital</th><th>Financiador</th><th>Emisión</th><th>Vencida hace</th><th class="money-header">Monto</th><th class="money-header">Pagado</th><th class="money-header">NC</th><th class="money-header">Saldo moroso</th><th>Expediente</th></tr></thead>
+      <tbody>${m.map(f => `<tr><td><code>${f.nro}</code>${marcaPagoPendiente(f.nro)}</td><td>${hospCorto(f.hospital)}</td><td>${finNombre(f.financiador)}</td><td>${f.fecha}</td><td style="color:var(--danger);font-weight:600;">${Math.abs(diasRestantes(f.fecha))} días</td><td class="money">${money(f.monto)}</td><td class="money" style="color:${(f.montoPagado||0)>0?'var(--success)':'var(--muted)'};">${(f.montoPagado||0)>0?money(f.montoPagado):'—'}</td><td class="money" style="color:${(f.notasCredito||0)>0?'var(--purple)':'var(--muted)'};">${(f.notasCredito||0)>0?money(f.notasCredito):'—'}</td><td class="money" style="color:var(--danger);font-weight:700;">${money(saldoPendiente(f))}</td><td>${f.expediente ? `<span class="exp-gdeba">${f.expediente}</span>` : '<span style="color:var(--muted);font-size:12px;">En acumulador</span>'}</td></tr>`).join('')}</tbody>
     </table></div>`;
 }
+
+/* Indicador de morosidad acumulada por par vs. umbral de 6 JUS (brief 3.4).
+   Compartido entre Ministerio (con acción de generar expediente) y Hospital (solo lectura). */
+function viewParesJus(pares, conAccion) {
+  const habilitados = pares.filter(p => p.habilitado).length;
+  return `<div class="card">
+    <h3 class="card-title">Acumulado de morosidad por par vs. umbral de ${UMBRAL_JUS} JUS
+      <span style="font-size:12px;font-weight:400;color:var(--muted);">1 JUS = ${money(JUS)} · umbral = ${money(UMBRAL_MONTO)}</span>
+    </h3>
+    <div class="note"><strong>Solo se puede abrir expediente cuando la deuda morosa acumulada del par supera ${UMBRAL_JUS} JUS.</strong>
+      Al generar el expediente, esas facturas salen del acumulador y el par vuelve a cero para la próxima tanda — por eso un mismo par puede terminar con varios expedientes.</div>
+    ${pares.length === 0 ? `<div style="color:var(--muted);padding:20px;text-align:center;">Ningún par con morosidad pendiente de judicializar.</div>` : `
+    <table>
+      <thead><tr><th>Hospital</th><th>Financiador</th><th style="text-align:center;">Facturas</th><th class="money-header">Saldo moroso acumulado</th><th>Avance hacia ${UMBRAL_JUS} JUS</th><th style="text-align:center;">Estado</th><th style="text-align:center;">Exp. previos</th>${conAccion ? '<th></th>' : ''}</tr></thead>
+      <tbody>${pares.map(p => `<tr>
+        <td><strong>${hospCorto(p.hospital)}</strong></td>
+        <td>${finNombre(p.financiador)}</td>
+        <td style="text-align:center;">${p.facturas.length}</td>
+        <td class="money" style="font-weight:700;color:${p.habilitado?'var(--danger)':'var(--text)'};">${money(p.monto)}</td>
+        <td><div style="font-size:11px;color:var(--muted);">${p.jus.toFixed(2)} / ${UMBRAL_JUS} JUS</div>${barraJus(p.monto)}</td>
+        <td style="text-align:center;">${etiquetaJus(p)}</td>
+        <td style="text-align:center;">${p.previos > 0 ? `<span class="chip chip-pago-parcial">${p.previos}</span>` : '—'}</td>
+        ${conAccion ? `<td style="text-align:right;">${p.habilitado
+          ? `<button class="btn btn-danger btn-sm" data-gen-exp="${p.hospital}:${p.financiador}">Generar expediente →</button>`
+          : `<span style="font-size:11px;color:var(--muted);">No habilitado</span>`}</td>` : ''}
+      </tr>`).join('')}</tbody>
+    </table>
+    ${conAccion && habilitados > 0 ? `<div class="note" style="margin-top:12px;"><strong>${habilitados} par(es) habilitado(s)</strong> para abrir expediente. La apertura <strong>no es automática</strong>: la decide Legales.</div>` : ''}`}
+  </div>`;
+}
+/* ---- Sub-proceso de judicialización (brief 3.3) ---- */
+function viewMinisterio_Expedientes() {
+  const exps = state.expedientes;
+  const pares = acumuladoPorPar();
+  const habilitados = pares.filter(p => p.habilitado);
+  const sinGDEBA = exps.filter(e => !e.nroGDEBA);
+  const montoTotal = exps.reduce((s,e)=>s+e.monto,0);
+  return `<div class="page-header">
+      <div><h1>Expedientes judiciales</h1><div class="sub">Morosidad acumulada por par derivada a Legales — un expediente por tanda</div></div>
+      <button class="btn btn-excel" onclick="exportMinExpedientes()">⬇ Excel</button>
+    </div>
+    ${habilitados.length > 0 ? `<div class="action-required-banner">
+      <div><strong>⚠ ${habilitados.length} par(es) superan ${UMBRAL_JUS} JUS</strong> — habilitados para abrir un expediente nuevo.</div>
+      <button class="btn btn-danger btn-sm" data-goto="morosidad">Ver acumulador →</button>
+    </div>` : ""}
+    ${sinGDEBA.length > 0 ? `<div class="action-required-banner" style="background:var(--warn-soft);border-color:#e0c977;">
+      <div><strong style="color:var(--warn);">${sinGDEBA.length} expediente(s) sin N° GDEBA</strong> — Legales debe registrar el número para cerrar la trazabilidad.</div>
+    </div>` : ""}
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">Expedientes abiertos</div><div class="value">${exps.length}</div></div>
+      <div class="kpi"><div class="label">Monto judicializado</div><div class="value money">${money(montoTotal)}</div><div class="hint">${jus(montoTotal).toFixed(1)} JUS</div></div>
+      <div class="kpi ${sinGDEBA.length>0?'warning':'good'}"><div class="label">Sin N° GDEBA</div><div class="value ${sinGDEBA.length>0?'warn':'success'}">${sinGDEBA.length}</div></div>
+      <div class="kpi ${habilitados.length>0?'action-required':''}"><div class="label">Pares habilitados</div><div class="value ${habilitados.length>0?'danger':''}">${habilitados.length}</div><div class="hint">Superan ${UMBRAL_JUS} JUS</div></div>
+    </div>
+    ${viewParesJus(pares, true)}
+    <div class="card">
+      <h3 class="card-title">Expedientes generados</h3>
+      ${exps.length === 0 ? `<div style="color:var(--muted);padding:24px;text-align:center;">Todavía no se generó ningún expediente.</div>` :
+        exps.map(e => {
+          const facts = e.facturas.map(nro => state.facturas.find(x => x.nro === nro)).filter(Boolean);
+          const nOrden = expedientesDelPar(e.hospital, e.financiador).findIndex(x => x.id === e.id) + 1;
+          return `<div class="exp-card ${e.nroGDEBA ? 'presentado' : 'pendiente'}">
+            <div class="exp-head">
+              <div>
+                <div style="font-size:15px;font-weight:600;">${e.id}
+                  <span style="font-weight:400;color:var(--muted);font-size:13px;">— ${hospCorto(e.hospital)} · ${finNombre(e.financiador)}</span>
+                </div>
+                <div style="font-size:12px;color:var(--muted);margin-top:3px;">
+                  Expediente N° ${nOrden} de este par · Generado el ${e.fecha} · ${e.facturas.length} factura(s) de la tanda
+                </div>
+                <div style="margin-top:8px;">${e.nroGDEBA
+                  ? `<span class="exp-gdeba">GDEBA ${e.nroGDEBA}</span> <span style="font-size:11px;color:var(--muted);">carga ${e.cargaGDEBA}</span>`
+                  : `<span class="chip chip-por-vencer">Pendiente de N° GDEBA</span>`}</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-family:monospace;font-size:18px;font-weight:700;color:var(--danger);">${money(e.monto)}</div>
+                <div style="font-size:11px;color:var(--muted);">${jus(e.monto).toFixed(2)} JUS</div>
+              </div>
+            </div>
+            <table style="margin-top:12px;">
+              <thead><tr><th>Factura</th><th>Emisión</th><th class="money-header">Saldo reclamado</th><th>Vencida hace</th></tr></thead>
+              <tbody>${facts.map(f => `<tr><td><code>${f.nro}</code></td><td>${f.fecha}</td><td class="money">${money(saldoPendiente(f))}</td><td style="color:var(--danger);">${Math.abs(diasRestantes(f.fecha))} días</td></tr>`).join('')}</tbody>
+            </table>
+            <div class="actions-row">
+              <button class="btn btn-secondary btn-sm" data-ver-paquete="${e.id}">📄 Ver paquete judicial</button>
+              ${e.nroGDEBA
+                ? `<button class="btn btn-secondary btn-sm" data-gdeba="${e.id}">Editar N° GDEBA</button>`
+                : `<button class="btn btn-primary btn-sm" data-gdeba="${e.id}">Registrar N° GDEBA</button>`}
+            </div>
+          </div>`;
+        }).join('')}
+    </div>`;
+}
+window.exportMinExpedientes = function() {
+  const rows = [["Expediente","Hospital","Financiador","Fecha","Facturas","Monto reclamado","JUS","N° GDEBA","Carga GDEBA"]];
+  state.expedientes.forEach(e => rows.push([e.id, hospNombre(e.hospital), finNombre(e.financiador), e.fecha, e.facturas.join(" | "), e.monto, jus(e.monto).toFixed(2), e.nroGDEBA || "(pendiente)", e.cargaGDEBA || "—"]));
+  exportCSV("expedientes_judiciales.csv", rows);
+};
+
 window.exportMinMorosidad = function() {
   const m = state.facturas.filter(f => f.estado === "morosa");
-  const rows = [["Factura","Hospital","Financiador","Emisión","Vencida hace (días)","Monto"]];
-  m.forEach(f => rows.push([f.nro, hospNombre(f.hospital), finNombre(f.financiador), f.fecha, Math.abs(diasRestantes(f.fecha)), f.monto]));
+  const rows = [["Factura","Hospital","Financiador","Emisión","Vencida hace (días)","Monto","Pagado","Notas de crédito","Saldo moroso"]];
+  m.forEach(f => rows.push([f.nro, hospNombre(f.hospital), finNombre(f.financiador), f.fecha, Math.abs(diasRestantes(f.fecha)), f.monto, f.montoPagado||0, f.notasCredito||0, saldoPendiente(f)]));
   exportCSV("morosidad_legales.csv", rows);
 };
 
 /* ========================================================= ROUTER ========================================================= */
 function render() {
+  evaluarVencimientos();
   renderSidebar();
   const main = $("#main"); const role = state.role; const view = state.view;
   let html = "";
@@ -1236,6 +1978,7 @@ function render() {
     else if (view === "notificadas") html = viewMinisterio_Notificadas();
     else if (view === "discusiones") html = viewMinisterio_Discusiones();
     else if (view === "morosidad") html = viewMinisterio_Morosidad();
+    else if (view === "expedientes") html = viewMinisterio_Expedientes();
     else if (view === "min_detalle_fin") html = viewMinisterio_DetalleActor("financiador", state.context.actor);
     else if (view === "min_detalle_hosp") html = viewMinisterio_DetalleActor("hospital", state.context.actor);
   } else if (role === "hospital") {
@@ -1246,6 +1989,7 @@ function render() {
     else if (view === "discusiones_hospital" || view === "disc_h_esperan_yo") html = viewHospital_Discusiones("yo");
     else if (view === "disc_h_esperan_fin") html = viewHospital_Discusiones("fin");
     else if (view === "pagos_hospital") html = viewHospital_Pagos();
+    else if (view === "morosidad_hospital") html = viewHospital_Morosidad();
     else if (view === "cerradas_hospital") html = viewHospital_Cerradas();
   } else if (role === "financiador") {
     if (view === "panel_financiador") html = viewFinanciador_Panel();
@@ -1266,9 +2010,29 @@ function render() {
   </div></div>`;
   main.innerHTML = html;
   wireEvents();
+  // Devuelve el foco al campo de búsqueda que disparó el re-render, con el cursor al final.
+  if (state.focusSel) {
+    const el = document.querySelector(state.focusSel);
+    state.focusSel = null;
+    if (el) { el.focus(); const v = el.value; el.value = ""; el.value = v; }
+  }
 }
 
 /* ========================================================= EVENTS + MODALES ========================================================= */
+/* Conecta un grupo de filtros a su objeto en `state`. Los selects reaccionan al cambio;
+   los campos de texto filtran mientras se escribe y recuperan el foco tras el re-render. */
+function wireFiltros(sel, dsKey, stateKey) {
+  document.querySelectorAll(sel).forEach(el => {
+    const campo = el.dataset[dsKey];
+    const esTexto = el.tagName === "INPUT";
+    el.addEventListener(esTexto ? 'input' : 'change', () => {
+      state[stateKey][campo] = el.value;
+      if (esTexto) state.focusSel = `${sel.slice(0, -1)}="${campo}"]`;
+      render();
+    });
+  });
+}
+
 function wireEvents() {
   document.querySelectorAll('[data-nav]').forEach(el => el.addEventListener('click', (e) => { e.preventDefault(); state.view = el.dataset.nav; state.context = {}; render(); }));
   document.querySelectorAll('[data-goto]').forEach(el => el.addEventListener('click', (e) => { e.preventDefault(); state.view = el.dataset.goto; render(); }));
@@ -1277,18 +2041,109 @@ function wireEvents() {
   document.querySelectorAll('[data-min-fin]').forEach(el => el.addEventListener('click', () => { state.view = "min_detalle_fin"; state.context.actor = el.dataset.minFin; render(); }));
   document.querySelectorAll('[data-min-hosp]').forEach(el => el.addEventListener('click', () => { state.view = "min_detalle_hosp"; state.context.actor = el.dataset.minHosp; render(); }));
   document.querySelectorAll('[data-open-notif]').forEach(el => el.addEventListener('click', () => { state.view = "facturas_financiador"; render(); }));
-  document.querySelectorAll('[data-open-fact-fin]').forEach(el => el.addEventListener('click', () => { state.view = "detalle_factura"; state.context.factura = el.dataset.openFactFin; render(); }));
+  document.querySelectorAll('[data-open-fact-fin]').forEach(el => el.addEventListener('click', () => {
+    const nro = el.dataset.openFactFin;
+    // Al cambiar de factura se descarta la selección de prestaciones de la anterior.
+    if (state.context.factura !== nro) { state.selItems = []; state.filtroItems = { codigo: "TODOS", q: "" }; }
+    state.view = "detalle_factura"; state.context.factura = nro; render();
+  }));
   document.querySelectorAll('[data-open-fact-hosp]').forEach(el => el.addEventListener('click', () => { state.view = "detalle_factura_hosp"; state.context.factura = el.dataset.openFactHosp; render(); }));
   const bN = $("#btn-notificar"); if (bN) bN.addEventListener('click', () => openModalNotificar());
-  const bA = $("#btn-aceptar-total"); if (bA) bA.addEventListener('click', () => { const f = state.facturas.find(x => x.nro === state.context.factura); if (f) f.estado = "aceptada"; render(); showToast("✓ Aceptada"); });
+  // Toda acción sobre la factura pasa por una confirmación explícita.
+  const factActual = () => state.facturas.find(x => x.nro === state.context.factura);
+  const bA = $("#btn-aceptar-total"); if (bA) bA.addEventListener('click', () => {
+    const f = factActual(); if (!f) return;
+    confirmarAccion({ titulo: "Aceptar la factura completa", clase: "btn-success", textoBoton: "Sí, aceptar factura",
+      mensaje: `Vas a aceptar la factura ${f.nro} de ${hospNombre(f.hospital)} por ${money(f.monto)}.`,
+      detalle: "Aceptar implica reconocer la deuda por el total facturado. El plazo de 60 días sigue corriendo hasta que se cancele el saldo.",
+      onOk: () => { f.estado = "aceptada"; closeModal(); render(); showToast("✓ Factura aceptada"); } });
+  });
   const bD = $("#btn-discutir"); if (bD) bD.addEventListener('click', () => openModalDiscutirFin());
-  const bRP = $("#btn-rechazar-parcial"); if (bRP) bRP.addEventListener('click', () => { const f = state.facturas.find(x => x.nro === state.context.factura); if (f) f.estado = "rechazada_parcial"; render(); });
-  const bRT = $("#btn-rechazar-total"); if (bRT) bRT.addEventListener('click', () => { const f = state.facturas.find(x => x.nro === state.context.factura); if (f) f.estado = "rechazada_total"; render(); });
+  const bRP = $("#btn-rechazar-parcial"); if (bRP) bRP.addEventListener('click', () => {
+    const f = factActual(); if (!f) return;
+    const items = itemsDe(f.nro).filter(i => state.selItems.includes(i.id));
+    if (!items.length) { showToast("⚠ Seleccioná primero las prestaciones a rechazar"); return; }
+    const total = items.reduce((s, i) => s + i.monto, 0);
+    confirmarAccion({ titulo: "Rechazar prestaciones seleccionadas", clase: "btn-danger", textoBoton: "Sí, rechazar seleccionadas",
+      mensaje: `Vas a rechazar ${items.length} prestación(es) por ${money(total)} de la factura ${f.nro}.`,
+      detalle: "El hospital podrá presentar descargo. Si preferís plantearlo como objeción con motivo y respaldo, usá <strong>Objetar seleccionadas</strong>.",
+      onOk: () => { f.estado = "rechazada_parcial"; f.montoDebate = total; closeModal(); render(); showToast(`Rechazo parcial — ${money(total)}`); } });
+  });
+  const bRT = $("#btn-rechazar-total"); if (bRT) bRT.addEventListener('click', () => {
+    const f = factActual(); if (!f) return;
+    confirmarAccion({ titulo: "Rechazar la factura completa", clase: "btn-danger", textoBoton: "Sí, rechazar todo",
+      mensaje: `Vas a rechazar íntegramente la factura ${f.nro} por ${money(f.monto)}.`,
+      detalle: "Es la acción más drástica: se rechaza el total facturado, no una prestación puntual. Verificá que no corresponda una objeción parcial.",
+      onOk: () => { f.estado = "rechazada_total"; closeModal(); render(); showToast("Factura rechazada en su totalidad"); } });
+  });
+  /* ---- Filtros del panel del financiador ---- */
+  document.querySelectorAll('[data-filtro-panel]').forEach(el => el.addEventListener('change', () => {
+    state.filtrosPanelFin[el.dataset.filtroPanel] = el.value; render();
+  }));
+  const fpr = document.querySelector('[data-filtro-panel-reset]');
+  if (fpr) fpr.addEventListener('click', () => { state.filtrosPanelFin = { hospital: "TODOS", periodo: "TODOS" }; render(); });
+  // Las tarjetas de por vencer / vencidas llevan al listado ya filtrado por esa situación.
+  document.querySelectorAll('[data-ir-facturas]').forEach(el => el.addEventListener('click', () => {
+    state.filtrosFactFin = { hospital: state.filtrosPanelFin.hospital, estado: "TODOS", situacion: el.dataset.irFacturas, q: "" };
+    state.view = "facturas_financiador"; render();
+  }));
+  /* ---- Filtros de notificaciones y de facturas ---- */
+  wireFiltros('[data-filtro-notif]', 'filtroNotif', 'filtrosNotifFin');
+  const fnr = document.querySelector('[data-filtro-notif-reset]');
+  if (fnr) fnr.addEventListener('click', () => { state.filtrosNotifFin = { hospital: "TODOS", estado: "TODOS", q: "", fecha: "TODOS" }; render(); });
+  // Click en un lote: filtra el detalle por esa notificación consolidada (y destilda si ya estaba activo).
+  document.querySelectorAll('[data-lote-notif]').forEach(el => el.addEventListener('click', () => {
+    const fe = el.dataset.loteNotif;
+    state.filtrosNotifFin.fecha = state.filtrosNotifFin.fecha === fe ? "TODOS" : fe;
+    render();
+  }));
+  wireFiltros('[data-filtro-fact]', 'filtroFact', 'filtrosFactFin');
+  const ffr = document.querySelector('[data-filtro-fact-reset]');
+  if (ffr) ffr.addEventListener('click', () => { state.filtrosFactFin = { hospital: "TODOS", estado: "TODOS", situacion: "TODOS", q: "" }; render(); });
+  /* ---- Selección y filtrado de prestaciones dentro de la factura ---- */
+  wireFiltros('[data-filtro-item]', 'filtroItem', 'filtroItems');
+  const fir = document.querySelector('[data-filtro-item-reset]');
+  if (fir) fir.addEventListener('click', () => { state.filtroItems = { codigo: "TODOS", q: "" }; render(); });
+  document.querySelectorAll('[data-sel-item]').forEach(el => el.addEventListener('change', () => {
+    const id = el.dataset.selItem;
+    state.selItems = el.checked ? [...new Set([...state.selItems, id])] : state.selItems.filter(x => x !== id);
+    render();
+  }));
+  const selTodos = document.querySelector('[data-sel-todos]');
+  if (selTodos) selTodos.addEventListener('change', () => {
+    const visibles = [...document.querySelectorAll('[data-sel-item]')].map(c => c.dataset.selItem);
+    state.selItems = selTodos.checked
+      ? [...new Set([...state.selItems, ...visibles])]
+      : state.selItems.filter(x => !visibles.includes(x));
+    render();
+  });
+  const limpiarSel = document.querySelector('[data-limpiar-sel]');
+  if (limpiarSel) limpiarSel.addEventListener('click', () => { state.selItems = []; render(); });
+  document.querySelectorAll('[data-objetar-items]').forEach(el => el.addEventListener('click', () => openModalObjetarItems(el.dataset.objetarItems)));
+  document.querySelectorAll('[data-ver-paciente]').forEach(el => el.addEventListener('click', (e) => {
+    e.stopPropagation(); openModalPaciente(state.context.factura, decodeURIComponent(el.dataset.verPaciente));
+  }));
   const bNP = $("#btn-nuevo-pago"); if (bNP) bNP.addEventListener('click', () => openModalNuevoPago());
+  document.querySelectorAll('[data-gen-exp]').forEach(el => el.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const [hospId, finId] = el.dataset.genExp.split(":");
+    openModalPaqueteJudicial(hospId, finId);
+  }));
+  document.querySelectorAll('[data-gdeba]').forEach(el => el.addEventListener('click', () => openModalGDEBA(el.dataset.gdeba)));
+  document.querySelectorAll('[data-ver-paquete]').forEach(el => el.addEventListener('click', () => openModalVerPaquete(el.dataset.verPaquete)));
   document.querySelectorAll('[data-confirmar-pago]').forEach(el => el.addEventListener('click', () => {
     const id = el.dataset.confirmarPago; const p = state.pagosInformados.find(x => x.id === id);
-    if (p) { p.estado = "confirmado"; p.facturas.forEach(nro => { const f = state.facturas.find(x => x.nro === nro); if (f) f.estado = "cerrada"; }); }
-    render(); showToast("✓ Pago confirmado — factura cerrada");
+    if (p) {
+      p.estado = "confirmado";
+      // Se imputa factura por factura según lo declarado por el financiador (brief 3.1).
+      const imputaciones = p.imputaciones || p.facturas.map(nro => ({ nro, monto: p.monto }));
+      imputaciones.forEach(i => {
+        const f = state.facturas.find(x => x.nro === i.nro); if (!f) return;
+        f.montoPagado = (f.montoPagado||0) + Math.min(i.monto, saldoPendiente(f));
+        f.estado = saldoPendiente(f) <= 0 ? "cerrada" : "pago_parcial";
+      });
+    }
+    render(); showToast("✓ Pago confirmado — imputado a las facturas");
   }));
 }
 
@@ -1442,14 +2297,222 @@ window.confirmarDescargoHosp = function() {
   closeModal(); render(); showToast("Descargo enviado — el financiador debe revisar");
 };
 
+/* MODAL INFORMAR PAGO — imputación a facturas concretas de UN SOLO hospital (brief 3.1) */
 function openModalNuevoPago() {
+  const hospitales = [...new Set(state.facturas
+    .filter(f => f.financiador === "F001" && isImpaga(f) && f.estado !== "en_cola")
+    .map(f => f.hospital))];
   openModal(`<h3>Informar nuevo pago</h3>
-    <label>Tipo</label><select><option>Total</option><option>Parcial</option></select>
-    <label>Monto</label><input placeholder="$ 0">
-    <label>Fecha</label><input type="date" value="2026-08-03">
-    <label>Referencia</label><input placeholder="TRF-...">
-    <label>Comprobante</label><input type="file">
-    <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="closeModal(); showToast('Pago informado')">Informar</button></div>`);
+    <p class="subtle">El pago se imputa a una o varias facturas concretas. Un mismo pago <strong>no puede cruzar hospitales</strong>: elegí primero el hospital y después las facturas.</p>
+    <label>Hospital destinatario</label>
+    <select id="pago-hospital" onchange="renderFacturasPago()">
+      ${hospitales.map(h => `<option value="${h}">${hospNombre(h)}</option>`).join('')}
+    </select>
+    <div class="note note-blue" style="margin-top:10px;">Solo se listan facturas impagas de este hospital. Para pagar facturas de otro hospital, informá un pago separado.</div>
+    <label>Facturas a imputar</label>
+    <div class="cat-list" id="pago-facturas"></div>
+    <div id="pago-resumen" style="background:#fafbfc;border-radius:6px;padding:10px 12px;margin-top:10px;font-size:13px;"></div>
+    <label>Monto total transferido</label><input type="number" id="pago-monto" placeholder="0" oninput="recalcPago()">
+    <label>Fecha</label><input type="date" id="pago-fecha" value="2026-08-03">
+    <label>Referencia / comprobante</label><input id="pago-ref" placeholder="TRF-...">
+    <label>Adjuntar comprobante</label><input type="file">
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarNuevoPago()">Informar pago</button>
+    </div>`);
+  renderFacturasPago();
+}
+window.renderFacturasPago = function() {
+  const hospId = $("#pago-hospital").value;
+  const facts = state.facturas.filter(f => f.financiador === "F001" && f.hospital === hospId && isImpaga(f) && f.estado !== "en_cola");
+  $("#pago-facturas").innerHTML = facts.length === 0
+    ? `<div style="color:var(--muted);padding:14px;text-align:center;font-size:13px;">Sin facturas impagas con este hospital.</div>`
+    : facts.map(f => {
+        const s = saldoPendiente(f);
+        return `<div class="cat-item">
+          <label class="cat-header">
+            <input type="checkbox" class="pago-check" data-nro="${f.nro}" data-saldo="${s}">
+            <span style="flex:1;"><code>${f.nro}</code> ${chip(f.estado)}${f.estado === "morosa" ? '' : ` <span style="font-size:11px;color:var(--muted);">${diasRestantes(f.fecha)} días</span>`}</span>
+            <span style="font-family:monospace;font-size:12px;">Saldo ${money(s)}</span>
+          </label>
+          <div class="cat-body">
+            <label>Importe a imputar a esta factura</label>
+            <input type="number" class="pago-imputa" data-nro="${f.nro}" value="${s}" max="${s}" oninput="recalcPago()">
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;">Saldo pendiente: ${money(s)}. Imputar menos deja la factura en pago parcial — el reloj de 60 días no se renueva.</div>
+          </div>
+        </div>`;
+      }).join('');
+  document.querySelectorAll('.pago-check').forEach(cb => cb.addEventListener('change', () => {
+    cb.closest('.cat-item').classList.toggle('checked', cb.checked);
+    recalcPago();
+  }));
+  recalcPago();
+};
+function imputacionesSeleccionadas() {
+  return [...document.querySelectorAll('.pago-check')].filter(cb => cb.checked).map(cb => {
+    const nro = cb.dataset.nro;
+    const input = document.querySelector(`.pago-imputa[data-nro="${nro}"]`);
+    return { nro, monto: Math.max(0, Number(input?.value) || 0), saldo: Number(cb.dataset.saldo) };
+  });
+}
+window.recalcPago = function() {
+  const box = $("#pago-resumen"); if (!box) return;
+  const imp = imputacionesSeleccionadas();
+  const totalImputado = imp.reduce((s, i) => s + i.monto, 0);
+  const declarado = Number($("#pago-monto")?.value) || 0;
+  const excedido = imp.filter(i => i.monto > i.saldo);
+  const descuadre = declarado > 0 && Math.abs(declarado - totalImputado) > 0.5;
+  box.innerHTML = `
+    <div style="display:flex;justify-content:space-between;"><span>Facturas seleccionadas</span><strong>${imp.length}</strong></div>
+    <div style="display:flex;justify-content:space-between;"><span>Total imputado</span><strong style="font-family:monospace;">${money(totalImputado)}</strong></div>
+    ${excedido.length ? `<div style="color:var(--danger);margin-top:6px;">⚠ ${excedido.length} imputación(es) superan el saldo de la factura.</div>` : ''}
+    ${descuadre ? `<div style="color:var(--warn);margin-top:6px;">⚠ El total imputado no coincide con el monto transferido (${money(declarado)}).</div>` : ''}`;
+};
+window.confirmarNuevoPago = function() {
+  const hospId = $("#pago-hospital").value;
+  const imp = imputacionesSeleccionadas().filter(i => i.monto > 0);
+  if (imp.length === 0) { showToast("⚠ Seleccioná al menos una factura e indicá el importe"); return; }
+  if (imp.some(i => i.monto > i.saldo)) { showToast("⚠ Una imputación supera el saldo de la factura"); return; }
+  const total = imp.reduce((s, i) => s + i.monto, 0);
+  const ref = $("#pago-ref").value || "TRF-" + Math.floor(100000 + Math.random() * 899999);
+  const pago = {
+    id: "PAG-" + String(state.pagosInformados.length + 1).padStart(3, "0"),
+    financiador: "F001", hospital: hospId,
+    facturas: imp.map(i => i.nro),
+    imputaciones: imp.map(i => ({ nro: i.nro, monto: i.monto })),
+    monto: total,
+    tipo: imp.every(i => i.monto >= i.saldo) ? "total" : "parcial",
+    comprobante: ref, fecha: $("#pago-fecha").value || "2026-08-03",
+    estado: "pendiente_confirmacion"
+  };
+  state.pagosInformados.push(pago);
+  imp.forEach(i => { const f = state.facturas.find(x => x.nro === i.nro); if (f) f.estado = "pago_informado"; });
+  closeModal(); render();
+  showToast(`✓ Pago informado — ${money(total)} imputado a ${imp.length} factura(s) de ${hospCorto(hospId)}`);
+};
+
+/* ---- MODALES DE JUDICIALIZACIÓN (brief 3.3) ---- */
+function notaModelo({ hospital, financiador, facturas, monto, fecha, id }) {
+  const desde = facturas.map(f => f.fecha).sort()[0];
+  return `<div class="nota-modelo">
+    <h5>Nota de reclamo judicial — Recuperación de Costos</h5>
+    <p>La Plata, <span class="campo">${fecha}</span>.</p>
+    <p>Por la presente, la Dirección de SAMO del Ministerio de Salud de la Provincia de Buenos Aires promueve reclamo
+    contra <span class="campo">${finNombre(financiador)}</span> (${finTipo(financiador)}) por la deuda impaga que mantiene
+    con <span class="campo">${hospNombre(hospital)}</span>.</p>
+    <p>La deuda asciende a <span class="campo">${money(monto)}</span>, equivalente a
+    <span class="campo">${jus(monto).toFixed(2)} JUS</span>, superando el umbral de ${UMBRAL_JUS} JUS requerido para la promoción de la acción.</p>
+    <p>El reclamo comprende <span class="campo">${facturas.length}</span> factura(s) notificadas fehacientemente a partir del
+    <span class="campo">${desde}</span>, cuyo plazo de 60 días corridos venció sin que se cancelara el saldo:</p>
+    <ul style="margin:6px 0 6px 18px;padding:0;">
+      ${facturas.map(f => `<li>Factura <span class="campo">${f.nro}</span> — notificada ${f.fecha}, vencida hace ${Math.abs(diasRestantes(f.fecha))} días — saldo reclamado <span class="campo">${money(saldoPendiente(f))}</span>${(f.montoPagado||0)>0 ? ` (pago parcial imputado: ${money(f.montoPagado)})` : ''}${(f.notasCredito||0)>0 ? ` (NC: ${money(f.notasCredito)})` : ''}</li>`).join('')}
+    </ul>
+    <p>Se acompaña la documentación respaldatoria de cada factura y las constancias de notificación fehaciente.</p>
+    <p style="margin-top:14px;">Expediente interno: <span class="campo">${id}</span></p>
+  </div>`;
+}
+
+function openModalPaqueteJudicial(hospId, finId) {
+  const facts = morosasDelPar(hospId, finId);
+  const monto = facts.reduce((s, f) => s + saldoPendiente(f), 0);
+  if (monto <= UMBRAL_MONTO) { showToast(`⚠ El par no supera ${UMBRAL_JUS} JUS`); return; }
+  const previos = expedientesDelPar(hospId, finId).length;
+  const idTentativo = "EXP-2026-" + String(state.expedientes.length + 1).padStart(4, "0");
+  openModal(`<h3>Generar expediente judicial</h3>
+    <p class="subtle">${hospCorto(hospId)} · ${finNombre(finId)} — tanda de ${facts.length} factura(s) morosa(s) por ${money(monto)} (${jus(monto).toFixed(2)} JUS).</p>
+    ${previos > 0 ? `<div class="note"><strong>Este par ya tiene ${previos} expediente(s) previo(s).</strong> Este sería el N° ${previos + 1}: agrupa únicamente las morosas acumuladas desde la última tanda. Al confirmarlo, estas facturas salen del acumulador y el contador del par vuelve a cero.</div>` : `<div class="note"><strong>Primera tanda de este par.</strong> Al confirmar, estas facturas salen del acumulador y el contador vuelve a cero para la próxima.</div>`}
+    <label>Facturas incluidas en la tanda</label>
+    <table style="font-size:12.5px;">
+      <thead><tr><th>Factura</th><th>Notificada</th><th class="money-header">Saldo</th></tr></thead>
+      <tbody>${facts.map(f => `<tr><td><code>${f.nro}</code></td><td>${f.fecha}</td><td class="money">${money(saldoPendiente(f))}</td></tr>`).join('')}
+        <tr><td colspan="2" style="text-align:right;font-weight:600;">Total reclamado</td><td class="money" style="font-weight:700;color:var(--danger);">${money(monto)}</td></tr></tbody>
+    </table>
+    <label>Paquete judicial — documentación</label>
+    <div class="attachments">
+      <span class="attachment-chip">📎 facturas_${facts.length}_originales.pdf</span>
+      <span class="attachment-chip">📎 constancias_notificacion.pdf</span>
+      <span class="attachment-chip">📎 detalle_prestaciones.xlsx</span>
+      <span class="attachment-chip">📎 comprobantes_pagos_parciales.pdf</span>
+      <span class="attachment-chip">📎 notas_credito.pdf</span>
+    </div>
+    <label>Nota modelo autocompletada</label>
+    ${notaModelo({ hospital: hospId, financiador: finId, facturas: facts, monto, fecha: "2026-08-03", id: idTentativo })}
+    <label>Carga en GDEBA</label>
+    <select id="exp-carga">
+      <option value="manual">Manual — Legales carga el expediente en GDEBA (modalidad actual)</option>
+      <option value="api">Interoperable por API — alta automática en GDEBA (a futuro)</option>
+    </select>
+    <div class="decision-abierta" style="margin-top:8px;">
+      <strong>D6 — a definir:</strong> la carga en GDEBA puede ser manual (como hoy) o interoperable por API. La decisión está abierta; el prototipo muestra ambas opciones.
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-secondary" onclick="showToast('📄 Paquete judicial generado (simulado)')">Descargar paquete PDF</button>
+      <button class="btn btn-danger" onclick="confirmarExpediente('${hospId}','${finId}')">Confirmar y abrir expediente</button>
+    </div>`);
+}
+window.confirmarExpediente = function(hospId, finId) {
+  const facts = morosasDelPar(hospId, finId);
+  const monto = facts.reduce((s, f) => s + saldoPendiente(f), 0);
+  if (monto <= UMBRAL_MONTO) { showToast(`⚠ El par no supera ${UMBRAL_JUS} JUS`); return; }
+  const id = "EXP-2026-" + String(state.expedientes.length + 1).padStart(4, "0");
+  state.expedientes.push({
+    id, hospital: hospId, financiador: finId,
+    facturas: facts.map(f => f.nro), monto, fecha: "2026-08-03",
+    nroGDEBA: null, cargaGDEBA: $("#exp-carga")?.value || "manual", estado: "pendiente_gdeba"
+  });
+  // Las facturas de la tanda salen del acumulador: el par vuelve a cero.
+  facts.forEach(f => f.expediente = id);
+  closeModal();
+  state.view = "expedientes"; render();
+  showToast(`✓ ${id} abierto — ${facts.length} factura(s), ${money(monto)}. El acumulador del par vuelve a cero.`);
+};
+
+function openModalGDEBA(expId) {
+  const e = state.expedientes.find(x => x.id === expId); if (!e) return;
+  openModal(`<h3>Registrar N° de expediente GDEBA</h3>
+    <p class="subtle">${e.id} — ${hospCorto(e.hospital)} · ${finNombre(e.financiador)} — ${money(e.monto)}</p>
+    <div class="note note-blue">El número se asocia a <strong>todas las facturas de la tanda</strong> (${e.facturas.length}), de modo que desde cualquier factura morosa se puede ver en qué expediente está.</div>
+    <label>N° de expediente GDEBA</label>
+    <input id="gdeba-nro" placeholder="EX-2026-00000000-GDEBA-DPSAMOMSALGP" value="${e.nroGDEBA || ''}">
+    <label>Modalidad de carga</label>
+    <select id="gdeba-carga">
+      <option value="manual" ${e.cargaGDEBA === 'manual' ? 'selected' : ''}>Manual</option>
+      <option value="api" ${e.cargaGDEBA === 'api' ? 'selected' : ''}>Interoperable por API</option>
+    </select>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarGDEBA('${expId}')">Guardar</button>
+    </div>`);
+}
+window.confirmarGDEBA = function(expId) {
+  const e = state.expedientes.find(x => x.id === expId); if (!e) return;
+  const nro = $("#gdeba-nro").value.trim();
+  if (!nro) { showToast("⚠ Ingresá el N° de expediente GDEBA"); return; }
+  e.nroGDEBA = nro; e.cargaGDEBA = $("#gdeba-carga").value; e.estado = "presentado";
+  closeModal(); render();
+  showToast(`✓ GDEBA ${nro} asociado a ${e.facturas.length} factura(s)`);
+};
+
+function openModalVerPaquete(expId) {
+  const e = state.expedientes.find(x => x.id === expId); if (!e) return;
+  const facts = e.facturas.map(nro => state.facturas.find(x => x.nro === nro)).filter(Boolean);
+  openModal(`<h3>Paquete judicial — ${e.id}</h3>
+    <p class="subtle">${hospCorto(e.hospital)} · ${finNombre(e.financiador)} — generado el ${e.fecha}</p>
+    ${e.nroGDEBA ? `<div class="note note-blue"><strong>GDEBA:</strong> <span class="exp-gdeba">${e.nroGDEBA}</span> — carga ${e.cargaGDEBA}.</div>` : `<div class="note"><strong>Sin N° GDEBA todavía.</strong> Legales debe registrarlo.</div>`}
+    <label>Documentación del paquete</label>
+    <div class="attachments">
+      <span class="attachment-chip">📎 facturas_${facts.length}_originales.pdf</span>
+      <span class="attachment-chip">📎 constancias_notificacion.pdf</span>
+      <span class="attachment-chip">📎 detalle_prestaciones.xlsx</span>
+      <span class="attachment-chip">📎 nota_reclamo_${e.id}.pdf</span>
+    </div>
+    <label>Nota modelo</label>
+    ${notaModelo({ hospital: e.hospital, financiador: e.financiador, facturas: facts, monto: e.monto, fecha: e.fecha, id: e.id })}
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cerrar</button>
+      <button class="btn btn-primary" onclick="showToast('📄 Paquete descargado (simulado)')">Descargar PDF</button>
+    </div>`);
 }
 
 document.querySelectorAll('.role-switcher button').forEach(b => {
