@@ -103,6 +103,10 @@
   .modal p.subtle { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
   .modal label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 12px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
   .modal input, .modal select, .modal textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-family: inherit; }
+  /* Los checkbox/radio no deben tomar el ancho completo ni encogerse: si no, se comen la fila. */
+  .modal input[type="checkbox"], .modal input[type="radio"] { width: auto; flex: none; padding: 0; margin: 0; }
+  .tabla-scroll { max-height: 320px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; }
+  .tabla-scroll thead th { position: sticky; top: 0; z-index: 1; }
   .modal textarea { resize: vertical; min-height: 70px; }
   .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; flex-wrap: wrap; }
   .cat-list { margin-top: 4px; }
@@ -153,6 +157,14 @@
   .nota-modelo { background: #fdfdfb; border: 1px solid var(--border); border-radius: 6px; padding: 16px 18px; font-size: 12.5px; line-height: 1.7; max-height: 260px; overflow-y: auto; }
   .nota-modelo h5 { margin: 0 0 10px; font-size: 13px; text-align: center; text-transform: uppercase; letter-spacing: 0.5px; }
   .nota-modelo .campo { background: var(--info-soft); padding: 0 4px; border-radius: 3px; font-weight: 600; }
+  .resumen-respuesta { border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-top: 16px; background: #fafbfc; }
+  .rr-titulo { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); font-weight: 600; margin-bottom: 10px; }
+  .rr-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+  .rr-label { font-size: 11px; color: var(--muted); }
+  .rr-valor { font-family: "SF Mono", Monaco, monospace; font-size: 16px; font-weight: 700; margin-top: 2px; }
+  .rr-valor.success { color: var(--success); }
+  .rr-valor.warn { color: var(--warn); }
+  .btn[disabled] { opacity: 0.45; cursor: not-allowed; }
   .sel-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; background: var(--primary-soft); border: 1px solid #a8c5e8; border-radius: 6px; padding: 10px 14px; margin-bottom: 10px; font-size: 13px; color: var(--primary-dark); }
   tr.row-sel td { background: var(--primary-soft); }
   .paciente-item { border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; display: flex; gap: 10px; align-items: flex-start; }
@@ -205,18 +217,27 @@ const FACTURAS = [
   { nro: "0001-00042192", hospital: "H001", financiador: "F004", fecha: "2026-07-15", monto: 1250000, montoPagado: 0, estado: "esperando_hospital", pacientes: 6, montoDebate: 210000 },
   { nro: "0001-00042193", hospital: "H001", financiador: "F002", fecha: "2026-07-15", monto: 3100000, montoPagado: 0, estado: "esperando_hospital", pacientes: 14, montoDebate: 450000 },
   { nro: "0001-00042194", hospital: "H001", financiador: "F005", fecha: "2026-07-15", monto: 780000, montoPagado: 0, estado: "aceptada", pacientes: 3 },
-  { nro: "0001-00042195", hospital: "H001", financiador: "F001", fecha: "2026-06-10", monto: 2900220, montoPagado: 0, estado: "notificada", pacientes: 8 },
+  { nro: "0001-00042210", hospital: "H001", financiador: "F001", fecha: "2026-06-18", monto: 1750000, montoPagado: 0, estado: "aceptada", pacientes: 8 },
   { nro: "0001-00041000", hospital: "H001", financiador: "F002", fecha: "2026-05-15", monto: 2800000, montoPagado: 0, estado: "notificada", pacientes: 11 },
   { nro: "0001-00040500", hospital: "H001", financiador: "F003", fecha: "2026-06-01", monto: 1100000, montoPagado: 550000, estado: "pago_parcial", pacientes: 5 },
   { nro: "0001-00040000", hospital: "H001", financiador: "F001", fecha: "2026-04-15", monto: 1200000, montoPagado: 1200000, estado: "cerrada", pacientes: 6 },
   { nro: "0004-00028112", hospital: "H002", financiador: "F001", fecha: "2026-07-15", monto: 1120800, montoPagado: 0, estado: "esperando_hospital", pacientes: 6, montoDebate: 145200 },
   { nro: "0004-00028113", hospital: "H002", financiador: "F002", fecha: "2026-07-15", monto: 3450200, montoPagado: 0, estado: "notificada", pacientes: 15 },
   { nro: "0004-00028119", hospital: "H002", financiador: "F001", fecha: "2026-06-10", monto: 2100000, montoPagado: 0, estado: "aceptada", pacientes: 11 },
-  { nro: "0007-00019845", hospital: "H003", financiador: "F001", fecha: "2026-07-15", monto: 780600, montoPagado: 0, estado: "notificada", pacientes: 5 },
+  { nro: "0007-00019845", hospital: "H003", financiador: "F001", fecha: "2026-07-15", monto: 780600, montoPagado: 0, estado: "aceptada", pacientes: 5 },
   { nro: "0012-00010203", hospital: "H004", financiador: "F001", fecha: "2026-07-15", monto: 2050300, montoPagado: 1000000, estado: "pago_parcial", pacientes: 9 },
   { nro: "0015-00007712", hospital: "H005", financiador: "F001", fecha: "2026-07-15", monto: 4120700, montoPagado: 0, estado: "esperando_financiador", pacientes: 18, montoDebate: 620800 },
   { nro: "0004-00027000", hospital: "H002", financiador: "F001", fecha: "2026-05-20", monto: 1650000, montoPagado: 0, estado: "aceptada", pacientes: 8 },
   { nro: "0001-00042250", hospital: "H001", financiador: "F001", fecha: "2026-08-01", monto: 950000, montoPagado: 0, estado: "en_cola", pacientes: 5 },
+
+  // --- Notificación consolidada del 2026-08-01 a IOMA: recién recibida, ninguna revisada todavía ---
+  // Es el lote al que apunta la alerta del panel: todas en "notificada", coherente con que acaba de llegar.
+  { nro: "0001-00042195", hospital: "H001", financiador: "F001", fecha: "2026-08-01", monto: 2900220, montoPagado: 0, estado: "notificada", pacientes: 8 },
+  { nro: "0001-00042300", hospital: "H001", financiador: "F001", fecha: "2026-08-01", monto: 2150000, montoPagado: 0, estado: "notificada", pacientes: 9 },
+  { nro: "0004-00028300", hospital: "H002", financiador: "F001", fecha: "2026-08-01", monto: 1680000, montoPagado: 0, estado: "notificada", pacientes: 7 },
+  { nro: "0007-00019900", hospital: "H003", financiador: "F001", fecha: "2026-08-01", monto: 940000, montoPagado: 0, estado: "notificada", pacientes: 5 },
+  { nro: "0012-00010400", hospital: "H004", financiador: "F001", fecha: "2026-08-01", monto: 1320000, montoPagado: 0, estado: "notificada", pacientes: 6 },
+  { nro: "0015-00007800", hospital: "H005", financiador: "F001", fecha: "2026-08-01", monto: 2480000, montoPagado: 0, estado: "notificada", pacientes: 11 },
 
   // --- Par OSDE (F003) – Hospital Evita (H003): ejemplo canónico de acumulación por tandas (brief 3.3) ---
   // Tanda 1 — vencida a fines de junio, saldo moroso 1.500.000 = 10 JUS. Ya judicializada (EXP-2026-0001).
@@ -384,8 +405,19 @@ const chip = (e) => {
 const diasRestantes = (f) => 60 - Math.floor((new Date("2026-08-03") - new Date(f)) / 86400000);
 const isImpaga = (f) => !["cerrada","pagada","rechazada_total"].includes(f.estado);
 // saldo = monto notificado − pagos imputados − notas de crédito (brief 3.2).
-// En rechazo parcial el monto en debate se descuenta: se presume que se resolverá con NC.
-const saldoPendiente = (f) => f.monto - (f.montoPagado||0) - (f.notasCredito||0) - (f.estado === "rechazada_parcial" ? (f.montoDebate||0) : 0);
+const saldoPendiente = (f) => f.monto - (f.montoPagado||0) - (f.notasCredito||0);
+/* El saldo se parte en dos ejes independientes:
+   - en debate: lo que el financiador objetó y todavía se discute;
+   - cobrable: el resto, que está reconocido y se puede pagar YA sin esperar a que cierre la discusión.
+   Sin esta separación, objetar $100.000 de una factura de $2.000.000 congelaría el cobro
+   de los $1.900.000 en los que nadie discrepa. */
+const enDiscusion = (f) => ["esperando_financiador","esperando_hospital","rechazada_parcial"].includes(f.estado);
+function montoEnDebate(f) {
+  const objs = (f.objeciones || []).filter(o => !o.resuelta);
+  if (objs.length) return Math.min(saldoPendiente(f), objs.reduce((s, o) => s + o.monto, 0));
+  return enDiscusion(f) ? Math.min(saldoPendiente(f), f.montoDebate || 0) : 0;
+}
+const montoCobrable = (f) => Math.max(0, saldoPendiente(f) - montoEnDebate(f));
 const jus = (monto) => monto / JUS;
 
 // Rombo de vencimiento: al día 60 se evalúa el saldo. Saldo 0 → cerrada; saldo > 0 → morosa por ese saldo.
@@ -812,8 +844,12 @@ function viewHospital_DetalleFactura(nro) {
             <div><span style="color:var(--muted);">Monto:</span> <strong>${money(f.monto)}</strong></div>
             ${f.montoPagado > 0 ? `<div><span style="color:var(--muted);">Cobrado:</span> <strong style="color:var(--success);">${money(f.montoPagado)}</strong></div>` : ''}
             ${f.notasCredito ? `<div><span style="color:var(--muted);">Notas de crédito:</span> <strong style="color:var(--purple);">${money(f.notasCredito)}</strong></div>` : ''}
-            ${f.montoDebate ? `<div><span style="color:var(--muted);">En debate:</span> <strong style="color:var(--warn);">${money(f.montoDebate)}</strong></div>` : ''}
             <div><span style="color:var(--muted);">Saldo:</span> <strong>${money(saldoPendiente(f))}</strong></div>
+            ${montoEnDebate(f) > 0 ? `<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border);">
+              <div><span style="color:var(--muted);">En debate:</span> <strong style="color:var(--warn);">${money(montoEnDebate(f))}</strong></div>
+              <div><span style="color:var(--muted);">Cobrable ahora:</span> <strong style="color:var(--success);">${money(montoCobrable(f))}</strong></div>
+              <div style="font-size:11px;color:var(--muted);line-height:1.5;margin-top:4px;">El financiador objetó solo una parte. El resto está reconocido y podés reclamar su cobro sin esperar a que se resuelva la discusión.</div>
+            </div>` : ''}
             ${f.estado === "morosa" ? `<div style="margin-top:6px;color:var(--danger);font-size:12px;">Morosa por saldo — venció el ${vence} sin cancelar. El reloj no se renueva con pagos parciales.</div>` : ''}
             ${(() => { const e = expedienteDe(f.nro); return e ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
               <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Judicializada</div>
@@ -1119,7 +1155,7 @@ function viewFinanciador_Notificaciones() {
   // Lotes de notificación: cada fecha es una notificación consolidada.
   const lotes = {};
   todas.forEach(f => { (lotes[f.fecha] = lotes[f.fecha] || []).push(f); });
-  const fechasLote = Object.keys(lotes).sort().reverse().slice(0, 4);
+  const fechasLote = Object.keys(lotes).sort().reverse();
   const sinRevisar = facts.filter(f => f.estado === "notificada");
   return `
     <div class="page-header">
@@ -1134,7 +1170,10 @@ function viewFinanciador_Notificaciones() {
       <div class="kpi"><div class="label">Hospitales en vista</div><div class="value">${new Set(facts.map(f=>f.hospital)).size}</div></div>
     </div>
     <div class="card">
-      <h3 class="card-title">Últimas notificaciones consolidadas</h3>
+      <h3 class="card-title">Notificaciones consolidadas recibidas
+        <span style="font-size:12px;font-weight:400;color:var(--muted);">${fechasLote.length} en total — de la más reciente a la más antigua</span>
+      </h3>
+      <div class="tabla-scroll">
       <table>
         <thead><tr><th>Fecha de notificación</th><th style="text-align:center;">Facturas</th><th style="text-align:center;">Hospitales</th><th class="money-header">Monto</th><th>Vence</th><th style="text-align:center;">Sin revisar</th></tr></thead>
         <tbody>${fechasLote.map(fe => {
@@ -1151,7 +1190,8 @@ function viewFinanciador_Notificaciones() {
           </tr>`;
         }).join('')}</tbody>
       </table>
-      <div class="note note-blue" style="margin-top:12px;"><strong>Click en una notificación</strong> para filtrar el detalle de abajo por esa fecha.</div>
+      </div>
+      <div class="note note-blue" style="margin-top:12px;"><strong>Click en una notificación</strong> para filtrar el detalle de abajo por esa fecha. Volvé a clickearla para quitar el filtro.</div>
     </div>
     <div class="card">
       <h3 class="card-title">Detalle de facturas notificadas</h3>
@@ -1315,11 +1355,27 @@ function viewFinanciador_DetalleFactura(nro) {
                 <td><button class="btn btn-secondary btn-sm" data-ver-paciente="${encodeURIComponent(it.paciente)}">Ver paciente</button></td>
               </tr>`;}).join('')}</tbody>
           </table>
+          <div class="resumen-respuesta">
+            <div class="rr-titulo">Resumen de tu respuesta</div>
+            <div class="rr-grid">
+              <div><div class="rr-label">Reconocido y cobrable</div><div class="rr-valor success">${money(montoCobrable(f))}</div></div>
+              <div><div class="rr-label">En debate</div><div class="rr-valor warn">${money(montoEnDebate(f))}</div></div>
+              <div><div class="rr-label">Ya cobrado</div><div class="rr-valor">${money(f.montoPagado || 0)}</div></div>
+              <div><div class="rr-label">Total facturado</div><div class="rr-valor">${money(f.monto)}</div></div>
+            </div>
+            ${montoEnDebate(f) > 0 ? `<div class="note note-blue" style="margin:10px 0 0;">
+              Lo objetado (${money(montoEnDebate(f))}) espera resolución, pero <strong>los ${money(montoCobrable(f))} restantes están reconocidos y se pueden pagar ya</strong>: no hace falta esperar a que cierre la discusión.
+            </div>` : ''}
+          </div>
           <div class="actions-row">
-            <button class="btn btn-success" id="btn-aceptar-total">✓ Aceptar factura</button>
-            <button class="btn btn-warn" id="btn-discutir">✎ Iniciar discusión (factura completa)</button>
-            <button class="btn btn-danger" id="btn-rechazar-parcial">Rechazar prestaciones seleccionadas</button>
+            <button class="btn btn-success" id="btn-aceptar-total">✓ Aceptar factura completa</button>
+            <button class="btn btn-warn" id="btn-objetar-sel" ${sel.length ? '' : 'disabled title="Seleccioná primero las prestaciones que querés objetar"'}>✎ Objetar prestaciones seleccionadas${sel.length ? ` (${sel.length})` : ''}</button>
             <button class="btn btn-danger" id="btn-rechazar-total">Rechazar factura completa</button>
+          </div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.7;">
+            <strong>Aceptar</strong>: reconocés el total; queda a pagar dentro de los 60 días.<br>
+            <strong>Objetar</strong>: discutís solo las prestaciones que marcaste; el resto queda reconocido y cobrable de inmediato.<br>
+            <strong>Rechazar todo</strong>: desconocés la factura íntegra. El hospital puede presentar descargo, no es definitivo.
           </div>
         </div>
         ${thread ? `<div class="card">
@@ -1459,8 +1515,10 @@ function openModalObjetarItems(nro) {
   const total = items.reduce((s, i) => s + i.monto, 0);
   const pacientes = [...new Set(items.map(i => i.paciente))];
   const codigos = [...new Set(items.map(i => i.codigo))];
+  const restante = Math.max(0, saldoPendiente(f) - montoEnDebate(f) - total);
   openModal(`<h3>Objetar ${items.length} prestación(es)</h3>
     <p class="subtle">Se aplica <strong>el mismo motivo</strong> a todas las prestaciones seleccionadas — ${pacientes.length} paciente(s), ${money(total)}.</p>
+    <div class="note note-blue">Objetar <strong>no frena el resto de la factura</strong>: los ${money(restante)} que no estás objetando quedan reconocidos y cobrables de inmediato, sin esperar a que se resuelva esta discusión.</div>
     ${codigos.length === 1 ? `<div class="note note-blue">Todas comparten el código <code>${codigos[0]}</code>. Típico de un valor de nomenclador mal aplicado en lote.</div>` : ''}
     <label>Prestaciones alcanzadas</label>
     <div style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;">
@@ -1469,7 +1527,10 @@ function openModalObjetarItems(nro) {
       </tr>`).join('')}</tbody></table>
     </div>
     <label>Motivo de la objeción</label>
-    <select id="obj-categoria">${CATEGORIAS_OBJECION.map(c => `<option>${c}</option>`).join('')}</select>
+    <select id="obj-categoria">
+      <option value="">— Elegí un motivo —</option>
+      ${CATEGORIAS_OBJECION.map(c => `<option value="${c}">${c}</option>`).join('')}
+    </select>
     <label>Detalle / fundamento</label>
     <textarea id="obj-detalle" placeholder="Ej: el código 420101 se facturó a $145.200 y según convenio vigente corresponde $118.400."></textarea>
     <label>Monto objetado</label>
@@ -1487,6 +1548,7 @@ window.confirmarObjecionItems = function(nro) {
   const items = itemsDe(nro).filter(i => ids.includes(i.id));
   if (!items.length) { showToast("⚠ No hay prestaciones seleccionadas"); return; }
   const categoria = $("#obj-categoria").value;
+  if (!categoria) { showToast("⚠ Elegí el motivo de la objeción"); return; }
   const detalle = $("#obj-detalle").value.trim() || "(sin detalle)";
   const monto = Math.max(0, Number($("#obj-monto").value) || 0);
   f.objeciones = [...objecionesDe(f), { id: "OBJ-" + (objecionesDe(f).length + 1), items: ids, categoria, detalle, monto, fecha: "2026-08-03" }];
@@ -1504,7 +1566,7 @@ window.confirmarObjecionItems = function(nro) {
   });
   state.selItems = [];
   closeModal(); render();
-  showToast(`✎ Objeción enviada — ${items.length} prestación(es), ${money(monto)}`);
+  showToast(`✎ Objeción enviada — ${money(monto)} en debate, ${money(montoCobrable(f))} quedan cobrables`);
 };
 
 window.responderDiscFin = function(nro) {
@@ -1847,6 +1909,7 @@ function viewMinisterio_Morosidad() {
     </div>
     <div class="note"><strong>Regla:</strong> al día 60 se evalúa el saldo (monto notificado − pagos imputados − notas de crédito). Si el saldo es 0 la factura se cierra; si queda saldo, cae en mora <em>por ese saldo</em>. El reloj es único por factura: los pagos parciales no lo renuevan.</div>
     <div class="decision-abierta" style="margin-bottom:16px;"><strong>D7 — a definir:</strong> cuando el saldo se cancela con una nota de crédito, falta decidir si la factura va a <em>“Factura cerrada”</em> (como hace hoy el prototipo) o a un estado propio de <em>“Cierre por nota de crédito”</em>.</div>
+    <div class="decision-abierta" style="margin-bottom:16px;"><strong>D8 — a definir:</strong> si al día 60 hay una parte <em>en debate</em> sin resolver, falta decidir si esa parte cae en mora junto con el resto o si el reloj queda suspendido sobre ella hasta que cierre la discusión. <strong>El prototipo hoy la cuenta como morosa</strong> (el saldo total es el que se evalúa), pero la parte reconocida se puede cobrar antes sin esperar a la resolución.</div>
     <div class="kpi-grid">
       <div class="kpi action-required"><div class="label">Facturas morosas</div><div class="value danger">${m.length}</div><div class="hint">${parciales} con pago parcial o NC</div></div>
       <div class="kpi action-required"><div class="label">Saldo moroso total</div><div class="value money danger">${money(totalSaldo)}</div><div class="hint">${jus(totalSaldo).toFixed(1)} JUS</div></div>
@@ -2054,27 +2117,29 @@ function wireEvents() {
   const bA = $("#btn-aceptar-total"); if (bA) bA.addEventListener('click', () => {
     const f = factActual(); if (!f) return;
     confirmarAccion({ titulo: "Aceptar la factura completa", clase: "btn-success", textoBoton: "Sí, aceptar factura",
-      mensaje: `Vas a aceptar la factura ${f.nro} de ${hospNombre(f.hospital)} por ${money(f.monto)}.`,
-      detalle: "Aceptar implica reconocer la deuda por el total facturado. El plazo de 60 días sigue corriendo hasta que se cancele el saldo.",
-      onOk: () => { f.estado = "aceptada"; closeModal(); render(); showToast("✓ Factura aceptada"); } });
+      mensaje: `Vas a reconocer la factura ${f.nro} de ${hospNombre(f.hospital)} por el total: ${money(f.monto)}.`,
+      detalle: montoEnDebate(f) > 0
+        ? `Esto <strong>da por cerradas las objeciones abiertas</strong> (${money(montoEnDebate(f))}) y deja todo el saldo como cobrable. El plazo de 60 días sigue corriendo.`
+        : "El saldo completo queda reconocido y a pagar. El plazo de 60 días sigue corriendo hasta cancelarlo.",
+      onOk: () => {
+        f.estado = "aceptada"; f.objeciones = []; f.montoDebate = 0; f.rechazoTotal = false;
+        closeModal(); render(); showToast("✓ Factura aceptada — saldo reconocido");
+      } });
   });
-  const bD = $("#btn-discutir"); if (bD) bD.addEventListener('click', () => openModalDiscutirFin());
-  const bRP = $("#btn-rechazar-parcial"); if (bRP) bRP.addEventListener('click', () => {
-    const f = factActual(); if (!f) return;
-    const items = itemsDe(f.nro).filter(i => state.selItems.includes(i.id));
-    if (!items.length) { showToast("⚠ Seleccioná primero las prestaciones a rechazar"); return; }
-    const total = items.reduce((s, i) => s + i.monto, 0);
-    confirmarAccion({ titulo: "Rechazar prestaciones seleccionadas", clase: "btn-danger", textoBoton: "Sí, rechazar seleccionadas",
-      mensaje: `Vas a rechazar ${items.length} prestación(es) por ${money(total)} de la factura ${f.nro}.`,
-      detalle: "El hospital podrá presentar descargo. Si preferís plantearlo como objeción con motivo y respaldo, usá <strong>Objetar seleccionadas</strong>.",
-      onOk: () => { f.estado = "rechazada_parcial"; f.montoDebate = total; closeModal(); render(); showToast(`Rechazo parcial — ${money(total)}`); } });
-  });
+  const bOS = $("#btn-objetar-sel"); if (bOS && !bOS.disabled) bOS.addEventListener('click', () => openModalObjetarItems(state.context.factura));
   const bRT = $("#btn-rechazar-total"); if (bRT) bRT.addEventListener('click', () => {
     const f = factActual(); if (!f) return;
     confirmarAccion({ titulo: "Rechazar la factura completa", clase: "btn-danger", textoBoton: "Sí, rechazar todo",
-      mensaje: `Vas a rechazar íntegramente la factura ${f.nro} por ${money(f.monto)}.`,
-      detalle: "Es la acción más drástica: se rechaza el total facturado, no una prestación puntual. Verificá que no corresponda una objeción parcial.",
-      onOk: () => { f.estado = "rechazada_total"; closeModal(); render(); showToast("Factura rechazada en su totalidad"); } });
+      mensaje: `Vas a desconocer íntegramente la factura ${f.nro} por ${money(f.monto)}.`,
+      detalle: "Queda el total en debate y <strong>nada cobrable</strong> hasta que se resuelva. No es definitivo: el hospital puede presentar descargo. Si en realidad discrepás solo con algunas prestaciones, objetá esas y el resto queda cobrable.",
+      onOk: () => {
+        f.estado = "esperando_hospital"; f.rechazoTotal = true; f.montoDebate = saldoPendiente(f);
+        if (!state.threads[f.nro]) state.threads[f.nro] = [];
+        state.threads[f.nro].push({ who: "financiador", nombre: "IOMA", when: "hoy",
+          text: `Rechazamos la factura en su totalidad (${money(f.monto)}).`,
+          accion: { tipo: "Rechazo total", categorias: ["Desconocimiento íntegro de la factura"], detalles: ["El hospital puede presentar descargo o aceptar el rechazo."] }, adjuntos: [] });
+        closeModal(); render(); showToast("Factura rechazada en su totalidad — el hospital debe responder");
+      } });
   });
   /* ---- Filtros del panel del financiador ---- */
   document.querySelectorAll('[data-filtro-panel]').forEach(el => el.addEventListener('change', () => {
@@ -2172,42 +2237,8 @@ window.confirmarNotif = function() {
   closeModal(); render(); showToast("✓ Notificado");
 };
 
-function openModalDiscutirFin() {
-  openModal(`<h3>Iniciar discusión</h3>
-    <p class="subtle">Elegí una o más categorías. Cada una despliega sus campos.</p>
-    <div class="cat-list">
-      <div class="cat-item"><label class="cat-header"><input type="checkbox"><span>Afiliado no vigente / no corresponde</span></label>
-        <div class="cat-body"><label>N° de afiliado</label><input placeholder="Ej: 4-503-819***">
-          <label>Fecha de baja</label><input type="date">
-          <label>¿Corresponde a otra cobertura?</label><select><option>No sabemos</option><option>Sí</option><option>No</option></select></div></div>
-      <div class="cat-item"><label class="cat-header"><input type="checkbox"><span>Falta autorización previa</span></label>
-        <div class="cat-body"><label>Prestación</label><input placeholder="Código">
-          <label>¿Fue emergencia?</label><select><option>Indicar</option><option>Sí</option><option>No</option></select></div></div>
-      <div class="cat-item"><label class="cat-header"><input type="checkbox"><span>Prestación no cubierta por el plan</span></label>
-        <div class="cat-body"><label>Plan del afiliado</label><input><label>Código</label><input></div></div>
-      <div class="cat-item"><label class="cat-header"><input type="checkbox"><span>Documentación incompleta</span></label>
-        <div class="cat-body"><label>¿Qué falta?</label>
-          <div class="checkline"><input type="checkbox"> Historia clínica</div>
-          <div class="checkline"><input type="checkbox"> Epicrisis</div>
-          <div class="checkline"><input type="checkbox"> Consentimiento informado</div>
-          <div class="checkline"><input type="checkbox"> Formulario de autorización</div>
-          <div class="checkline"><input type="checkbox"> Comprobante de urgencia</div></div></div>
-      <div class="cat-item"><label class="cat-header"><input type="checkbox"><span>Diferencia en código / valor</span></label>
-        <div class="cat-body"><label>Código facturado</label><input><label>Código correcto</label><input><label>Valor s/ convenio</label><input></div></div>
-    </div>
-    <label>Comentario general</label><textarea></textarea>
-    <label>Adjuntos</label><input type="file">
-    <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-warn" onclick="confirmarDiscFin()">Iniciar discusión</button></div>`);
-}
-window.confirmarDiscFin = function() {
-  const f = state.facturas.find(x => x.nro === state.context.factura);
-  if (f) { f.estado = "esperando_hospital"; if (!f.montoDebate) f.montoDebate = Math.round(f.monto * 0.15); }
-  if (!state.threads[state.context.factura]) state.threads[state.context.factura] = [];
-  state.threads[state.context.factura].push({ who: "financiador", nombre: "IOMA", when: "hoy",
-    text: "Iniciamos discusión con las categorías seleccionadas.",
-    accion: { tipo: "Objeción iniciada", categorias: ["(categorías del modal)"], detalles: [] }, adjuntos: [] });
-  closeModal(); render(); showToast("✎ Discusión iniciada");
-};
+/* La discusión a nivel factura completa se eliminó: toda objeción se plantea sobre prestaciones
+   concretas (openModalObjetarItems), que además permite que el resto quede cobrable. */
 
 /* MODAL DESCARGO DEL HOSPITAL — 6 categorías */
 function openModalDescargoHosp() {
@@ -2329,16 +2360,21 @@ window.renderFacturasPago = function() {
     ? `<div style="color:var(--muted);padding:14px;text-align:center;font-size:13px;">Sin facturas impagas con este hospital.</div>`
     : facts.map(f => {
         const s = saldoPendiente(f);
+        const cobrable = montoCobrable(f), debate = montoEnDebate(f);
         return `<div class="cat-item">
           <label class="cat-header">
             <input type="checkbox" class="pago-check" data-nro="${f.nro}" data-saldo="${s}">
             <span style="flex:1;"><code>${f.nro}</code> ${chip(f.estado)}${f.estado === "morosa" ? '' : ` <span style="font-size:11px;color:var(--muted);">${diasRestantes(f.fecha)} días</span>`}</span>
-            <span style="font-family:monospace;font-size:12px;">Saldo ${money(s)}</span>
+            <span style="font-family:monospace;font-size:12px;">${debate > 0 ? `Cobrable ${money(cobrable)}` : `Saldo ${money(s)}`}</span>
           </label>
           <div class="cat-body">
             <label>Importe a imputar a esta factura</label>
-            <input type="number" class="pago-imputa" data-nro="${f.nro}" value="${s}" max="${s}" oninput="recalcPago()">
-            <div style="font-size:11px;color:var(--muted);margin-top:4px;">Saldo pendiente: ${money(s)}. Imputar menos deja la factura en pago parcial — el reloj de 60 días no se renueva.</div>
+            <input type="number" class="pago-imputa" data-nro="${f.nro}" value="${cobrable}" max="${s}" oninput="recalcPago()">
+            <div style="font-size:11px;color:var(--muted);margin-top:4px;">
+              ${debate > 0
+                ? `Saldo ${money(s)}, de los cuales <strong>${money(debate)} están en debate</strong>. Se propone imputar los ${money(cobrable)} reconocidos, que se pueden pagar sin esperar a que cierre la discusión.`
+                : `Saldo pendiente: ${money(s)}. Imputar menos deja la factura en pago parcial — el reloj de 60 días no se renueva.`}
+            </div>
           </div>
         </div>`;
       }).join('');
