@@ -1,0 +1,1469 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Portal de Financiadores — Prototipo SAMO</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --panel: #ffffff; --border: #e3e6ea;
+    --text: #1a1d21; --muted: #6b7280;
+    --primary: #1e5eaa; --primary-dark: #164a86; --primary-soft: #e8f0fb;
+    --success: #147a3d; --success-soft: #e2f4ea;
+    --warn: #a15c00; --warn-soft: #fdf1dc;
+    --danger: #a1291b; --danger-soft: #fbe6e2;
+    --neutral: #4b5563; --neutral-soft: #eef0f3;
+    --info: #1e5eaa; --info-soft: #e8f0fb;
+    --purple: #6b3fa0; --purple-soft: #eee5f7;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
+  .topbar { background: #0f2438; color: #fff; padding: 10px 24px; display: flex; align-items: center; gap: 24px; border-bottom: 3px solid var(--primary); }
+  .topbar .brand { font-weight: 700; font-size: 15px; letter-spacing: 0.3px; }
+  .topbar .brand small { display: block; font-weight: 400; font-size: 11px; opacity: 0.7; }
+  .role-switcher { display: flex; gap: 4px; margin-left: auto; background: rgba(255,255,255,0.08); padding: 4px; border-radius: 8px; }
+  .role-switcher button { background: transparent; color: #cfd6de; border: none; padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+  .role-switcher button:hover { color: #fff; background: rgba(255,255,255,0.05); }
+  .role-switcher button.active { background: #fff; color: #0f2438; }
+  .layout { display: flex; min-height: calc(100vh - 55px); }
+  .sidebar { width: 240px; background: var(--panel); border-right: 1px solid var(--border); padding: 16px 0; }
+  .sidebar .section-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); padding: 8px 20px 4px; font-weight: 600; }
+  .sidebar a { display: flex; align-items: center; justify-content: space-between; padding: 8px 20px; color: var(--text); text-decoration: none; font-size: 13.5px; border-left: 3px solid transparent; cursor: pointer; }
+  .sidebar a:hover { background: var(--bg); }
+  .sidebar a.active { background: var(--primary-soft); border-left-color: var(--primary); color: var(--primary-dark); font-weight: 600; }
+  .sidebar a .badge { background: var(--danger); color: white; font-size: 10px; padding: 1px 7px; border-radius: 10px; font-weight: 700; }
+  .sidebar a .badge.warn { background: var(--warn); }
+  .sidebar .sub-item { padding-left: 36px; font-size: 12.5px; color: var(--muted); }
+  .sidebar .sub-item.active { color: var(--primary-dark); background: var(--primary-soft); }
+  .main { flex: 1; padding: 24px 32px; overflow-x: hidden; }
+  .page-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; gap: 12px; }
+  .page-header h1 { margin: 0; font-size: 22px; font-weight: 600; }
+  .page-header .sub { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .page-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .breadcrumb { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .breadcrumb a { color: var(--primary); cursor: pointer; text-decoration: none; }
+  .breadcrumb a:hover { text-decoration: underline; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 16px; }
+  .card-title { font-size: 15px; font-weight: 600; margin: 0 0 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .kpi { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+  .kpi.action-required { border-left: 4px solid var(--danger); }
+  .kpi.warning { border-left: 4px solid var(--warn); }
+  .kpi.good { border-left: 4px solid var(--success); }
+  .kpi .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); font-weight: 600; }
+  .kpi .value { font-size: 22px; font-weight: 700; margin-top: 4px; }
+  .kpi .value.money { font-family: "SF Mono", Monaco, monospace; font-size: 18px; }
+  .kpi .value.danger { color: var(--danger); }
+  .kpi .value.warn { color: var(--warn); }
+  .kpi .value.success { color: var(--success); }
+  .kpi .hint { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .kpi .hint.money { font-family: "SF Mono", Monaco, monospace; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 10px 12px; background: #fafbfc; color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr.clickable { cursor: pointer; }
+  tr.clickable:hover td { background: var(--bg); }
+  td.money { font-family: "SF Mono", Monaco, monospace; text-align: right; }
+  th.money-header { text-align: right; }
+  .chip { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; letter-spacing: 0.2px; }
+  .chip-emitida, .chip-cerrada { background: var(--neutral-soft); color: var(--neutral); }
+  .chip-en-cola, .chip-notificada, .chip-vista, .chip-pago-informado { background: var(--info-soft); color: var(--info); }
+  .chip-aceptada, .chip-pagada { background: var(--success-soft); color: var(--success); }
+  .chip-parcial, .chip-esperando-hospital, .chip-por-vencer { background: var(--warn-soft); color: var(--warn); }
+  .chip-rechazada, .chip-esperando-financiador, .chip-morosa { background: var(--danger-soft); color: var(--danger); }
+  .chip-pago-parcial { background: var(--purple-soft); color: var(--purple); }
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid transparent; text-decoration: none; }
+  .btn-primary { background: var(--primary); color: white; border-color: var(--primary); }
+  .btn-primary:hover { background: var(--primary-dark); }
+  .btn-secondary { background: white; color: var(--text); border-color: var(--border); }
+  .btn-secondary:hover { background: var(--bg); }
+  .btn-success { background: var(--success); color: white; border-color: var(--success); }
+  .btn-danger { background: white; color: var(--danger); border-color: var(--danger); }
+  .btn-warn { background: white; color: var(--warn); border-color: var(--warn); }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn-excel { background: white; color: #1f6b3a; border-color: #b8d4c1; font-weight: 500; }
+  .btn-excel:hover { background: #f0f8f2; }
+  .actions-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+  .two-col { display: grid; grid-template-columns: 1fr 340px; gap: 20px; }
+  @media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+  .note { background: #fffdf5; border: 1px dashed #e0c977; border-radius: 6px; padding: 10px 12px; font-size: 12px; color: #6b5410; margin-bottom: 12px; }
+  .note strong { color: #4a3a08; }
+  .note-blue { background: #f4f8fc; border: 1px dashed #a8c5e8; color: #2a4a72; }
+  .note-blue strong { color: #143c66; }
+  .filter-bar { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  .filter-bar select, .filter-bar input { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: white; }
+  .group-header { background: #fafbfc; padding: 10px 12px; font-weight: 600; font-size: 13px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+  .group-header .caret { color: var(--muted); font-size: 10px; }
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 36, 56, 0.55); display: none; align-items: center; justify-content: center; z-index: 100; }
+  .modal-backdrop.open { display: flex; }
+  .modal { background: white; border-radius: 8px; width: 640px; max-width: 92vw; max-height: 88vh; overflow-y: auto; padding: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+  .modal h3 { margin: 0 0 12px; font-size: 17px; }
+  .modal p.subtle { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+  .modal label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 12px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .modal input, .modal select, .modal textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; font-family: inherit; }
+  .modal textarea { resize: vertical; min-height: 70px; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; flex-wrap: wrap; }
+  .cat-list { margin-top: 4px; }
+  .cat-item { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 8px; overflow: hidden; }
+  .cat-item.checked { border-color: var(--primary); background: var(--primary-soft); }
+  .cat-header { padding: 10px 12px; display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 13px; font-weight: 500; }
+  .cat-header input[type="checkbox"] { transform: scale(1.15); }
+  .cat-body { padding: 0 12px 12px 40px; display: none; background: white; }
+  .cat-item.checked .cat-body { display: block; }
+  .cat-body label { text-transform: none; letter-spacing: 0; font-weight: 500; color: var(--text); margin-top: 8px; font-size: 12px; }
+  .cat-body .checkline { display: block; padding: 3px 0; font-size: 13px; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--text); }
+  .cat-body .checkline input { width: auto; margin-right: 6px; }
+  .thread { background: #fafbfc; border-radius: 6px; padding: 12px; margin-top: 12px; }
+  .thread-msg { padding: 10px 12px; background: white; border-radius: 6px; margin-bottom: 10px; border-left: 3px solid var(--primary); }
+  .thread-msg.from-hospital { border-left-color: var(--success); }
+  .thread-msg.from-financiador { border-left-color: var(--warn); }
+  .thread-msg.from-ministerio { border-left-color: var(--purple); }
+  .thread-msg .who { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+  .thread-msg .who .when { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--muted); margin-left: auto; font-size: 11px; }
+  .thread-msg .who .role-tag { background: var(--neutral-soft); color: var(--muted); padding: 1px 6px; border-radius: 4px; font-size: 10px; }
+  .thread-msg.from-hospital .who .role-tag { background: var(--success-soft); color: var(--success); }
+  .thread-msg.from-financiador .who .role-tag { background: var(--warn-soft); color: var(--warn); }
+  .thread-msg .action-summary { background: #f4f6f9; border-radius: 4px; padding: 6px 8px; margin-top: 6px; font-size: 12px; }
+  .thread-msg .attachments { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .attachment-chip { display: inline-flex; align-items: center; gap: 4px; background: var(--info-soft); color: var(--primary-dark); padding: 3px 8px; border-radius: 4px; font-size: 11px; cursor: pointer; }
+  .attachment-chip:hover { background: #d5e5f5; }
+  .thread-composer { background: white; border: 1px solid var(--border); border-radius: 6px; padding: 10px; margin-top: 8px; }
+  .thread-composer textarea { width: 100%; border: none; resize: vertical; min-height: 60px; font-family: inherit; font-size: 13px; padding: 4px; }
+  .thread-composer textarea:focus { outline: none; }
+  .thread-composer .composer-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+  .items-table th { font-size: 10px; }
+  .items-table td { font-size: 12.5px; }
+  .legend { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px 18px; margin-top: 20px; font-size: 12px; }
+  .legend h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); }
+  .legend-items { display: flex; flex-wrap: wrap; gap: 12px; }
+  .toast { position: fixed; bottom: 24px; right: 24px; background: #143c66; color: white; padding: 12px 18px; border-radius: 6px; font-size: 13px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 200; opacity: 0; transform: translateY(10px); transition: all 0.25s; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .action-required-banner { background: var(--danger-soft); border: 1px solid #e8b0a5; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .action-required-banner strong { color: var(--danger); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">Portal de Financiadores<small>Recuperación de Costos — Min. Salud PBA — Prototipo</small></div>
+  <div class="role-switcher">
+    <button data-role="ministerio">Ministerio</button>
+    <button data-role="hospital" class="active">Hospital</button>
+    <button data-role="financiador">Financiador</button>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="sidebar" id="sidebar"></div>
+  <div class="main" id="main"></div>
+</div>
+
+<div class="modal-backdrop" id="modal-backdrop"><div class="modal" id="modal-content"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const HOSPITALES = [
+  { id: "H001", nombre: "Hospital Interzonal San Martín (La Plata)" },
+  { id: "H002", nombre: "Hospital Provincial Rossi (La Plata)" },
+  { id: "H003", nombre: "Hospital Municipal Evita (Lanús)" },
+  { id: "H004", nombre: "Hospital Zonal Ricardo Gutiérrez (La Plata)" },
+  { id: "H005", nombre: "Hospital El Cruce (Florencio Varela)" },
+];
+const FINANCIADORES = [
+  { id: "F001", nombre: "IOMA", tipo: "Obra Social Provincial" },
+  { id: "F002", nombre: "PAMI", tipo: "Obra Social Nacional" },
+  { id: "F003", nombre: "OSDE", tipo: "Prepaga" },
+  { id: "F004", nombre: "Swiss Medical", tipo: "Prepaga" },
+  { id: "F005", nombre: "OSECAC", tipo: "Obra Social Sindical" },
+];
+const FACTURAS = [
+  { nro: "0001-00042189", hospital: "H001", financiador: "F001", fecha: "2026-07-15", monto: 1845320, montoPagado: 0, estado: "aceptada", pacientes: 12 },
+  { nro: "0001-00042190", hospital: "H001", financiador: "F001", fecha: "2026-07-15", monto: 2310500, montoPagado: 0, estado: "esperando_financiador", pacientes: 8, montoDebate: 280400 },
+  { nro: "0001-00042191", hospital: "H001", financiador: "F003", fecha: "2026-07-15", monto: 890400, montoPagado: 0, estado: "notificada", pacientes: 4 },
+  { nro: "0001-00042192", hospital: "H001", financiador: "F004", fecha: "2026-07-15", monto: 1250000, montoPagado: 0, estado: "esperando_hospital", pacientes: 6, montoDebate: 210000 },
+  { nro: "0001-00042193", hospital: "H001", financiador: "F002", fecha: "2026-07-15", monto: 3100000, montoPagado: 0, estado: "esperando_hospital", pacientes: 14, montoDebate: 450000 },
+  { nro: "0001-00042194", hospital: "H001", financiador: "F005", fecha: "2026-07-15", monto: 780000, montoPagado: 0, estado: "aceptada", pacientes: 3 },
+  { nro: "0001-00042195", hospital: "H001", financiador: "F001", fecha: "2026-06-10", monto: 1500000, montoPagado: 0, estado: "notificada", pacientes: 7 },
+  { nro: "0001-00041000", hospital: "H001", financiador: "F002", fecha: "2026-05-15", monto: 2800000, montoPagado: 0, estado: "morosa", pacientes: 11 },
+  { nro: "0001-00040500", hospital: "H001", financiador: "F003", fecha: "2026-06-01", monto: 1100000, montoPagado: 550000, estado: "pago_parcial", pacientes: 5 },
+  { nro: "0001-00040000", hospital: "H001", financiador: "F001", fecha: "2026-04-15", monto: 1200000, montoPagado: 1200000, estado: "cerrada", pacientes: 6 },
+  { nro: "0004-00028112", hospital: "H002", financiador: "F001", fecha: "2026-07-15", monto: 1120800, montoPagado: 0, estado: "esperando_hospital", pacientes: 6, montoDebate: 145200 },
+  { nro: "0004-00028113", hospital: "H002", financiador: "F002", fecha: "2026-07-15", monto: 3450200, montoPagado: 0, estado: "notificada", pacientes: 15 },
+  { nro: "0004-00028119", hospital: "H002", financiador: "F001", fecha: "2026-06-10", monto: 2100000, montoPagado: 0, estado: "aceptada", pacientes: 11 },
+  { nro: "0007-00019845", hospital: "H003", financiador: "F001", fecha: "2026-07-15", monto: 780600, montoPagado: 0, estado: "notificada", pacientes: 5 },
+  { nro: "0012-00010203", hospital: "H004", financiador: "F001", fecha: "2026-07-15", monto: 2050300, montoPagado: 1000000, estado: "pago_parcial", pacientes: 9 },
+  { nro: "0015-00007712", hospital: "H005", financiador: "F001", fecha: "2026-07-15", monto: 4120700, montoPagado: 0, estado: "esperando_financiador", pacientes: 18, montoDebate: 620800 },
+  { nro: "0004-00027000", hospital: "H002", financiador: "F001", fecha: "2026-05-20", monto: 1650000, montoPagado: 0, estado: "morosa", pacientes: 8 },
+  { nro: "0001-00042250", hospital: "H001", financiador: "F001", fecha: "2026-08-01", monto: 950000, montoPagado: 0, estado: "en_cola", pacientes: 5 },
+];
+const ITEMS_FACTURA = {
+  "0001-00042189": [
+    { paciente: "González, María (DNI 25.312.***)", afiliado: "IOMA 4-501-023***", prestacion: "Consulta guardia + estudios", codigo: "420101", monto: 145200 },
+    { paciente: "Pérez, Juan (DNI 30.812.***)", afiliado: "IOMA 4-503-819***", prestacion: "Internación clínica 3 días", codigo: "620301", monto: 480500 },
+    { paciente: "Rodríguez, Ana (DNI 42.101.***)", afiliado: "IOMA 4-509-102***", prestacion: "Cirugía menor + insumos", codigo: "710422", monto: 620800 },
+    { paciente: "López, Carlos (DNI 28.445.***)", afiliado: "IOMA 4-502-777***", prestacion: "Estudios de laboratorio", codigo: "310105", monto: 98400 },
+    { paciente: "Martínez, Elena (DNI 33.222.***)", afiliado: "IOMA 4-510-345***", prestacion: "Diagnóstico por imágenes", codigo: "340210", monto: 500420 },
+  ]
+};
+const THREADS_INITIAL = {
+  "0001-00042190": [
+    { who: "financiador", nombre: "IOMA", when: "28/07/2026 14:32", text: "Iniciamos discusión sobre 1 ítem por afiliado no vigente.",
+      accion: { tipo: "Objeción iniciada", categorias: ["Afiliado no vigente"], detalles: ["Ítem: Internación — Juan Pérez", "N° afiliado: IOMA 4-503-819***", "Fecha de baja: 30/06/2026"] },
+      adjuntos: [{ nombre: "padron_ioma_junio_2026.pdf", tipo: "pdf" }] },
+    { who: "hospital", nombre: "Hosp. San Martín", when: "29/07/2026 09:15", text: "Discrepamos. Adjuntamos padrón consultado el día de la atención — cobertura activa.",
+      accion: { tipo: "Descargo del hospital", categorias: ["Ratificar cobertura con documentación"], detalles: ["Padrón consultado: 12/07/2026 08:41", "Estado registrado: ACTIVO", "Prestación efectuada: 12/07/2026 10:20"] },
+      adjuntos: [{ nombre: "consulta_padron_ioma_12-07.pdf", tipo: "pdf" }, { nombre: "HC_perez_juan.pdf", tipo: "pdf" }, { nombre: "captura_padron.png", tipo: "img" }] }
+  ],
+  "0001-00042192": [
+    { who: "financiador", nombre: "Swiss Medical", when: "26/07/2026 11:20", text: "Falta autorización previa en cirugía programada.",
+      accion: { tipo: "Objeción iniciada", categorias: ["Falta autorización previa"], detalles: ["Prestación: Cirugía programada 710422"] }, adjuntos: [] }
+  ],
+  "0001-00042193": [
+    { who: "financiador", nombre: "PAMI", when: "25/07/2026 16:45", text: "Diferencia en códigos facturados y documentación incompleta en 3 prestaciones.",
+      accion: { tipo: "Objeción iniciada", categorias: ["Diferencia en código", "Documentación incompleta"], detalles: ["Códigos observados: 340210 → correspondería 340215", "Falta: epicrisis, formulario de autorización"] },
+      adjuntos: [{ nombre: "convenio_pami_2026.pdf", tipo: "pdf" }] }
+  ],
+  "0004-00028112": [
+    { who: "financiador", nombre: "IOMA", when: "24/07/2026", text: "Diferencia de código en 1 prestación.",
+      accion: { tipo: "Objeción iniciada", categorias: ["Diferencia en código"], detalles: ["Código 340210 → correspondería 340215"] }, adjuntos: [] },
+    { who: "hospital", nombre: "Hosp. Rossi", when: "25/07/2026", text: "Se rectifica. Emitimos nota de crédito.",
+      accion: { tipo: "Aceptación con refacturación", categorias: ["Reconocer diferencia"], detalles: ["Se emitirá nota de crédito"] }, adjuntos: [{ nombre: "nota_credito.pdf", tipo: "pdf" }] }
+  ],
+  "0015-00007712": [
+    { who: "financiador", nombre: "IOMA", when: "26/07/2026", text: "Falta autorización previa en 2 prestaciones de alta complejidad.",
+      accion: { tipo: "Objeción iniciada", categorias: ["Falta autorización previa"], detalles: ["Prestaciones: 710422, 810301"] }, adjuntos: [] }
+  ]
+};
+
+let state = {
+  role: "hospital", view: "panel_hospital", context: {},
+  facturas: JSON.parse(JSON.stringify(FACTURAS)),
+  threads: JSON.parse(JSON.stringify(THREADS_INITIAL)),
+  pagosInformados: [
+    { id: "PAG-001", financiador: "F003", hospital: "H001", facturas: ["0001-00042191"], monto: 890400, tipo: "total", comprobante: "TRF-889021", fecha: "2026-07-28", estado: "pendiente_confirmacion" }
+  ]
+};
+
+const NAV = {
+  ministerio: [
+    { label: "Panel general", view: "dashboard" },
+    { label: "Cola de notificación", view: "cola" },
+    { label: "Facturas notificadas", view: "notificadas" },
+    { label: "Discusiones abiertas", view: "discusiones" },
+    { label: "Morosidad → Legales", view: "morosidad" },
+  ],
+  hospital: [
+    { label: "Panel", view: "panel_hospital" },
+    { label: "Mis facturas", view: "facturas_hospital" },
+    { label: "Discusiones", view: "discusiones_hospital", sub: [
+      { label: "Esperan mi respuesta", view: "disc_h_esperan_yo" },
+      { label: "Esperando al financiador", view: "disc_h_esperan_fin" },
+    ]},
+    { label: "Pagos por confirmar", view: "pagos_hospital" },
+    { label: "Historial", view: "cerradas_hospital" },
+  ],
+  financiador: [
+    { label: "Panel", view: "panel_financiador" },
+    { label: "Notificaciones recibidas", view: "notificaciones" },
+    { label: "Facturas a revisar", view: "facturas_financiador" },
+    { label: "Discusiones", view: "discusiones_financiador", sub: [
+      { label: "Esperan mi respuesta", view: "disc_esperan_yo" },
+      { label: "Esperando al hospital", view: "disc_esperan_hosp" },
+    ]},
+    { label: "Informar pagos", view: "informar_pagos" },
+    { label: "Historial", view: "historial_financiador" },
+  ]
+};
+
+const $ = (sel) => document.querySelector(sel);
+const money = (n) => "$ " + n.toLocaleString("es-AR", { minimumFractionDigits: 0 });
+const hospNombre = (id) => HOSPITALES.find(h => h.id === id)?.nombre || id;
+const hospCorto = (id) => hospNombre(id).replace("Hospital ", "").replace(" (La Plata)", " – La Plata").replace(" (Lanús)", " – Lanús").replace(" (Florencio Varela)", " – F. Varela");
+const finNombre = (id) => FINANCIADORES.find(f => f.id === id)?.nombre || id;
+const finTipo = (id) => FINANCIADORES.find(f => f.id === id)?.tipo || "";
+const chip = (e) => {
+  const labels = { emitida:"Emitida", en_cola:"En cola", notificada:"Notificada", vista:"Vista", aceptada:"Aceptada", rechazada_parcial:"Rechazada parcial", rechazada_total:"Rechazada", esperando_financiador:"Esperando financiador", esperando_hospital:"Esperando hospital", pago_informado:"Pago informado", pago_parcial:"Pago parcial", pagada:"Pagada", morosa:"Morosa", cerrada:"Cerrada", por_vencer:"Por vencer" };
+  const cls = { emitida:"chip-emitida", en_cola:"chip-en-cola", notificada:"chip-notificada", vista:"chip-vista", aceptada:"chip-aceptada", rechazada_parcial:"chip-parcial", rechazada_total:"chip-rechazada", esperando_financiador:"chip-esperando-financiador", esperando_hospital:"chip-esperando-hospital", pago_informado:"chip-pago-informado", pago_parcial:"chip-pago-parcial", pagada:"chip-pagada", morosa:"chip-morosa", cerrada:"chip-cerrada", por_vencer:"chip-por-vencer" };
+  return `<span class="chip ${cls[e]||'chip-emitida'}">${labels[e]||e}</span>`;
+};
+const diasRestantes = (f) => 60 - Math.floor((new Date("2026-08-03") - new Date(f)) / 86400000);
+const isImpaga = (f) => !["cerrada","pagada","rechazada_total"].includes(f.estado);
+const saldoPendiente = (f) => f.monto - (f.montoPagado||0) - (f.estado === "rechazada_parcial" ? (f.montoDebate||0) : 0);
+const esDiscYo_fin = (f) => f.estado === "esperando_financiador";
+const esDiscHosp_fin = (f) => f.estado === "esperando_hospital";
+const esDiscYo_hosp = (f) => f.estado === "esperando_hospital";
+const esDiscOtro_hosp = (f) => f.estado === "esperando_financiador";
+const showToast = (msg) => { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 3000); };
+
+function exportCSV(filename, rows) {
+  const csv = rows.map(r => r.map(cell => { const s = String(cell??""); if (s.includes(",")||s.includes('"')||s.includes("\n")) return '"'+s.replace(/"/g,'""')+'"'; return s; }).join(",")).join("\n");
+  const blob = new Blob(["\uFEFF"+csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a"); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  showToast("✓ Descarga: " + filename);
+}
+window.exportCSV = exportCSV;
+
+/* ========================================================= AGGREGATIONS ========================================================= */
+function agruparPorHospital_fin() {
+  const facts = state.facturas.filter(f => f.financiador === "F001" && isImpaga(f));
+  const g = {};
+  facts.forEach(f => {
+    if (!g[f.hospital]) g[f.hospital] = { count:0, deudaTotal:0, aceptadoSinPagar:0, saldoParcial:0, espYo:0, espHosp:0, porVencer:0, vencidas:0 };
+    const d = g[f.hospital]; d.count++; d.deudaTotal += saldoPendiente(f);
+    if (f.estado === "aceptada") d.aceptadoSinPagar += saldoPendiente(f);
+    if (f.estado === "pago_parcial") d.saldoParcial += saldoPendiente(f);
+    if (esDiscYo_fin(f)) d.espYo++;
+    if (esDiscHosp_fin(f)) d.espHosp++;
+    if (f.estado === "morosa") d.vencidas++;
+    const dias = diasRestantes(f.fecha);
+    if (dias > 0 && dias <= 15 && f.estado !== "morosa") d.porVencer++;
+  });
+  return g;
+}
+function kpisFinanciador() {
+  const facts = state.facturas.filter(f => f.financiador === "F001" && isImpaga(f));
+  const k = { deudaTotal:0, sinPagar:0, sinPagarMonto:0, pagoParcial:0, pagoParcialSaldo:0, porVencer:0, porVencerMonto:0, vencidas:0, vencidasMonto:0, espYo:0, espYoMonto:0, espHosp:0, espHospMonto:0, total: facts.length };
+  facts.forEach(f => {
+    const s = saldoPendiente(f); k.deudaTotal += s;
+    if (f.estado !== "pago_parcial") { k.sinPagar++; k.sinPagarMonto += s; }
+    if (f.estado === "pago_parcial") { k.pagoParcial++; k.pagoParcialSaldo += s; }
+    if (esDiscYo_fin(f)) { k.espYo++; k.espYoMonto += (f.montoDebate || s); }
+    if (esDiscHosp_fin(f)) { k.espHosp++; k.espHospMonto += (f.montoDebate || s); }
+    if (f.estado === "morosa") { k.vencidas++; k.vencidasMonto += s; }
+    const dias = diasRestantes(f.fecha);
+    if (dias > 0 && dias <= 15 && f.estado !== "morosa") { k.porVencer++; k.porVencerMonto += s; }
+  });
+  return k;
+}
+function agruparPorFinanciador_hosp() {
+  const facts = state.facturas.filter(f => f.hospital === "H001" && isImpaga(f));
+  const g = {};
+  facts.forEach(f => {
+    if (!g[f.financiador]) g[f.financiador] = { count:0, porCobrar:0, aceptadoSinCobrar:0, saldoParcial:0, espYo:0, espFin:0, porVencer:0, vencidas:0 };
+    const d = g[f.financiador]; d.count++; d.porCobrar += saldoPendiente(f);
+    if (f.estado === "aceptada") d.aceptadoSinCobrar += saldoPendiente(f);
+    if (f.estado === "pago_parcial") d.saldoParcial += saldoPendiente(f);
+    if (esDiscYo_hosp(f)) d.espYo++;
+    if (esDiscOtro_hosp(f)) d.espFin++;
+    if (f.estado === "morosa") d.vencidas++;
+    const dias = diasRestantes(f.fecha);
+    if (dias > 0 && dias <= 15 && f.estado !== "morosa") d.porVencer++;
+  });
+  return g;
+}
+function kpisHospital() {
+  const facts = state.facturas.filter(f => f.hospital === "H001" && isImpaga(f));
+  const k = { porCobrar:0, notificadas:0, notificadasMonto:0, aceptadas:0, aceptadasMonto:0, pagoParcial:0, pagoParcialSaldo:0, espYo:0, espYoMonto:0, espFin:0, espFinMonto:0, porVencer:0, porVencerMonto:0, vencidas:0, vencidasMonto:0,
+    pagosPorConfirmar: state.pagosInformados.filter(p => p.estado === "pendiente_confirmacion" && p.hospital === "H001").length,
+    total: facts.length };
+  facts.forEach(f => {
+    const s = saldoPendiente(f); k.porCobrar += s;
+    if (f.estado === "notificada") { k.notificadas++; k.notificadasMonto += s; }
+    if (f.estado === "aceptada") { k.aceptadas++; k.aceptadasMonto += s; }
+    if (f.estado === "pago_parcial") { k.pagoParcial++; k.pagoParcialSaldo += s; }
+    if (esDiscYo_hosp(f)) { k.espYo++; k.espYoMonto += (f.montoDebate || s); }
+    if (esDiscOtro_hosp(f)) { k.espFin++; k.espFinMonto += (f.montoDebate || s); }
+    if (f.estado === "morosa") { k.vencidas++; k.vencidasMonto += s; }
+    const dias = diasRestantes(f.fecha);
+    if (dias > 0 && dias <= 15 && f.estado !== "morosa") { k.porVencer++; k.porVencerMonto += s; }
+  });
+  return k;
+}
+
+/* ========================================================= SIDEBAR ========================================================= */
+function renderSidebar() {
+  const items = NAV[state.role]; const sidebar = $("#sidebar");
+  const roleLabel = state.role === 'ministerio' ? 'Ministerio de Salud PBA' : state.role === 'hospital' ? 'Hospital Interzonal San Martín' : 'IOMA';
+  const kFin = state.role === "financiador" ? kpisFinanciador() : null;
+  const kHosp = state.role === "hospital" ? kpisHospital() : null;
+  const html = [`<div class="section-label">${roleLabel}</div>`];
+  items.forEach(item => {
+    const activeCls = state.view === item.view || (item.sub && item.sub.some(s => s.view === state.view)) ? "active" : "";
+    html.push(`<a data-view="${item.view}" class="${activeCls}">${item.label}</a>`);
+    if (item.sub) {
+      item.sub.forEach(sub => {
+        let badge = "";
+        if (state.role === "financiador") {
+          if (sub.view === "disc_esperan_yo" && kFin.espYo > 0) badge = `<span class="badge">${kFin.espYo}</span>`;
+          if (sub.view === "disc_esperan_hosp" && kFin.espHosp > 0) badge = `<span class="badge warn">${kFin.espHosp}</span>`;
+        } else if (state.role === "hospital") {
+          if (sub.view === "disc_h_esperan_yo" && kHosp.espYo > 0) badge = `<span class="badge">${kHosp.espYo}</span>`;
+          if (sub.view === "disc_h_esperan_fin" && kHosp.espFin > 0) badge = `<span class="badge warn">${kHosp.espFin}</span>`;
+        }
+        html.push(`<a data-view="${sub.view}" class="sub-item ${state.view === sub.view ? 'active' : ''}">${sub.label}${badge}</a>`);
+      });
+    }
+  });
+  sidebar.innerHTML = html.join("");
+  sidebar.querySelectorAll('a').forEach(a => a.addEventListener('click', () => { state.view = a.dataset.view; state.context = {}; render(); }));
+}
+
+/* ========================================================= COMPONENTES ========================================================= */
+function renderMensaje(m) {
+  const rol = m.who === "financiador" ? "Financiador" : m.who === "hospital" ? "Hospital" : "Ministerio";
+  return `<div class="thread-msg from-${m.who}">
+    <div class="who">${m.nombre}<span class="role-tag">${rol}</span><span class="when">${m.when}</span></div>
+    <div>${m.text}</div>
+    ${m.accion ? `<div class="action-summary"><strong>${m.accion.tipo}:</strong> ${m.accion.categorias.join(" · ")}
+      ${m.accion.detalles && m.accion.detalles.length ? `<ul style="margin:4px 0 0 20px;padding:0;font-size:12px;color:var(--muted);">${m.accion.detalles.map(d => `<li>${d}</li>`).join('')}</ul>` : ''}
+    </div>` : ''}
+    ${m.adjuntos && m.adjuntos.length ? `<div class="attachments">${m.adjuntos.map(a => `<span class="attachment-chip">${a.tipo === 'img' ? '🖼' : '📎'} ${a.nombre}</span>`).join('')}</div>` : ''}
+  </div>`;
+}
+function renderHilo(nro) { const t = state.threads[nro]; if (!t) return ''; return `<div class="thread">${t.map(renderMensaje).join('')}</div>`; }
+
+/* ========================================================= VISTAS HOSPITAL ========================================================= */
+function viewHospital_Panel() {
+  const k = kpisHospital();
+  const grouped = agruparPorFinanciador_hosp();
+  return `
+    <div class="page-header">
+      <div><h1>Panel — Hospital Interzonal San Martín</h1><div class="sub">Situación consolidada de facturación con financiadores</div></div>
+      <div class="page-actions"><button class="btn btn-excel" onclick="exportPanelHosp()">⬇ Descargar Excel</button></div>
+    </div>
+    ${k.espYo > 0 ? `<div class="action-required-banner">
+      <div><strong>⚠ Tenés ${k.espYo} discusión(es) esperando tu descargo</strong> — ${money(k.espYoMonto)} en debate. Un financiador objetó facturas y espera respuesta.</div>
+      <button class="btn btn-danger btn-sm" data-goto="disc_h_esperan_yo">Revisar →</button>
+    </div>` : ""}
+    ${k.pagosPorConfirmar > 0 ? `<div style="background:var(--info-soft);border:1px solid #a8c5e8;border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:12px;">
+      <div><strong style="color:var(--primary-dark);">💰 Tenés ${k.pagosPorConfirmar} pago(s) informado(s)</strong> esperando confirmación de recepción.</div>
+      <button class="btn btn-primary btn-sm" data-goto="pagos_hospital">Ver pagos →</button>
+    </div>` : ""}
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">Por cobrar</div><div class="value money">${money(k.porCobrar)}</div><div class="hint">${k.total} facturas activas</div></div>
+      <div class="kpi"><div class="label">Notificadas</div><div class="value">${k.notificadas}</div><div class="hint money">${money(k.notificadasMonto)}</div></div>
+      <div class="kpi good"><div class="label">Aceptadas s/cobrar</div><div class="value success">${k.aceptadas}</div><div class="hint money">${money(k.aceptadasMonto)}</div></div>
+      <div class="kpi"><div class="label">Pago parcial</div><div class="value">${k.pagoParcial}</div><div class="hint money">Saldo: ${money(k.pagoParcialSaldo)}</div></div>
+      <div class="kpi warning"><div class="label">Por vencer (&lt;15d)</div><div class="value warn">${k.porVencer}</div><div class="hint money">${money(k.porVencerMonto)}</div></div>
+      <div class="kpi action-required"><div class="label">Vencidas</div><div class="value danger">${k.vencidas}</div><div class="hint money">${money(k.vencidasMonto)}</div></div>
+    </div>
+    <div class="card">
+      <h3 class="card-title">Discusiones abiertas</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div style="border:1px solid #e8b0a5;border-radius:6px;padding:14px;background:var(--danger-soft);cursor:pointer;" data-goto="disc_h_esperan_yo">
+          <div style="font-size:11px;text-transform:uppercase;color:var(--danger);font-weight:600;">Esperan MI descargo</div>
+          <div style="font-size:26px;font-weight:700;color:var(--danger);">${k.espYo}</div>
+          <div style="font-size:12px;color:var(--danger);">${money(k.espYoMonto)} en debate</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:6px;">El financiador objetó — necesito responder</div>
+        </div>
+        <div style="border:1px solid #e0c977;border-radius:6px;padding:14px;background:var(--warn-soft);cursor:pointer;" data-goto="disc_h_esperan_fin">
+          <div style="font-size:11px;text-transform:uppercase;color:var(--warn);font-weight:600;">Esperando al financiador</div>
+          <div style="font-size:26px;font-weight:700;color:var(--warn);">${k.espFin}</div>
+          <div style="font-size:12px;color:var(--warn);">${money(k.espFinMonto)} en debate</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:6px;">Ya envié descargo — esperando respuesta</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h3 class="card-title">Desglose por financiador
+        <button class="btn btn-excel btn-sm" onclick="exportPanelHosp()">⬇ Excel</button>
+      </h3>
+      <table>
+        <thead><tr>
+          <th>Financiador</th><th style="text-align:center;">Facturas</th>
+          <th class="money-header">Por cobrar</th><th class="money-header">Aceptado s/cobrar</th><th class="money-header">Saldo parcial</th>
+          <th style="text-align:center;">Esp. mi resp.</th><th style="text-align:center;">Esp. financ.</th>
+          <th style="text-align:center;">Por vencer</th><th style="text-align:center;">Vencidas</th>
+        </tr></thead>
+        <tbody>
+          ${Object.entries(grouped).map(([finId, d]) => `<tr class="clickable" data-financiador-hosp="${finId}">
+            <td><strong>${finNombre(finId)}</strong> <span style="color:var(--muted);font-size:11px;">${finTipo(finId)}</span></td>
+            <td style="text-align:center;">${d.count}</td>
+            <td class="money">${money(d.porCobrar)}</td>
+            <td class="money" style="color:${d.aceptadoSinCobrar>0?'var(--success)':'var(--muted)'};">${d.aceptadoSinCobrar>0?money(d.aceptadoSinCobrar):'—'}</td>
+            <td class="money" style="color:${d.saldoParcial>0?'var(--purple)':'var(--muted)'};">${d.saldoParcial>0?money(d.saldoParcial):'—'}</td>
+            <td style="text-align:center;">${d.espYo>0?`<span class="chip chip-esperando-financiador">${d.espYo}</span>`:'—'}</td>
+            <td style="text-align:center;">${d.espFin>0?`<span class="chip chip-esperando-hospital">${d.espFin}</span>`:'—'}</td>
+            <td style="text-align:center;">${d.porVencer>0?`<span class="chip chip-por-vencer">${d.porVencer}</span>`:'—'}</td>
+            <td style="text-align:center;">${d.vencidas>0?`<span class="chip chip-morosa">${d.vencidas}</span>`:'—'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      <div class="note note-blue" style="margin-top:12px;"><strong>Click en una fila</strong> para ver el detalle de facturas con ese financiador.</div>
+    </div>
+  `;
+}
+window.exportPanelHosp = function() {
+  const g = agruparPorFinanciador_hosp();
+  const rows = [["Financiador","Tipo","Facturas","Por cobrar","Aceptado s/cobrar","Saldo parcial","Esp. mi resp.","Esp. financ.","Por vencer","Vencidas"]];
+  Object.entries(g).forEach(([finId, d]) => rows.push([finNombre(finId), finTipo(finId), d.count, d.porCobrar, d.aceptadoSinCobrar, d.saldoParcial, d.espYo, d.espFin, d.porVencer, d.vencidas]));
+  exportCSV("panel_hospital_por_financiador.csv", rows);
+};
+
+function viewHospital_DetalleFinanciador(finId) {
+  const facts = state.facturas.filter(f => f.hospital === "H001" && f.financiador === finId && isImpaga(f));
+  const g = agruparPorFinanciador_hosp()[finId] || {};
+  return `
+    <div class="breadcrumb"><a data-nav="panel_hospital">Panel</a> / ${finNombre(finId)}</div>
+    <div class="page-header">
+      <div><h1>${finNombre(finId)}</h1><div class="sub">${finTipo(finId)} — Situación consolidada</div></div>
+      <button class="btn btn-excel" onclick="exportFacturasHosp()">⬇ Excel</button>
+    </div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">Facturas</div><div class="value">${g.count||0}</div></div>
+      <div class="kpi"><div class="label">Por cobrar</div><div class="value money">${money(g.porCobrar||0)}</div></div>
+      <div class="kpi"><div class="label">Aceptado s/cobrar</div><div class="value money success">${money(g.aceptadoSinCobrar||0)}</div></div>
+      <div class="kpi ${g.espYo>0?'action-required':''}"><div class="label">Esperan mi resp.</div><div class="value ${g.espYo>0?'danger':''}">${g.espYo||0}</div></div>
+      <div class="kpi ${g.vencidas>0?'action-required':''}"><div class="label">Vencidas</div><div class="value ${g.vencidas>0?'danger':''}">${g.vencidas||0}</div></div>
+    </div>
+    <div class="card" style="padding:0;">
+      <table>
+        <thead><tr><th>Factura</th><th>Emisión</th><th>Estado</th><th>Días</th><th class="money-header">Monto</th><th class="money-header">Saldo</th><th></th></tr></thead>
+        <tbody>${facts.map(f => `<tr class="clickable" data-open-fact-hosp="${f.nro}">
+          <td><code>${f.nro}</code></td><td>${f.fecha}</td><td>${chip(f.estado)}</td><td>${diasRestantes(f.fecha)}</td>
+          <td class="money">${money(f.monto)}</td><td class="money"><strong>${money(saldoPendiente(f))}</strong></td>
+          <td><button class="btn btn-secondary btn-sm">Ver</button></td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>
+  `;
+}
+window.exportFacturasHosp = function() {
+  const facts = state.facturas.filter(f => f.hospital === "H001");
+  const rows = [["N° Factura","Financiador","Fecha","Estado","Monto","Pagado","Saldo","En debate","Días","Pacientes"]];
+  facts.forEach(f => rows.push([f.nro, finNombre(f.financiador), f.fecha, f.estado, f.monto, f.montoPagado||0, saldoPendiente(f), f.montoDebate||0, f.estado === "en_cola" ? "-" : diasRestantes(f.fecha), f.pacientes]));
+  exportCSV("facturas_hospital.csv", rows);
+};
+
+function viewHospital_Facturas() {
+  const facts = state.facturas.filter(f => f.hospital === "H001");
+  const porFin = {};
+  facts.forEach(f => { if (!porFin[f.financiador]) porFin[f.financiador] = []; porFin[f.financiador].push(f); });
+  return `
+    <div class="page-header">
+      <div><h1>Mis facturas</h1><div class="sub">Facturación emitida en el sistema central del ministerio</div></div>
+      <button class="btn btn-excel" onclick="exportFacturasHosp()">⬇ Excel</button>
+    </div>
+    <div class="filter-bar">
+      <select><option>Todos los estados</option></select>
+      <select><option>Todos los financiadores</option>${FINANCIADORES.map(f=>`<option>${f.nombre}</option>`).join('')}</select>
+      <input placeholder="Buscar por N°…" style="min-width:200px;">
+    </div>
+    <div class="card" style="padding:0;">
+      ${Object.entries(porFin).map(([finId, fs]) => `
+        <div class="group-header"><span class="caret">▾</span><strong>${finNombre(finId)}</strong><span style="color:var(--muted);font-weight:400;">— ${fs.length} factura(s)</span></div>
+        <table>
+          <thead><tr><th>Factura</th><th>Emisión</th><th>Estado</th><th>Días</th><th class="money-header">Monto</th><th class="money-header">Saldo</th></tr></thead>
+          <tbody>${fs.map(f => `<tr class="clickable" data-open-fact-hosp="${f.nro}">
+            <td><code>${f.nro}</code></td><td>${f.fecha}</td><td>${chip(f.estado)}</td>
+            <td>${f.estado === 'en_cola' ? '—' : diasRestantes(f.fecha)}</td>
+            <td class="money">${money(f.monto)}</td><td class="money"><strong>${money(saldoPendiente(f))}</strong></td>
+          </tr>`).join('')}</tbody>
+        </table>
+      `).join('')}
+    </div>
+  `;
+}
+
+function viewHospital_DetalleFactura(nro) {
+  const f = state.facturas.find(x => x.nro === nro);
+  if (!f) return "No encontrada.";
+  const items = ITEMS_FACTURA[nro] || ITEMS_FACTURA["0001-00042189"];
+  const thread = state.threads[nro];
+  const vence = new Date(new Date(f.fecha).getTime() + 60*86400000).toISOString().split("T")[0];
+  const requiereMiRespuesta = esDiscYo_hosp(f);
+  return `
+    <div class="breadcrumb"><a data-nav="panel_hospital">Panel</a> / <a data-nav="facturas_hospital">Mis facturas</a> / ${nro}</div>
+    <div class="page-header">
+      <div><h1>Factura ${nro}</h1><div class="sub">${finNombre(f.financiador)} — Emitida ${f.fecha} — Vence ${vence}</div></div>
+      <div>${chip(f.estado)}</div>
+    </div>
+    ${requiereMiRespuesta ? `<div class="action-required-banner">
+      <div><strong>${finNombre(f.financiador)} planteó una objeción</strong> — ${f.montoDebate ? money(f.montoDebate) + ' en debate. ' : ''}Necesitás enviar descargo, aportar documentación, o aceptar el planteo.</div>
+    </div>` : ""}
+    <div class="two-col">
+      <div>
+        <div class="card">
+          <h3 class="card-title">Prestaciones facturadas
+            <div style="font-size:12px;font-weight:400;color:var(--muted);">${items.length} ítems — ${money(items.reduce((s,i)=>s+i.monto,0))}</div>
+          </h3>
+          <table class="items-table">
+            <thead><tr><th>Paciente</th><th>Prestación</th><th>Código</th><th class="money-header">Monto</th></tr></thead>
+            <tbody>${items.map(it => `<tr>
+              <td><div>${it.paciente}</div><div style="color:var(--muted);font-size:11px;">${it.afiliado}</div></td>
+              <td>${it.prestacion}</td><td><code>${it.codigo}</code></td><td class="money">${money(it.monto)}</td>
+            </tr>`).join('')}</tbody>
+          </table>
+          <div class="actions-row">
+            <button class="btn btn-secondary btn-sm">📎 Descargar factura PDF</button>
+            <button class="btn btn-secondary btn-sm">📎 Ver documentación adjunta</button>
+            <button class="btn btn-secondary btn-sm">Emitir nota de crédito</button>
+          </div>
+        </div>
+        ${thread ? `<div class="card">
+          <h3 class="card-title">Hilo de discusión <span style="font-size:12px;font-weight:400;color:var(--muted);">${thread.length} mensaje(s)</span></h3>
+          ${renderHilo(nro)}
+          ${requiereMiRespuesta ? `<div class="thread-composer">
+            <div style="margin-bottom:8px;font-size:12px;color:var(--muted);">Podés responder con texto rápido o abrir un descargo estructurado con categorías.</div>
+            <textarea placeholder="Escribí una respuesta rápida…"></textarea>
+            <div class="composer-actions">
+              <div><button class="btn btn-secondary btn-sm">📎 Adjuntar</button></div>
+              <div style="display:flex;gap:6px;">
+                <button class="btn btn-warn btn-sm" onclick="openModalDescargoHosp()">Descargo estructurado</button>
+                <button class="btn btn-primary btn-sm" onclick="responderRapidoHosp('${nro}')">Responder</button>
+              </div>
+            </div>
+          </div>` : `<div class="note note-blue" style="margin-top:12px;">
+            <strong>Esperando al financiador.</strong> Ya enviaste tu descargo. Si no responde en un tiempo razonable, podés escalar al ministerio.
+            <div style="margin-top:6px;"><button class="btn btn-secondary btn-sm">Escalar al ministerio</button></div>
+          </div>`}
+        </div>` : `<div class="card">
+          <h3 class="card-title">Sin discusiones abiertas</h3>
+          <div style="color:var(--muted);font-size:13px;">Esta factura no tiene objeciones. Podés adjuntar documentación preventiva.</div>
+          <div class="actions-row"><button class="btn btn-secondary btn-sm">📎 Adjuntar documentación de respaldo</button></div>
+        </div>`}
+      </div>
+      <div>
+        <div class="card">
+          <h3 class="card-title">Datos</h3>
+          <div style="font-size:12.5px;line-height:1.9;">
+            <div><span style="color:var(--muted);">Financiador:</span> <strong>${finNombre(f.financiador)}</strong></div>
+            <div><span style="color:var(--muted);">Tipo:</span> ${finTipo(f.financiador)}</div>
+            <div><span style="color:var(--muted);">Emisión:</span> ${f.fecha}</div>
+            <div><span style="color:var(--muted);">Vencimiento:</span> ${vence}</div>
+            <div><span style="color:var(--muted);">Pacientes:</span> ${f.pacientes}</div>
+            <div><span style="color:var(--muted);">Monto:</span> <strong>${money(f.monto)}</strong></div>
+            ${f.montoPagado > 0 ? `<div><span style="color:var(--muted);">Cobrado:</span> <strong style="color:var(--success);">${money(f.montoPagado)}</strong></div>` : ''}
+            ${f.montoDebate ? `<div><span style="color:var(--muted);">En debate:</span> <strong style="color:var(--warn);">${money(f.montoDebate)}</strong></div>` : ''}
+            <div><span style="color:var(--muted);">Saldo:</span> <strong>${money(saldoPendiente(f))}</strong></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3 class="card-title">Documentación adjunta</h3>
+          <div class="attachments">
+            <span class="attachment-chip">📎 factura_original.pdf</span>
+            <span class="attachment-chip">📎 HCs_lote.zip</span>
+            <span class="attachment-chip">📎 autorizaciones.pdf</span>
+          </div>
+          <div style="margin-top:12px;"><button class="btn btn-secondary btn-sm">+ Agregar</button></div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+window.responderRapidoHosp = function(nro) {
+  const f = state.facturas.find(x => x.nro === nro); if (f) f.estado = "esperando_financiador";
+  state.threads[nro].push({ who: "hospital", nombre: "Hosp. San Martín", when: "hoy", text: "(Respuesta rápida enviada)", accion: null, adjuntos: [] });
+  render(); showToast("Respuesta enviada — pelota del lado del financiador");
+};
+
+function viewHospital_Discusiones(subestado) {
+  const facts = state.facturas.filter(f => f.hospital === "H001" && (subestado === "yo" ? esDiscYo_hosp(f) : esDiscOtro_hosp(f)));
+  const titulo = subestado === "yo" ? "Discusiones — Esperan mi descargo" : "Discusiones — Esperando al financiador";
+  const sub = subestado === "yo" ? "El financiador objetó y espera que respondas o aportes documentación." : "Ya enviaste tu descargo. Esperás la respuesta del financiador.";
+  return `
+    <div class="breadcrumb"><a data-nav="panel_hospital">Panel</a> / Discusiones / ${subestado === "yo" ? "Esperan mi descargo" : "Esperando al financiador"}</div>
+    <div class="page-header">
+      <div><h1>${titulo}</h1><div class="sub">${sub}</div></div>
+      <button class="btn btn-excel" onclick="exportCSV('disc_hosp.csv', [['Factura','Financiador','Emisión','Días','Monto','En debate']])">⬇ Excel</button>
+    </div>
+    ${subestado === "yo" ? `<div class="note"><strong>Priorizá por vencimiento:</strong> el plazo de 60 días sigue corriendo.</div>` : `<div class="note note-blue"><strong>Ya enviaste tu descargo.</strong> Si el financiador no responde en un tiempo razonable, podés escalar al ministerio para mediación.</div>`}
+    ${facts.length === 0 ? `<div class="card" style="text-align:center;color:var(--muted);padding:40px;">Sin discusiones en este subestado.</div>` : `
+    <div class="card" style="padding:0;">
+      <table>
+        <thead><tr><th>Factura</th><th>Financiador</th><th>Emisión</th><th>Días</th><th class="money-header">Monto</th><th class="money-header">En debate</th><th>Últ. mensaje</th><th></th></tr></thead>
+        <tbody>${facts.map(f => {
+          const t = state.threads[f.nro] || []; const last = t[t.length-1];
+          return `<tr class="clickable" data-open-fact-hosp="${f.nro}">
+            <td><code>${f.nro}</code></td><td>${finNombre(f.financiador)}</td><td>${f.fecha}</td>
+            <td style="color:${diasRestantes(f.fecha) < 15 ? 'var(--danger)' : 'var(--muted)'};font-weight:600;">${diasRestantes(f.fecha)}</td>
+            <td class="money">${money(f.monto)}</td>
+            <td class="money" style="color:var(--warn);font-weight:600;">${money(f.montoDebate||0)}</td>
+            <td style="font-size:12px;color:var(--muted);">${last ? last.nombre + ' — ' + last.when : '—'}</td>
+            <td><button class="btn ${subestado === 'yo' ? 'btn-primary' : 'btn-secondary'} btn-sm">${subestado === 'yo' ? 'Responder →' : 'Ver hilo'}</button></td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>`}
+  `;
+}
+
+function viewHospital_Pagos() {
+  const pagos = state.pagosInformados.filter(p => p.estado === "pendiente_confirmacion" && p.hospital === "H001");
+  return `
+    <div class="page-header"><div><h1>Pagos por confirmar</h1><div class="sub">Pagos informados por financiadores</div></div></div>
+    <div class="note note-blue"><strong>Cierre del circuito:</strong> confirmá que el pago efectivamente entró.</div>
+    <div class="card">
+      ${pagos.length === 0 ? '<div style="color:var(--muted);padding:20px;text-align:center;">Sin pagos pendientes.</div>' :
+        pagos.map(pago => `<div style="border:1px solid var(--border);border-radius:6px;padding:14px;margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+            <div><strong>${finNombre(pago.financiador)}</strong> informó un pago<div style="color:var(--muted);font-size:12px;">Factura ${pago.facturas.join(', ')} — ${pago.comprobante} — ${pago.fecha}</div></div>
+            <div style="text-align:right;"><div style="font-family:monospace;font-size:16px;font-weight:700;">${money(pago.monto)}</div><div style="font-size:11px;color:var(--muted);">${pago.tipo === 'total' ? 'Pago total' : 'Pago parcial'}</div></div>
+          </div>
+          <div class="attachments"><span class="attachment-chip">📎 comprobante_${pago.comprobante}.pdf</span></div>
+          <div class="actions-row">
+            <button class="btn btn-success btn-sm" data-confirmar-pago="${pago.id}">✓ Confirmar recepción</button>
+            <button class="btn btn-danger btn-sm">✗ No lo recibí</button>
+            <button class="btn btn-warn btn-sm">⚠ Monto no coincide</button>
+          </div>
+        </div>`).join('')}
+    </div>
+  `;
+}
+
+function viewHospital_Cerradas() {
+  const cerradas = state.facturas.filter(f => f.hospital === "H001" && (f.estado === "cerrada" || f.estado === "rechazada_total"));
+  return `
+    <div class="page-header"><div><h1>Historial</h1></div><button class="btn btn-excel" onclick="exportFacturasHosp()">⬇ Excel</button></div>
+    <div class="card" style="padding:0;">
+      <table>
+        <thead><tr><th>Factura</th><th>Financiador</th><th>Fecha</th><th class="money-header">Monto</th><th>Estado</th></tr></thead>
+        <tbody>${cerradas.length === 0 ? '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--muted);">Sin historial.</td></tr>' :
+          cerradas.map(f => `<tr><td><code>${f.nro}</code></td><td>${finNombre(f.financiador)}</td><td>${f.fecha}</td><td class="money">${money(f.monto)}</td><td>${chip(f.estado)}</td></tr>`).join('')}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+/* ========================================================= VISTAS FINANCIADOR ========================================================= */
+function viewFinanciador_Panel() {
+  const k = kpisFinanciador(); const grouped = agruparPorHospital_fin();
+  return `
+    <div class="page-header">
+      <div><h1>Panel — IOMA</h1><div class="sub">Situación consolidada de facturación del Ministerio de Salud PBA</div></div>
+      <div class="page-actions"><button class="btn btn-excel" onclick="exportPanelFin()">⬇ Descargar Excel</button></div>
+    </div>
+    ${k.espYo > 0 ? `<div class="action-required-banner">
+      <div><strong>⚠ Tenés ${k.espYo} discusión(es) esperando tu respuesta</strong> — ${money(k.espYoMonto)} en debate.</div>
+      <button class="btn btn-danger btn-sm" data-goto="disc_esperan_yo">Revisar →</button>
+    </div>` : ""}
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">Deuda total</div><div class="value money">${money(k.deudaTotal)}</div><div class="hint">${k.total} facturas activas</div></div>
+      <div class="kpi"><div class="label">Sin pagar</div><div class="value">${k.sinPagar}</div><div class="hint money">${money(k.sinPagarMonto)}</div></div>
+      <div class="kpi"><div class="label">Pago parcial</div><div class="value">${k.pagoParcial}</div><div class="hint money">Saldo: ${money(k.pagoParcialSaldo)}</div></div>
+      <div class="kpi warning"><div class="label">Por vencer (&lt;15d)</div><div class="value warn">${k.porVencer}</div><div class="hint money">${money(k.porVencerMonto)}</div></div>
+      <div class="kpi action-required"><div class="label">Vencidas</div><div class="value danger">${k.vencidas}</div><div class="hint money">${money(k.vencidasMonto)}</div></div>
+    </div>
+    <div class="card">
+      <h3 class="card-title">Discusiones abiertas</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div style="border:1px solid #e8b0a5;border-radius:6px;padding:14px;background:var(--danger-soft);cursor:pointer;" data-goto="disc_esperan_yo">
+          <div style="font-size:11px;text-transform:uppercase;color:var(--danger);font-weight:600;">Esperan MI respuesta</div>
+          <div style="font-size:26px;font-weight:700;color:var(--danger);">${k.espYo}</div>
+          <div style="font-size:12px;color:var(--danger);">${money(k.espYoMonto)} en debate</div>
+        </div>
+        <div style="border:1px solid #e0c977;border-radius:6px;padding:14px;background:var(--warn-soft);cursor:pointer;" data-goto="disc_esperan_hosp">
+          <div style="font-size:11px;text-transform:uppercase;color:var(--warn);font-weight:600;">Esperando al hospital</div>
+          <div style="font-size:26px;font-weight:700;color:var(--warn);">${k.espHosp}</div>
+          <div style="font-size:12px;color:var(--warn);">${money(k.espHospMonto)} en debate</div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h3 class="card-title">Desglose por hospital <button class="btn btn-excel btn-sm" onclick="exportPanelFin()">⬇ Excel</button></h3>
+      <table>
+        <thead><tr><th>Hospital</th><th>Facturas</th><th class="money-header">Deuda</th><th class="money-header">Aceptado</th><th class="money-header">Saldo parcial</th><th>Esp. yo</th><th>Esp. hosp.</th><th>Por vencer</th><th>Vencidas</th></tr></thead>
+        <tbody>${Object.entries(grouped).map(([hospId, d]) => `<tr class="clickable" data-hospital-fin="${hospId}">
+          <td><strong>${hospCorto(hospId)}</strong></td>
+          <td style="text-align:center;">${d.count}</td>
+          <td class="money">${money(d.deudaTotal)}</td>
+          <td class="money" style="color:${d.aceptadoSinPagar>0?'var(--success)':'var(--muted)'};">${d.aceptadoSinPagar>0?money(d.aceptadoSinPagar):'—'}</td>
+          <td class="money" style="color:${d.saldoParcial>0?'var(--purple)':'var(--muted)'};">${d.saldoParcial>0?money(d.saldoParcial):'—'}</td>
+          <td style="text-align:center;">${d.espYo>0?`<span class="chip chip-esperando-financiador">${d.espYo}</span>`:'—'}</td>
+          <td style="text-align:center;">${d.espHosp>0?`<span class="chip chip-esperando-hospital">${d.espHosp}</span>`:'—'}</td>
+          <td style="text-align:center;">${d.porVencer>0?`<span class="chip chip-por-vencer">${d.porVencer}</span>`:'—'}</td>
+          <td style="text-align:center;">${d.vencidas>0?`<span class="chip chip-morosa">${d.vencidas}</span>`:'—'}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>
+  `;
+}
+window.exportPanelFin = function() {
+  const g = agruparPorHospital_fin();
+  const rows = [["Hospital","Facturas","Deuda","Aceptado","Saldo parcial","Esp. yo","Esp. hosp.","Por vencer","Vencidas"]];
+  Object.entries(g).forEach(([hospId, d]) => rows.push([hospNombre(hospId), d.count, d.deudaTotal, d.aceptadoSinPagar, d.saldoParcial, d.espYo, d.espHosp, d.porVencer, d.vencidas]));
+  exportCSV("panel_ioma_por_hospital.csv", rows);
+};
+
+function viewFinanciador_DetalleHospital(hospId) {
+  const facts = state.facturas.filter(f => f.financiador === "F001" && f.hospital === hospId && isImpaga(f));
+  const g = agruparPorHospital_fin()[hospId] || {};
+  return `
+    <div class="breadcrumb"><a data-nav="panel_financiador">Panel</a> / ${hospNombre(hospId)}</div>
+    <div class="page-header"><div><h1>${hospNombre(hospId)}</h1></div><button class="btn btn-excel" onclick="exportFacturasFin()">⬇ Excel</button></div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">Facturas</div><div class="value">${g.count||0}</div></div>
+      <div class="kpi"><div class="label">Deuda</div><div class="value money">${money(g.deudaTotal||0)}</div></div>
+      <div class="kpi"><div class="label">Aceptado</div><div class="value money success">${money(g.aceptadoSinPagar||0)}</div></div>
+      <div class="kpi ${g.espYo>0?'action-required':''}"><div class="label">Esperan mi resp.</div><div class="value ${g.espYo>0?'danger':''}">${g.espYo||0}</div></div>
+      <div class="kpi ${g.vencidas>0?'action-required':''}"><div class="label">Vencidas</div><div class="value ${g.vencidas>0?'danger':''}">${g.vencidas||0}</div></div>
+    </div>
+    <div class="card" style="padding:0;">
+      <table>
+        <thead><tr><th>Factura</th><th>Emisión</th><th>Estado</th><th>Días</th><th class="money-header">Monto</th><th class="money-header">Saldo</th><th></th></tr></thead>
+        <tbody>${facts.map(f => `<tr class="clickable" data-open-fact-fin="${f.nro}">
+          <td><code>${f.nro}</code></td><td>${f.fecha}</td><td>${chip(f.estado)}</td><td>${diasRestantes(f.fecha)}</td>
+          <td class="money">${money(f.monto)}</td><td class="money"><strong>${money(saldoPendiente(f))}</strong></td>
+          <td><button class="btn btn-secondary btn-sm">Ver</button></td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>
+  `;
+}
+window.exportFacturasFin = function() {
+  const facts = state.facturas.filter(f => f.financiador === "F001");
+  const rows = [["Factura","Hospital","Fecha","Estado","Monto","Pagado","Saldo","En debate","Días","Pacientes"]];
+  facts.forEach(f => rows.push([f.nro, hospNombre(f.hospital), f.fecha, f.estado, f.monto, f.montoPagado||0, saldoPendiente(f), f.montoDebate||0, f.estado === "en_cola" ? "-" : diasRestantes(f.fecha), f.pacientes]));
+  exportCSV("facturas_ioma.csv", rows);
+};
+
+function viewFinanciador_Notificaciones() {
+  return `
+    <div class="page-header"><div><h1>Notificaciones recibidas</h1></div><button class="btn btn-excel">⬇ Excel</button></div>
+    <div class="note"><strong>Notificación fehaciente vía portal + domicilio electrónico nacional.</strong> 60 días para pagar.</div>
+    <div class="card" style="padding:0;"><table>
+      <thead><tr><th>Fecha</th><th>Período</th><th>Facturas</th><th>Hospitales</th><th class="money-header">Monto</th><th>Vencimiento</th></tr></thead>
+      <tbody><tr class="clickable" data-open-notif="1"><td><strong>15/07/2026</strong></td><td>Julio 2026</td><td>10</td><td>5</td><td class="money">${money(20297620)}</td><td>13/09/2026</td></tr></tbody>
+    </table></div>
+  `;
+}
+
+function viewFinanciador_Facturas() {
+  const facts = state.facturas.filter(f => f.financiador === "F001" && isImpaga(f));
+  const porHospital = {};
+  facts.forEach(f => { if (!porHospital[f.hospital]) porHospital[f.hospital] = []; porHospital[f.hospital].push(f); });
+  return `
+    <div class="page-header"><div><h1>Facturas a revisar</h1><div class="sub">${facts.length} facturas activas</div></div>
+      <button class="btn btn-excel" onclick="exportFacturasFin()">⬇ Excel</button></div>
+    <div class="card" style="padding:0;">
+      ${Object.entries(porHospital).map(([hospId, fs]) => `
+        <div class="group-header"><span class="caret">▾</span><strong>${hospNombre(hospId)}</strong><span style="color:var(--muted);font-weight:400;">— ${fs.length}</span></div>
+        <table>
+          <thead><tr><th>Factura</th><th>Emisión</th><th>Estado</th><th>Días</th><th class="money-header">Monto</th><th class="money-header">Saldo</th></tr></thead>
+          <tbody>${fs.map(f => `<tr class="clickable" data-open-fact-fin="${f.nro}">
+            <td><code>${f.nro}</code></td><td>${f.fecha}</td><td>${chip(f.estado)}</td><td>${diasRestantes(f.fecha)}</td>
+            <td class="money">${money(f.monto)}</td><td class="money"><strong>${money(saldoPendiente(f))}</strong></td>
+          </tr>`).join('')}</tbody>
+        </table>
+      `).join('')}
+    </div>
+  `;
+}
+
+function viewFinanciador_DetalleFactura(nro) {
+  const f = state.facturas.find(x => x.nro === nro); if (!f) return "No encontrada.";
+  const items = ITEMS_FACTURA[nro] || ITEMS_FACTURA["0001-00042189"];
+  const thread = state.threads[nro];
+  const vence = new Date(new Date(f.fecha).getTime() + 60*86400000).toISOString().split("T")[0];
+  return `
+    <div class="breadcrumb"><a data-nav="panel_financiador">Panel</a> / <a data-nav="facturas_financiador">Facturas</a> / ${nro}</div>
+    <div class="page-header"><div><h1>Factura ${nro}</h1><div class="sub">${hospNombre(f.hospital)} — Emitida ${f.fecha} — Vence ${vence}</div></div><div>${chip(f.estado)}</div></div>
+    <div class="two-col">
+      <div>
+        <div class="card">
+          <h3 class="card-title">Prestaciones facturadas</h3>
+          <table class="items-table">
+            <thead><tr><th><input type="checkbox"></th><th>Paciente</th><th>Prestación</th><th>Código</th><th class="money-header">Monto</th></tr></thead>
+            <tbody>${items.map(it => `<tr>
+              <td><input type="checkbox"></td>
+              <td><div>${it.paciente}</div><div style="color:var(--muted);font-size:11px;">${it.afiliado}</div></td>
+              <td>${it.prestacion}</td><td><code>${it.codigo}</code></td><td class="money">${money(it.monto)}</td>
+            </tr>`).join('')}</tbody>
+          </table>
+          <div class="actions-row">
+            <button class="btn btn-success" id="btn-aceptar-total">✓ Aceptar factura</button>
+            <button class="btn btn-warn" id="btn-discutir">✎ Iniciar discusión</button>
+            <button class="btn btn-danger" id="btn-rechazar-parcial">Rechazar ítems</button>
+            <button class="btn btn-danger" id="btn-rechazar-total">Rechazar todo</button>
+          </div>
+        </div>
+        ${thread ? `<div class="card">
+          <h3 class="card-title">Hilo de discusión</h3>${renderHilo(nro)}
+          ${esDiscYo_fin(f) ? `<div class="thread-composer">
+            <textarea placeholder="Escribí tu respuesta…"></textarea>
+            <div class="composer-actions">
+              <div><button class="btn btn-secondary btn-sm">📎 Adjuntar</button></div>
+              <div style="display:flex;gap:6px;">
+                <button class="btn btn-success btn-sm" onclick="cerrarDiscFin('${nro}', true)">Aceptar descargo</button>
+                <button class="btn btn-warn btn-sm" onclick="responderDiscFin('${nro}')">Pedir más info</button>
+                <button class="btn btn-danger btn-sm" onclick="cerrarDiscFin('${nro}', false)">Mantener rechazo</button>
+              </div>
+            </div>
+          </div>` : ''}
+        </div>` : ''}
+      </div>
+      <div><div class="card">
+        <h3 class="card-title">Datos</h3>
+        <div style="font-size:12.5px;line-height:1.9;">
+          <div><span style="color:var(--muted);">Hospital:</span> ${hospNombre(f.hospital)}</div>
+          <div><span style="color:var(--muted);">Monto:</span> <strong>${money(f.monto)}</strong></div>
+          ${f.montoDebate ? `<div><span style="color:var(--muted);">En debate:</span> <strong style="color:var(--warn);">${money(f.montoDebate)}</strong></div>` : ''}
+          <div><span style="color:var(--muted);">Saldo:</span> <strong>${money(saldoPendiente(f))}</strong></div>
+        </div>
+      </div></div>
+    </div>
+  `;
+}
+window.responderDiscFin = function(nro) {
+  const f = state.facturas.find(x => x.nro === nro); if (f) f.estado = "esperando_hospital";
+  state.threads[nro].push({ who: "financiador", nombre: "IOMA", when: "hoy", text: "(Respuesta, pidiendo más info)", accion: { tipo: "Solicitud de info", categorias: ["Pedido de doc"], detalles: [] }, adjuntos: [] });
+  render(); showToast("Respuesta enviada");
+};
+window.cerrarDiscFin = function(nro, aceptar) {
+  const f = state.facturas.find(x => x.nro === nro); if (f) f.estado = aceptar ? "aceptada" : "rechazada_parcial";
+  render(); showToast(aceptar ? "Discusión cerrada — aceptada" : "Discusión cerrada — rechazo confirmado");
+};
+
+function viewFinanciador_Discusiones(subestado) {
+  const facts = state.facturas.filter(f => f.financiador === "F001" && (subestado === "yo" ? esDiscYo_fin(f) : esDiscHosp_fin(f)));
+  const titulo = subestado === "yo" ? "Esperan mi respuesta" : "Esperando al hospital";
+  return `
+    <div class="page-header"><div><h1>Discusiones — ${titulo}</h1></div></div>
+    ${facts.length === 0 ? `<div class="card" style="text-align:center;color:var(--muted);padding:40px;">Sin discusiones.</div>` : `
+    <div class="card" style="padding:0;"><table>
+      <thead><tr><th>Factura</th><th>Hospital</th><th>Días</th><th class="money-header">En debate</th><th></th></tr></thead>
+      <tbody>${facts.map(f => `<tr class="clickable" data-open-fact-fin="${f.nro}">
+        <td><code>${f.nro}</code></td><td>${hospCorto(f.hospital)}</td><td>${diasRestantes(f.fecha)}</td>
+        <td class="money" style="color:var(--warn);font-weight:600;">${money(f.montoDebate||0)}</td>
+        <td><button class="btn ${subestado === 'yo' ? 'btn-primary' : 'btn-secondary'} btn-sm">${subestado === 'yo' ? 'Responder →' : 'Ver'}</button></td>
+      </tr>`).join('')}</tbody>
+    </table></div>`}
+  `;
+}
+
+function viewFinanciador_InformarPagos() {
+  return `<div class="page-header"><div><h1>Informar pago</h1></div><button class="btn btn-primary" id="btn-nuevo-pago">+ Nuevo pago</button></div>
+    <div class="card"><table><thead><tr><th>Fecha</th><th>Comprobante</th><th>Facturas</th><th>Tipo</th><th class="money-header">Monto</th><th>Estado</th></tr></thead>
+      <tbody><tr><td>28/07/2026</td><td><code>TRF-889021</code></td><td>1 factura</td><td>Total</td><td class="money">${money(890400)}</td><td>${chip("pago_informado")}</td></tr></tbody></table></div>`;
+}
+function viewFinanciador_Historial() {
+  const cerradas = state.facturas.filter(f => f.financiador === "F001" && f.estado === "cerrada");
+  return `<div class="page-header"><div><h1>Historial</h1></div></div>
+    <div class="card" style="padding:0;"><table>
+      <thead><tr><th>Factura</th><th>Hospital</th><th>Fecha</th><th class="money-header">Monto</th></tr></thead>
+      <tbody>${cerradas.map(f => `<tr><td><code>${f.nro}</code></td><td>${hospCorto(f.hospital)}</td><td>${f.fecha}</td><td class="money">${money(f.monto)}</td></tr>`).join('')}</tbody>
+    </table></div>`;
+}
+
+/* ========================================================= VISTAS MINISTERIO ========================================================= */
+/* ---- Agregaciones globales del ministerio (todo el sistema, todos los financiadores) ---- */
+function kpisMinisterio() {
+  const activas = state.facturas.filter(f => isImpaga(f));
+  const k = { enCola:0, enColaMonto:0, notificado:0, notificadoMonto:0, deudaTotal:0,
+    aceptado:0, aceptadoMonto:0, espFin:0, espFinMonto:0, espHosp:0, espHospMonto:0,
+    porVencer:0, porVencerMonto:0, morosas:0, morosasMonto:0, total: activas.length };
+  activas.forEach(f => {
+    const s = saldoPendiente(f);
+    if (f.estado === "en_cola") { k.enCola++; k.enColaMonto += s; }
+    else { k.deudaTotal += s; }
+    if (f.estado !== "en_cola") { k.notificado++; k.notificadoMonto += s; }
+    if (f.estado === "aceptada") { k.aceptado++; k.aceptadoMonto += s; }
+    // desde la óptica del ministerio: esperando_financiador = pelota del financiador; esperando_hospital = pelota del hospital
+    if (f.estado === "esperando_financiador") { k.espFin++; k.espFinMonto += (f.montoDebate || s); }
+    if (f.estado === "esperando_hospital") { k.espHosp++; k.espHospMonto += (f.montoDebate || s); }
+    if (f.estado === "morosa") { k.morosas++; k.morosasMonto += s; }
+    const dias = diasRestantes(f.fecha);
+    if (dias > 0 && dias <= 15 && f.estado !== "morosa" && f.estado !== "en_cola") { k.porVencer++; k.porVencerMonto += s; }
+  });
+  return k;
+}
+function agruparMinisterioPor(dim) { // dim = "financiador" | "hospital"
+  const activas = state.facturas.filter(f => isImpaga(f) && f.estado !== "en_cola");
+  const g = {};
+  activas.forEach(f => {
+    const key = f[dim];
+    if (!g[key]) g[key] = { count:0, deuda:0, aceptado:0, espFin:0, espHosp:0, porVencer:0, morosas:0 };
+    const d = g[key]; const s = saldoPendiente(f);
+    d.count++; d.deuda += s;
+    if (f.estado === "aceptada") d.aceptado += s;
+    if (f.estado === "esperando_financiador") d.espFin++;
+    if (f.estado === "esperando_hospital") d.espHosp++;
+    if (f.estado === "morosa") d.morosas++;
+    const dias = diasRestantes(f.fecha);
+    if (dias > 0 && dias <= 15 && f.estado !== "morosa") d.porVencer++;
+  });
+  return g;
+}
+
+function viewMinisterio_Dashboard() {
+  const k = kpisMinisterio();
+  const porFin = agruparMinisterioPor("financiador");
+  const porHosp = agruparMinisterioPor("hospital");
+  const enDiscusion = k.espFin + k.espHosp;
+  return `
+    <div class="page-header">
+      <div><h1>Panel general</h1><div class="sub">Visión consolidada de todo el circuito de recuperación de costos</div></div>
+      <div class="page-actions">
+        <button class="btn btn-excel" onclick="exportPanelMin('financiador')">⬇ Excel (financiadores)</button>
+        <button class="btn btn-excel" onclick="exportPanelMin('hospital')">⬇ Excel (hospitales)</button>
+      </div>
+    </div>
+
+    ${k.morosas > 0 ? `<div class="action-required-banner">
+      <div><strong>⚠ Hay ${k.morosas} factura(s) en morosidad</strong> — ${money(k.morosasMonto)} vencido. Pendiente de derivar a legales.</div>
+      <button class="btn btn-danger btn-sm" data-goto="morosidad">Ver morosidad →</button>
+    </div>` : ""}
+
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">Deuda total del sistema</div><div class="value money">${money(k.deudaTotal)}</div><div class="hint">${k.total} facturas activas</div></div>
+      <div class="kpi"><div class="label">En cola de notificación</div><div class="value">${k.enCola}</div><div class="hint money">${money(k.enColaMonto)}</div></div>
+      <div class="kpi good"><div class="label">Aceptado sin pagar</div><div class="value success">${k.aceptado}</div><div class="hint money">${money(k.aceptadoMonto)}</div></div>
+      <div class="kpi"><div class="label">En discusión</div><div class="value">${enDiscusion}</div><div class="hint">${k.espFin} financ. · ${k.espHosp} hosp.</div></div>
+      <div class="kpi warning"><div class="label">Por vencer (&lt;15d)</div><div class="value warn">${k.porVencer}</div><div class="hint money">${money(k.porVencerMonto)}</div></div>
+      <div class="kpi action-required"><div class="label">Morosas</div><div class="value danger">${k.morosas}</div><div class="hint money">${money(k.morosasMonto)}</div></div>
+    </div>
+
+    <div class="card">
+      <h3 class="card-title">Discusiones abiertas — quién tiene la pelota</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div style="border:1px solid #e0c977;border-radius:6px;padding:14px;background:var(--warn-soft);cursor:pointer;" data-goto="discusiones">
+          <div style="font-size:11px;text-transform:uppercase;color:var(--warn);font-weight:600;">Del lado del financiador</div>
+          <div style="font-size:26px;font-weight:700;color:var(--warn);">${k.espFin}</div>
+          <div style="font-size:12px;color:var(--warn);">${money(k.espFinMonto)} en debate</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:6px;">El financiador debe responder al hospital</div>
+        </div>
+        <div style="border:1px solid #a5c9a5;border-radius:6px;padding:14px;background:var(--success-soft);cursor:pointer;" data-goto="discusiones">
+          <div style="font-size:11px;text-transform:uppercase;color:var(--success);font-weight:600;">Del lado del hospital</div>
+          <div style="font-size:26px;font-weight:700;color:var(--success);">${k.espHosp}</div>
+          <div style="font-size:12px;color:var(--success);">${money(k.espHospMonto)} en debate</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:6px;">El hospital debe enviar su descargo</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 class="card-title">Desglose por financiador
+        <button class="btn btn-excel btn-sm" onclick="exportPanelMin('financiador')">⬇ Excel</button>
+      </h3>
+      <table>
+        <thead><tr><th>Financiador</th><th style="text-align:center;">Facturas</th><th class="money-header">Deuda</th><th class="money-header">Aceptado</th><th style="text-align:center;">Esp. financ.</th><th style="text-align:center;">Esp. hosp.</th><th style="text-align:center;">Por vencer</th><th style="text-align:center;">Morosas</th></tr></thead>
+        <tbody>
+          ${FINANCIADORES.map(f => {
+            const d = porFin[f.id] || { count:0, deuda:0, aceptado:0, espFin:0, espHosp:0, porVencer:0, morosas:0 };
+            return `<tr class="clickable" data-min-fin="${f.id}">
+              <td><strong>${f.nombre}</strong> <span style="color:var(--muted);font-size:11px;">${f.tipo}</span></td>
+              <td style="text-align:center;">${d.count}</td>
+              <td class="money">${money(d.deuda)}</td>
+              <td class="money" style="color:${d.aceptado>0?'var(--success)':'var(--muted)'};">${d.aceptado>0?money(d.aceptado):'—'}</td>
+              <td style="text-align:center;">${d.espFin>0?`<span class="chip chip-esperando-hospital">${d.espFin}</span>`:'—'}</td>
+              <td style="text-align:center;">${d.espHosp>0?`<span class="chip chip-esperando-financiador">${d.espHosp}</span>`:'—'}</td>
+              <td style="text-align:center;">${d.porVencer>0?`<span class="chip chip-por-vencer">${d.porVencer}</span>`:'—'}</td>
+              <td style="text-align:center;">${d.morosas>0?`<span class="chip chip-morosa">${d.morosas}</span>`:'—'}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+      <div class="note note-blue" style="margin-top:12px;"><strong>Click en una fila</strong> para ver el detalle de ese financiador.</div>
+    </div>
+
+    <div class="card">
+      <h3 class="card-title">Desglose por hospital
+        <button class="btn btn-excel btn-sm" onclick="exportPanelMin('hospital')">⬇ Excel</button>
+      </h3>
+      <table>
+        <thead><tr><th>Hospital</th><th style="text-align:center;">Facturas</th><th class="money-header">Deuda</th><th class="money-header">Aceptado</th><th style="text-align:center;">Esp. financ.</th><th style="text-align:center;">Esp. hosp.</th><th style="text-align:center;">Por vencer</th><th style="text-align:center;">Morosas</th></tr></thead>
+        <tbody>
+          ${HOSPITALES.map(h => {
+            const d = porHosp[h.id] || { count:0, deuda:0, aceptado:0, espFin:0, espHosp:0, porVencer:0, morosas:0 };
+            if (d.count === 0) return '';
+            return `<tr class="clickable" data-min-hosp="${h.id}">
+              <td><strong>${hospCorto(h.id)}</strong></td>
+              <td style="text-align:center;">${d.count}</td>
+              <td class="money">${money(d.deuda)}</td>
+              <td class="money" style="color:${d.aceptado>0?'var(--success)':'var(--muted)'};">${d.aceptado>0?money(d.aceptado):'—'}</td>
+              <td style="text-align:center;">${d.espFin>0?`<span class="chip chip-esperando-hospital">${d.espFin}</span>`:'—'}</td>
+              <td style="text-align:center;">${d.espHosp>0?`<span class="chip chip-esperando-financiador">${d.espHosp}</span>`:'—'}</td>
+              <td style="text-align:center;">${d.porVencer>0?`<span class="chip chip-por-vencer">${d.porVencer}</span>`:'—'}</td>
+              <td style="text-align:center;">${d.morosas>0?`<span class="chip chip-morosa">${d.morosas}</span>`:'—'}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+      <div class="note note-blue" style="margin-top:12px;"><strong>Click en una fila</strong> para ver el detalle de ese hospital.</div>
+    </div>
+  `;
+}
+window.exportPanelMin = function(dim) {
+  const g = agruparMinisterioPor(dim);
+  const nombre = dim === "financiador" ? finNombre : (id) => hospNombre(id);
+  const rows = [[dim === "financiador" ? "Financiador" : "Hospital","Facturas","Deuda","Aceptado","Esp. financ.","Esp. hosp.","Por vencer","Morosas"]];
+  Object.entries(g).forEach(([id, d]) => rows.push([nombre(id), d.count, d.deuda, d.aceptado, d.espFin, d.espHosp, d.porVencer, d.morosas]));
+  exportCSV(`panel_ministerio_por_${dim}.csv`, rows);
+};
+
+function viewMinisterio_DetalleActor(dim, id) {
+  const facts = state.facturas.filter(f => f[dim] === id && isImpaga(f) && f.estado !== "en_cola");
+  const nombre = dim === "financiador" ? finNombre(id) : hospNombre(id);
+  const subtitulo = dim === "financiador" ? finTipo(id) : "Hospital";
+  const g = agruparMinisterioPor(dim)[id] || { count:0, deuda:0, aceptado:0, espFin:0, espHosp:0, porVencer:0, morosas:0 };
+  const backView = "dashboard";
+  const otherLabel = dim === "financiador" ? "Hospital" : "Financiador";
+  const otherFn = dim === "financiador" ? (f) => hospCorto(f.hospital) : (f) => finNombre(f.financiador);
+  return `
+    <div class="breadcrumb"><a data-nav="${backView}">Panel general</a> / ${nombre}</div>
+    <div class="page-header">
+      <div><h1>${nombre}</h1><div class="sub">${subtitulo} — visión del ministerio</div></div>
+      <button class="btn btn-excel" onclick="exportPanelMin('${dim}')">⬇ Excel</button>
+    </div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">Facturas</div><div class="value">${g.count}</div></div>
+      <div class="kpi"><div class="label">Deuda</div><div class="value money">${money(g.deuda)}</div></div>
+      <div class="kpi good"><div class="label">Aceptado</div><div class="value success">${money(g.aceptado)}</div></div>
+      <div class="kpi"><div class="label">En discusión</div><div class="value">${g.espFin + g.espHosp}</div></div>
+      <div class="kpi ${g.morosas>0?'action-required':''}"><div class="label">Morosas</div><div class="value ${g.morosas>0?'danger':''}">${g.morosas}</div></div>
+    </div>
+    <div class="card" style="padding:0;">
+      <table>
+        <thead><tr><th>Factura</th><th>${otherLabel}</th><th>Emisión</th><th>Estado</th><th>Días</th><th class="money-header">Monto</th></tr></thead>
+        <tbody>${facts.map(f => `<tr>
+          <td><code>${f.nro}</code></td><td>${otherFn(f)}</td><td>${f.fecha}</td><td>${chip(f.estado)}</td>
+          <td style="color:${diasRestantes(f.fecha)<15?'var(--danger)':'var(--muted)'};font-weight:600;">${diasRestantes(f.fecha)}</td>
+          <td class="money">${money(f.monto)}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function viewMinisterio_Cola() {
+  const enCola = state.facturas.filter(f => f.estado === "en_cola");
+  const porFin = {};
+  enCola.forEach(f => { if (!porFin[f.financiador]) porFin[f.financiador] = []; porFin[f.financiador].push(f); });
+  const totalMonto = enCola.reduce((s,f)=>s+f.monto,0);
+  return `<div class="page-header">
+      <div><h1>Cola de notificación</h1><div class="sub">Facturas emitidas pendientes de notificación consolidada</div></div>
+      <button class="btn btn-primary" id="btn-notificar">Ejecutar notificación consolidada</button>
+    </div>
+    <div class="note"><strong>Cada financiador recibe una sola notificación consolidada.</strong> A partir de esa fecha corren los 60 días.</div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">Facturas a notificar</div><div class="value">${enCola.length}</div></div>
+      <div class="kpi"><div class="label">Financiadores</div><div class="value">${Object.keys(porFin).length}</div></div>
+      <div class="kpi"><div class="label">Hospitales</div><div class="value">${new Set(enCola.map(f=>f.hospital)).size}</div></div>
+      <div class="kpi"><div class="label">Monto total</div><div class="value money">${money(totalMonto)}</div></div>
+    </div>
+    <div class="card" style="padding:0;">
+      ${Object.entries(porFin).map(([finId, fs]) => `
+        <div class="group-header"><span class="caret">▾</span><strong>${finNombre(finId)}</strong><span style="color:var(--muted);font-weight:400;">— ${fs.length} factura(s) — ${money(fs.reduce((s,f)=>s+f.monto,0))}</span></div>
+        <table>
+          <thead><tr><th>Factura</th><th>Hospital</th><th>Fecha</th><th>Pacientes</th><th class="money-header">Monto</th></tr></thead>
+          <tbody>${fs.map(f => `<tr><td><code>${f.nro}</code></td><td>${hospCorto(f.hospital)}</td><td>${f.fecha}</td><td>${f.pacientes}</td><td class="money">${money(f.monto)}</td></tr>`).join('')}</tbody>
+        </table>
+      `).join('')}
+    </div>`;
+}
+function viewMinisterio_Notificadas() {
+  const n = state.facturas.filter(f => f.estado !== "en_cola");
+  return `<div class="page-header">
+      <div><h1>Facturas notificadas</h1><div class="sub">Trazabilidad completa de todas las facturas del sistema</div></div>
+      <button class="btn btn-excel" onclick="exportMinNotificadas()">⬇ Excel</button>
+    </div>
+    <div class="filter-bar">
+      <select><option>Todos los financiadores</option>${FINANCIADORES.map(f=>`<option>${f.nombre}</option>`).join('')}</select>
+      <select><option>Todos los hospitales</option>${HOSPITALES.map(h=>`<option>${h.nombre}</option>`).join('')}</select>
+      <select><option>Todos los estados</option></select>
+    </div>
+    <div class="card" style="padding:0;"><table><thead><tr><th>Factura</th><th>Hospital</th><th>Financiador</th><th>Emisión</th><th>Días</th><th>Estado</th><th class="money-header">Monto</th></tr></thead>
+    <tbody>${n.map(f => {
+      const dias = diasRestantes(f.fecha);
+      return `<tr><td><code>${f.nro}</code></td><td>${hospCorto(f.hospital)}</td><td>${finNombre(f.financiador)}</td><td>${f.fecha}</td><td style="color:${dias<0?'var(--danger)':dias<15?'var(--warn)':'var(--muted)'};font-weight:600;">${dias}</td><td>${chip(f.estado)}</td><td class="money">${money(f.monto)}</td></tr>`;
+    }).join('')}</tbody></table></div>`;
+}
+window.exportMinNotificadas = function() {
+  const n = state.facturas.filter(f => f.estado !== "en_cola");
+  const rows = [["Factura","Hospital","Financiador","Emisión","Días","Estado","Monto"]];
+  n.forEach(f => rows.push([f.nro, hospNombre(f.hospital), finNombre(f.financiador), f.fecha, diasRestantes(f.fecha), f.estado, f.monto]));
+  exportCSV("facturas_notificadas.csv", rows);
+};
+function viewMinisterio_Discusiones() {
+  const facts = state.facturas.filter(f => esDiscYo_fin(f) || esDiscHosp_fin(f));
+  const espFin = facts.filter(f => f.estado === "esperando_financiador");
+  const espHosp = facts.filter(f => f.estado === "esperando_hospital");
+  const fila = (f) => {
+    const t = state.threads[f.nro] || []; const last = t[t.length-1];
+    const pelota = f.estado === "esperando_financiador" ? '<span class="chip chip-esperando-hospital">Financiador</span>' : '<span class="chip chip-esperando-financiador">Hospital</span>';
+    return `<tr><td><code>${f.nro}</code></td><td>${hospCorto(f.hospital)}</td><td>${finNombre(f.financiador)}</td><td>${pelota}</td><td class="money" style="color:var(--warn);font-weight:600;">${money(f.montoDebate||0)}</td><td style="color:${diasRestantes(f.fecha)<15?'var(--danger)':'var(--muted)'};font-weight:600;">${diasRestantes(f.fecha)}</td><td style="font-size:12px;color:var(--muted);">${last ? last.nombre+' — '+last.when : '—'}</td></tr>`;
+  };
+  return `<div class="page-header">
+      <div><h1>Discusiones abiertas</h1><div class="sub">Todas las discusiones del sistema y quién debe actuar</div></div>
+      <button class="btn btn-excel" onclick="exportMinDiscusiones()">⬇ Excel</button>
+    </div>
+    <div class="note note-blue"><strong>Decisión abierta:</strong> el rol del ministerio acá (observador / auditor / mediador) todavía está por definir. El prototipo asume que puede ver todo y, eventualmente, intervenir.</div>
+    <div class="kpi-grid">
+      <div class="kpi warning"><div class="label">Esperando al financiador</div><div class="value warn">${espFin.length}</div><div class="hint money">${money(espFin.reduce((s,f)=>s+(f.montoDebate||0),0))}</div></div>
+      <div class="kpi good"><div class="label">Esperando al hospital</div><div class="value success">${espHosp.length}</div><div class="hint money">${money(espHosp.reduce((s,f)=>s+(f.montoDebate||0),0))}</div></div>
+      <div class="kpi"><div class="label">Total en debate</div><div class="value money">${money(facts.reduce((s,f)=>s+(f.montoDebate||0),0))}</div></div>
+    </div>
+    <div class="card" style="padding:0;"><table>
+      <thead><tr><th>Factura</th><th>Hospital</th><th>Financiador</th><th>Pelota en</th><th class="money-header">En debate</th><th>Días</th><th>Últ. mensaje</th></tr></thead>
+      <tbody>${facts.map(fila).join('')}</tbody>
+    </table></div>`;
+}
+window.exportMinDiscusiones = function() {
+  const facts = state.facturas.filter(f => esDiscYo_fin(f) || esDiscHosp_fin(f));
+  const rows = [["Factura","Hospital","Financiador","Pelota en","En debate","Días"]];
+  facts.forEach(f => rows.push([f.nro, hospNombre(f.hospital), finNombre(f.financiador), f.estado === "esperando_financiador" ? "Financiador" : "Hospital", f.montoDebate||0, diasRestantes(f.fecha)]));
+  exportCSV("discusiones_sistema.csv", rows);
+};
+function viewMinisterio_Morosidad() {
+  const m = state.facturas.filter(f => f.estado === "morosa");
+  const totalMonto = m.reduce((s,f)=>s+f.monto,0);
+  const porFin = {};
+  m.forEach(f => { porFin[f.financiador] = (porFin[f.financiador]||0) + f.monto; });
+  return `<div class="page-header">
+      <div><h1>Morosidad → Legales</h1><div class="sub">Facturas vencidas (más de 60 días desde emisión sin pago)</div></div>
+      <div class="page-actions">
+        <button class="btn btn-excel" onclick="exportMinMorosidad()">⬇ Excel</button>
+        <button class="btn btn-danger">Derivar seleccionadas a legales</button>
+      </div>
+    </div>
+    <div class="kpi-grid">
+      <div class="kpi action-required"><div class="label">Facturas morosas</div><div class="value danger">${m.length}</div></div>
+      <div class="kpi action-required"><div class="label">Monto total vencido</div><div class="value money danger">${money(totalMonto)}</div></div>
+      <div class="kpi"><div class="label">Financiadores con mora</div><div class="value">${Object.keys(porFin).length}</div></div>
+    </div>
+    <div class="card" style="padding:0;"><table>
+      <thead><tr><th><input type="checkbox"></th><th>Factura</th><th>Hospital</th><th>Financiador</th><th>Emisión</th><th>Vencida hace</th><th class="money-header">Monto</th></tr></thead>
+      <tbody>${m.map(f => `<tr><td><input type="checkbox"></td><td><code>${f.nro}</code></td><td>${hospCorto(f.hospital)}</td><td>${finNombre(f.financiador)}</td><td>${f.fecha}</td><td style="color:var(--danger);font-weight:600;">${Math.abs(diasRestantes(f.fecha))} días</td><td class="money">${money(f.monto)}</td></tr>`).join('')}</tbody>
+    </table></div>`;
+}
+window.exportMinMorosidad = function() {
+  const m = state.facturas.filter(f => f.estado === "morosa");
+  const rows = [["Factura","Hospital","Financiador","Emisión","Vencida hace (días)","Monto"]];
+  m.forEach(f => rows.push([f.nro, hospNombre(f.hospital), finNombre(f.financiador), f.fecha, Math.abs(diasRestantes(f.fecha)), f.monto]));
+  exportCSV("morosidad_legales.csv", rows);
+};
+
+/* ========================================================= ROUTER ========================================================= */
+function render() {
+  renderSidebar();
+  const main = $("#main"); const role = state.role; const view = state.view;
+  let html = "";
+  if (role === "ministerio") {
+    if (view === "dashboard") html = viewMinisterio_Dashboard();
+    else if (view === "cola") html = viewMinisterio_Cola();
+    else if (view === "notificadas") html = viewMinisterio_Notificadas();
+    else if (view === "discusiones") html = viewMinisterio_Discusiones();
+    else if (view === "morosidad") html = viewMinisterio_Morosidad();
+    else if (view === "min_detalle_fin") html = viewMinisterio_DetalleActor("financiador", state.context.actor);
+    else if (view === "min_detalle_hosp") html = viewMinisterio_DetalleActor("hospital", state.context.actor);
+  } else if (role === "hospital") {
+    if (view === "panel_hospital") html = viewHospital_Panel();
+    else if (view === "detalle_financiador") html = viewHospital_DetalleFinanciador(state.context.financiador);
+    else if (view === "facturas_hospital") html = viewHospital_Facturas();
+    else if (view === "detalle_factura_hosp") html = viewHospital_DetalleFactura(state.context.factura);
+    else if (view === "discusiones_hospital" || view === "disc_h_esperan_yo") html = viewHospital_Discusiones("yo");
+    else if (view === "disc_h_esperan_fin") html = viewHospital_Discusiones("fin");
+    else if (view === "pagos_hospital") html = viewHospital_Pagos();
+    else if (view === "cerradas_hospital") html = viewHospital_Cerradas();
+  } else if (role === "financiador") {
+    if (view === "panel_financiador") html = viewFinanciador_Panel();
+    else if (view === "detalle_hospital") html = viewFinanciador_DetalleHospital(state.context.hospital);
+    else if (view === "notificaciones") html = viewFinanciador_Notificaciones();
+    else if (view === "facturas_financiador") html = viewFinanciador_Facturas();
+    else if (view === "detalle_factura") html = viewFinanciador_DetalleFactura(state.context.factura);
+    else if (view === "discusiones_financiador" || view === "disc_esperan_yo") html = viewFinanciador_Discusiones("yo");
+    else if (view === "disc_esperan_hosp") html = viewFinanciador_Discusiones("hosp");
+    else if (view === "informar_pagos") html = viewFinanciador_InformarPagos();
+    else if (view === "historial_financiador") html = viewFinanciador_Historial();
+  }
+  html += `<div class="legend"><h4>Ciclo de vida — estados</h4><div class="legend-items">
+    ${chip("emitida")} ${chip("en_cola")} ${chip("notificada")} ${chip("aceptada")}
+    ${chip("esperando_financiador")} ${chip("esperando_hospital")}
+    ${chip("rechazada_parcial")} ${chip("rechazada_total")}
+    ${chip("pago_informado")} ${chip("pago_parcial")} ${chip("pagada")} ${chip("morosa")} ${chip("cerrada")}
+  </div></div>`;
+  main.innerHTML = html;
+  wireEvents();
+}
+
+/* ========================================================= EVENTS + MODALES ========================================================= */
+function wireEvents() {
+  document.querySelectorAll('[data-nav]').forEach(el => el.addEventListener('click', (e) => { e.preventDefault(); state.view = el.dataset.nav; state.context = {}; render(); }));
+  document.querySelectorAll('[data-goto]').forEach(el => el.addEventListener('click', (e) => { e.preventDefault(); state.view = el.dataset.goto; render(); }));
+  document.querySelectorAll('[data-hospital-fin]').forEach(el => el.addEventListener('click', () => { state.view = "detalle_hospital"; state.context.hospital = el.dataset.hospitalFin; render(); }));
+  document.querySelectorAll('[data-financiador-hosp]').forEach(el => el.addEventListener('click', () => { state.view = "detalle_financiador"; state.context.financiador = el.dataset.financiadorHosp; render(); }));
+  document.querySelectorAll('[data-min-fin]').forEach(el => el.addEventListener('click', () => { state.view = "min_detalle_fin"; state.context.actor = el.dataset.minFin; render(); }));
+  document.querySelectorAll('[data-min-hosp]').forEach(el => el.addEventListener('click', () => { state.view = "min_detalle_hosp"; state.context.actor = el.dataset.minHosp; render(); }));
+  document.querySelectorAll('[data-open-notif]').forEach(el => el.addEventListener('click', () => { state.view = "facturas_financiador"; render(); }));
+  document.querySelectorAll('[data-open-fact-fin]').forEach(el => el.addEventListener('click', () => { state.view = "detalle_factura"; state.context.factura = el.dataset.openFactFin; render(); }));
+  document.querySelectorAll('[data-open-fact-hosp]').forEach(el => el.addEventListener('click', () => { state.view = "detalle_factura_hosp"; state.context.factura = el.dataset.openFactHosp; render(); }));
+  const bN = $("#btn-notificar"); if (bN) bN.addEventListener('click', () => openModalNotificar());
+  const bA = $("#btn-aceptar-total"); if (bA) bA.addEventListener('click', () => { const f = state.facturas.find(x => x.nro === state.context.factura); if (f) f.estado = "aceptada"; render(); showToast("✓ Aceptada"); });
+  const bD = $("#btn-discutir"); if (bD) bD.addEventListener('click', () => openModalDiscutirFin());
+  const bRP = $("#btn-rechazar-parcial"); if (bRP) bRP.addEventListener('click', () => { const f = state.facturas.find(x => x.nro === state.context.factura); if (f) f.estado = "rechazada_parcial"; render(); });
+  const bRT = $("#btn-rechazar-total"); if (bRT) bRT.addEventListener('click', () => { const f = state.facturas.find(x => x.nro === state.context.factura); if (f) f.estado = "rechazada_total"; render(); });
+  const bNP = $("#btn-nuevo-pago"); if (bNP) bNP.addEventListener('click', () => openModalNuevoPago());
+  document.querySelectorAll('[data-confirmar-pago]').forEach(el => el.addEventListener('click', () => {
+    const id = el.dataset.confirmarPago; const p = state.pagosInformados.find(x => x.id === id);
+    if (p) { p.estado = "confirmado"; p.facturas.forEach(nro => { const f = state.facturas.find(x => x.nro === nro); if (f) f.estado = "cerrada"; }); }
+    render(); showToast("✓ Pago confirmado — factura cerrada");
+  }));
+}
+
+function openModal(html) {
+  $("#modal-content").innerHTML = html;
+  $("#modal-backdrop").classList.add("open");
+  $("#modal-backdrop").onclick = (e) => { if (e.target.id === "modal-backdrop") closeModal(); };
+  document.querySelectorAll('.cat-item').forEach(item => {
+    const cb = item.querySelector('input[type="checkbox"]');
+    if (cb) cb.addEventListener('change', () => item.classList.toggle('checked', cb.checked));
+  });
+}
+function closeModal() { $("#modal-backdrop").classList.remove("open"); }
+window.closeModal = closeModal;
+
+function openModalNotificar() {
+  const enCola = state.facturas.filter(f => f.estado === "en_cola");
+  const fin = new Set(enCola.map(f => f.financiador));
+  openModal(`<h3>Ejecutar notificación consolidada</h3>
+    <p>Vas a notificar <strong>${enCola.length}</strong> facturas a <strong>${fin.size}</strong> financiadores.</p>
+    <label>Fecha</label><input type="date" value="2026-08-03">
+    <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="confirmarNotif()">Confirmar</button></div>`);
+}
+window.confirmarNotif = function() {
+  state.facturas.forEach(f => { if (f.estado === "en_cola") f.estado = "notificada"; });
+  closeModal(); render(); showToast("✓ Notificado");
+};
+
+function openModalDiscutirFin() {
+  openModal(`<h3>Iniciar discusión</h3>
+    <p class="subtle">Elegí una o más categorías. Cada una despliega sus campos.</p>
+    <div class="cat-list">
+      <div class="cat-item"><label class="cat-header"><input type="checkbox"><span>Afiliado no vigente / no corresponde</span></label>
+        <div class="cat-body"><label>N° de afiliado</label><input placeholder="Ej: 4-503-819***">
+          <label>Fecha de baja</label><input type="date">
+          <label>¿Corresponde a otra cobertura?</label><select><option>No sabemos</option><option>Sí</option><option>No</option></select></div></div>
+      <div class="cat-item"><label class="cat-header"><input type="checkbox"><span>Falta autorización previa</span></label>
+        <div class="cat-body"><label>Prestación</label><input placeholder="Código">
+          <label>¿Fue emergencia?</label><select><option>Indicar</option><option>Sí</option><option>No</option></select></div></div>
+      <div class="cat-item"><label class="cat-header"><input type="checkbox"><span>Prestación no cubierta por el plan</span></label>
+        <div class="cat-body"><label>Plan del afiliado</label><input><label>Código</label><input></div></div>
+      <div class="cat-item"><label class="cat-header"><input type="checkbox"><span>Documentación incompleta</span></label>
+        <div class="cat-body"><label>¿Qué falta?</label>
+          <div class="checkline"><input type="checkbox"> Historia clínica</div>
+          <div class="checkline"><input type="checkbox"> Epicrisis</div>
+          <div class="checkline"><input type="checkbox"> Consentimiento informado</div>
+          <div class="checkline"><input type="checkbox"> Formulario de autorización</div>
+          <div class="checkline"><input type="checkbox"> Comprobante de urgencia</div></div></div>
+      <div class="cat-item"><label class="cat-header"><input type="checkbox"><span>Diferencia en código / valor</span></label>
+        <div class="cat-body"><label>Código facturado</label><input><label>Código correcto</label><input><label>Valor s/ convenio</label><input></div></div>
+    </div>
+    <label>Comentario general</label><textarea></textarea>
+    <label>Adjuntos</label><input type="file">
+    <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-warn" onclick="confirmarDiscFin()">Iniciar discusión</button></div>`);
+}
+window.confirmarDiscFin = function() {
+  const f = state.facturas.find(x => x.nro === state.context.factura);
+  if (f) { f.estado = "esperando_hospital"; if (!f.montoDebate) f.montoDebate = Math.round(f.monto * 0.15); }
+  if (!state.threads[state.context.factura]) state.threads[state.context.factura] = [];
+  state.threads[state.context.factura].push({ who: "financiador", nombre: "IOMA", when: "hoy",
+    text: "Iniciamos discusión con las categorías seleccionadas.",
+    accion: { tipo: "Objeción iniciada", categorias: ["(categorías del modal)"], detalles: [] }, adjuntos: [] });
+  closeModal(); render(); showToast("✎ Discusión iniciada");
+};
+
+/* MODAL DESCARGO DEL HOSPITAL — 6 categorías */
+function openModalDescargoHosp() {
+  openModal(`<h3>Enviar descargo estructurado</h3>
+    <p class="subtle">Elegí cómo respondés. Podés combinar acciones — por ejemplo ratificar la mayor parte y aceptar refacturar un ítem específico.</p>
+    <div class="cat-list">
+
+      <div class="cat-item"><label class="cat-header"><input type="checkbox"><span>Ratificar factura con documentación de respaldo</span></label>
+        <div class="cat-body">
+          <label>Argumento / fundamento</label>
+          <textarea placeholder="Ej: La cobertura estaba activa al momento de la prestación, adjuntamos padrón."></textarea>
+          <label>Documentación que se adjunta</label>
+          <div class="checkline"><input type="checkbox"> Padrón consultado con timestamp</div>
+          <div class="checkline"><input type="checkbox"> Historia clínica completa</div>
+          <div class="checkline"><input type="checkbox"> Epicrisis firmada</div>
+          <div class="checkline"><input type="checkbox"> Constancia de urgencia</div>
+          <div class="checkline"><input type="checkbox"> Captura del sistema al momento de la atención</div>
+          <div class="checkline"><input type="checkbox"> Otro (aclarar)</div>
+        </div></div>
+
+      <div class="cat-item"><label class="cat-header"><input type="checkbox"><span>Aportar dato faltante</span></label>
+        <div class="cat-body">
+          <label>Tipo de dato</label>
+          <select><option>N° de autorización previa</option><option>N° de afiliado corregido</option><option>Plan del afiliado</option><option>Constancia de derivación</option><option>Otro</option></select>
+          <label>Valor / número</label><input placeholder="Ej: AUT-2026-88129">
+          <label>Fecha (si aplica)</label><input type="date">
+          <label>Aclaraciones</label><textarea></textarea>
+        </div></div>
+
+      <div class="cat-item"><label class="cat-header"><input type="checkbox"><span>Refutar el planteo</span></label>
+        <div class="cat-body">
+          <label>Motivo de la refutación</label>
+          <select>
+            <option>El código facturado es correcto según convenio</option>
+            <option>La prestación sí está cubierta por el plan</option>
+            <option>La autorización previa no era necesaria (emergencia)</option>
+            <option>Ya se aportó la documentación pedida</option>
+            <option>Otro</option>
+          </select>
+          <label>Fundamentación</label><textarea placeholder="Explicá el desacuerdo con evidencia."></textarea>
+          <label>Documento de referencia</label><input placeholder="Ej: Convenio IOMA vigente desde 05/2026">
+        </div></div>
+
+      <div class="cat-item"><label class="cat-header"><input type="checkbox"><span>Aceptar rechazo parcial y refacturar</span></label>
+        <div class="cat-body">
+          <label>Ítem(s) que se retiran</label>
+          <div class="checkline"><input type="checkbox"> Cirugía menor + insumos ($ 620.800)</div>
+          <div class="checkline"><input type="checkbox"> Estudios de laboratorio ($ 98.400)</div>
+          <div class="checkline"><input type="checkbox"> Otro ítem</div>
+          <label>Acción sobre lo retirado</label>
+          <select><option>Emitir nota de crédito por diferencia</option><option>Refacturar con corrección</option><option>Anular sin refacturar</option></select>
+          <label>Comentario</label><textarea></textarea>
+        </div></div>
+
+      <div class="cat-item"><label class="cat-header"><input type="checkbox"><span>Aceptar rechazo total de la factura</span></label>
+        <div class="cat-body">
+          <label>Motivo</label>
+          <select><option>Se emitirá nueva factura con datos corregidos</option><option>Corresponde a otro financiador</option><option>Factura duplicada — se anula</option><option>Otro</option></select>
+          <label>Aclaración</label><textarea></textarea>
+        </div></div>
+
+      <div class="cat-item"><label class="cat-header"><input type="checkbox"><span>Escalar al ministerio como mediador</span></label>
+        <div class="cat-body">
+          <label>Motivo del pedido de mediación</label>
+          <textarea placeholder="Ej: El financiador rechazó documentación válida. Solicitamos revisión del Ministerio."></textarea>
+          <div class="note note-blue" style="margin-top:8px;">Al escalar, el Ministerio interviene en el hilo. La discusión sigue abierta pero con visibilidad del auditor.</div>
+        </div></div>
+
+    </div>
+    <label>Comentario general (opcional)</label><textarea></textarea>
+    <label>Adjuntar archivos</label><input type="file" multiple>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarDescargoHosp()">Enviar descargo</button>
+    </div>`);
+}
+window.openModalDescargoHosp = openModalDescargoHosp;
+window.confirmarDescargoHosp = function() {
+  const f = state.facturas.find(x => x.nro === state.context.factura); if (f) f.estado = "esperando_financiador";
+  if (!state.threads[state.context.factura]) state.threads[state.context.factura] = [];
+  state.threads[state.context.factura].push({
+    who: "hospital", nombre: "Hosp. San Martín", when: "hoy",
+    text: "Enviamos descargo estructurado con documentación adjunta.",
+    accion: { tipo: "Descargo del hospital", categorias: ["(categorías del modal)"], detalles: ["Se argumenta según los campos completados", "Se adjunta documentación de respaldo"] },
+    adjuntos: [{ nombre: "descargo_respuesta.pdf", tipo: "pdf" }, { nombre: "documentacion_respaldo.zip", tipo: "pdf" }]
+  });
+  closeModal(); render(); showToast("Descargo enviado — el financiador debe revisar");
+};
+
+function openModalNuevoPago() {
+  openModal(`<h3>Informar nuevo pago</h3>
+    <label>Tipo</label><select><option>Total</option><option>Parcial</option></select>
+    <label>Monto</label><input placeholder="$ 0">
+    <label>Fecha</label><input type="date" value="2026-08-03">
+    <label>Referencia</label><input placeholder="TRF-...">
+    <label>Comprobante</label><input type="file">
+    <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="closeModal(); showToast('Pago informado')">Informar</button></div>`);
+}
+
+document.querySelectorAll('.role-switcher button').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.role-switcher button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    state.role = b.dataset.role;
+    state.view = NAV[state.role][0].view;
+    state.context = {};
+    render();
+  });
+});
+
+render();
+</script>
+</body>
+</html>
