@@ -189,10 +189,17 @@
   .planteo.me-toca { border-left-color: var(--danger); background: #fffcfb; }
   .planteo.cerrado { border-left-color: var(--neutral); opacity: 0.75; }
   .planteo-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  /* El planteo original del financiador, destacado: es lo que la otra parte tiene que poder leer
+     antes de decidir. Antes quedaba perdido dentro del hilo general. */
+  .planteo-origen { border-left: 3px solid var(--warn); background: var(--warn-soft); border-radius: 0 6px 6px 0; padding: 10px 12px; margin: 10px 0; }
+  .planteo-origen-tit { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; color: var(--warn); margin-bottom: 5px; }
+  .nc-consolidada { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; border: 1px dashed var(--purple); background: var(--purple-soft); border-radius: 6px; padding: 12px 14px; margin-bottom: 12px; font-size: 13px; color: #3d2263; }
   .planteo-mov { border-left: 3px solid var(--border); padding: 6px 10px; margin-bottom: 6px; font-size: 12.5px; background: #fafbfc; border-radius: 0 4px 4px 0; }
   .planteo-mov.from-hospital { border-left-color: var(--success); }
   .planteo-mov.from-financiador { border-left-color: var(--warn); }
   .planteo-mov.from-ministerio { border-left-color: var(--purple); }
+  .planteo-mov.from-sistema, .thread-msg.from-sistema { border-left-color: var(--neutral); }
+  .planteo-escindido { font-size: 11px; color: var(--muted); font-style: italic; }
 </style>
 </head>
 <body>
@@ -482,7 +489,9 @@ let state = {
   ],
   // Selección y filtrado de prestaciones dentro del detalle de una factura (objeción en lote).
   // `vistaItems` conmuta entre leer la factura por prestación o agrupada por paciente.
-  selItems: [], filtroItems: { codigo: "TODOS", q: "" }, vistaItems: "prestacion", focusSel: null
+  selItems: [], filtroItems: { codigo: "TODOS", q: "" }, vistaItems: "prestacion", focusSel: null,
+  // Prestaciones alcanzadas por la acción de planteo que se está por confirmar (ver planteoDeLaAccion).
+  accionPlanteo: null
 };
 // Objeciones cargadas sobre prestaciones concretas de una factura.
 const objecionesDe = (f) => f.objeciones || [];
@@ -554,10 +563,21 @@ const enDiscusion = (f) => ["esperando_financiador","esperando_hospital","rechaz
 const PLANTEO_CERRADO = ["aceptado", "cerrado_nc", "desestimado_firme"];
 const planteoAbierto = (o) => !PLANTEO_CERRADO.includes(o.estado);
 const planteosAbiertos = (f) => objecionesDe(f).filter(planteoAbierto);
+/* `a_acreditar` = la auditoría le dio la razón al financiador (o el hospital aceptó el planteo): no hay
+   nada más que discutir, falta la nota de crédito. Sigue contando como abierto y en debate porque el
+   saldo de la factura todavía no bajó — recién baja cuando se emite la NC. */
+const PLANTEO_EN_DISCUSION = ["en_auditoria", "derivado_hospital", "respondido"];
+const planteoEnDiscusion = (o) => PLANTEO_EN_DISCUSION.includes(o.estado);
+const planteosAcreditables = (f) => objecionesDe(f).filter(o => o.estado === "a_acreditar");
+/* Una sola NC por factura: se habilita cuando ya no queda nada en discusión, para no emitir una nota
+   de crédito por cada planteo (sería un lío administrativo del lado contable). */
+const ncConsolidadaHabilitada = (f) => planteosAcreditables(f).length > 0
+  && !objecionesDe(f).some(planteoEnDiscusion);
 const PLANTEO_LABEL = {
   en_auditoria: { txt: "En auditoría", cls: "chip-esperando-auditoria" },
   derivado_hospital: { txt: "Derivado al hospital", cls: "chip-esperando-hospital" },
   respondido: { txt: "Esperando al financiador", cls: "chip-esperando-financiador" },
+  a_acreditar: { txt: "Reconocido — pendiente de NC", cls: "chip-pago-parcial" },
   aceptado: { txt: "Cerrado — respuesta aceptada", cls: "chip-aceptada" },
   cerrado_nc: { txt: "Cerrado con nota de crédito", cls: "chip-cerrada-nc" },
   desestimado_firme: { txt: "Cerrado — objeción desistida", cls: "chip-cerrada" },
@@ -569,7 +589,7 @@ const chipPlanteo = (o) => {
 // Quién tiene que actuar sobre este planteo, para que cada rol sepa si le toca.
 const planteoEsDe = (o, rol) =>
   rol === "ministerio" ? o.estado === "en_auditoria"
-  : rol === "hospital" ? o.estado === "derivado_hospital"
+  : rol === "hospital" ? (o.estado === "derivado_hospital" || o.estado === "a_acreditar")
   : o.estado === "respondido";
 
 const ESTADOS_DISCUSION = ["esperando_auditoria", "esperando_hospital", "esperando_financiador", "rechazada_parcial"];
@@ -581,8 +601,61 @@ function recalcularEstadoFactura(f) {
   if (!abiertos.length) { f.estado = saldoPendiente(f) <= 0 ? "cerrada" : "aceptada"; return; }
   if (abiertos.some(o => o.estado === "derivado_hospital")) f.estado = "esperando_hospital";
   else if (abiertos.some(o => o.estado === "en_auditoria")) f.estado = "esperando_auditoria";
-  else f.estado = "esperando_financiador";
+  else if (abiertos.some(o => o.estado === "respondido")) f.estado = "esperando_financiador";
+  // Solo quedan planteos reconocidos: la pelota es del hospital, que debe emitir la NC consolidada.
+  else f.estado = "esperando_hospital";
 }
+/* El financiador objeta en lote (6 prestaciones con el mismo motivo), pero quien resuelve puede
+   necesitar decidir distinto en cada una: una improcedente, otra derivada, otra reconocida. Cuando
+   la decisión alcanza solo a parte de las prestaciones, el planteo SE ESCINDE: las alcanzadas se van
+   a un planteo nuevo sobre el que se aplica la acción, y el original queda con el resto.
+   Devuelve el planteo sobre el que hay que actuar. */
+function escindirPlanteo(f, o, ids) {
+  const seleccion = o.items.filter(i => ids.includes(i));
+  if (!seleccion.length || seleccion.length === o.items.length) return o;  // alcanza a todo: no se divide
+  const items = itemsDe(f.nro);
+  const montoDe = (lista) => items.filter(i => lista.includes(i.id)).reduce((s, i) => s + i.monto, 0);
+  const totalItems = montoDe(o.items);
+  // El monto se reparte proporcionalmente: el financiador pudo haber objetado menos que el facturado.
+  const montoNuevo = totalItems ? Math.round(o.monto * montoDe(seleccion) / totalItems) : 0;
+  const nuevo = {
+    ...o,
+    id: "OBJ-" + (objecionesDe(f).length + 1),
+    items: seleccion,
+    monto: montoNuevo,
+    escindidoDe: o.id,
+    adjuntos: [...(o.adjuntos || [])],
+    respuestas: (o.respuestas || []).map(r => ({ ...r })),
+  };
+  o.items = o.items.filter(i => !ids.includes(i));
+  o.monto = o.monto - montoNuevo;
+  f.objeciones.push(nuevo);
+  anotarPlanteo(f, nuevo, { who: "sistema", nombre: "Sistema", tipo: "Planteo desagregado",
+    texto: `Se separó de ${o.id} para resolverse por separado: ${seleccion.length} prestación(es) por ${money(montoNuevo)}.`,
+    detalles: [`${o.id} queda con ${o.items.length} prestación(es) por ${money(o.monto)}.`] });
+  return nuevo;
+}
+
+/* La escisión se decide al abrir el modal pero se EJECUTA recién al confirmar. Si se hiciera al abrir,
+   cancelar dejaría el planteo dividido igual y la pantalla de fondo —que no se re-renderizó— seguiría
+   mostrando prestaciones que ya se fueron a otro planteo: el siguiente intento actuaría sobre ítems
+   equivocados. Por eso la selección se guarda acá y se resuelve en el confirmador. */
+function prepararAccionPlanteo(f, o, ids) {
+  state.accionPlanteo = { nro: f.nro, objId: o.id, ids: (ids || o.items).slice() };
+}
+function planteoDeLaAccion(f, o) {
+  const a = state.accionPlanteo;
+  const ids = (a && a.nro === f.nro && a.objId === o.id) ? a.ids : o.items.slice();
+  state.accionPlanteo = null;
+  return escindirPlanteo(f, o, ids);
+}
+// Prestaciones que la acción va a alcanzar (para mostrarlas en el modal antes de confirmar).
+function itemsDeLaAccion(f, o) {
+  const a = state.accionPlanteo;
+  const ids = (a && a.nro === f.nro && a.objId === o.id) ? a.ids : o.items;
+  return itemsDe(f.nro).filter(i => ids.includes(i.id) && o.items.includes(i.id));
+}
+
 // Registra un movimiento en el planteo y lo replica en el log general de la factura.
 function anotarPlanteo(f, o, { who, nombre, tipo, categoria, texto, detalles = [], adjuntos = [] }) {
   o.respuestas.push({ who, nombre, when: HOY, tipo, texto, adjuntos });
@@ -932,12 +1005,15 @@ function viewPlanteo(f, o, rol) {
   const meToca = planteoEsDe(o, rol);
   const cerrado = !planteoAbierto(o);
   const acciones = accionesPlanteo(f, o, rol);
+  // El planteo original ya se muestra arriba ("Lo que plantea…"), así que no se repite en el historial.
+  const movs = (o.respuestas || []).filter(r => !r.inicial);
   return `<div class="planteo ${cerrado ? 'cerrado' : meToca ? 'me-toca' : ''}">
     <div class="planteo-head">
       <div>
         <div style="font-size:14px;font-weight:600;">${o.categoria}
           <span style="font-weight:400;color:var(--muted);font-size:12px;">— ${o.id} · planteado el ${o.fecha}</span>
         </div>
+        ${o.escindidoDe ? `<div class="planteo-escindido">Desagregado de ${o.escindidoDe} para resolverse por separado</div>` : ''}
         <div style="margin-top:5px;">${chipPlanteo(o)}
           ${meToca ? '<span class="chip chip-morosa">Te toca responder</span>' : ''}</div>
       </div>
@@ -946,24 +1022,30 @@ function viewPlanteo(f, o, rol) {
         <div style="font-size:11px;color:var(--muted);">${items.length} prestación(es) · ${pacientes.length} paciente(s)</div>
       </div>
     </div>
-    <div style="font-size:13px;margin:10px 0;padding:8px 10px;background:#fafbfc;border-radius:6px;">${o.detalle}</div>
+    <div class="planteo-origen">
+      <div class="planteo-origen-tit">Lo que plantea ${finNombre(f.financiador)}</div>
+      <div style="font-size:13px;">${o.detalle}</div>
+      ${o.adjuntos && o.adjuntos.length ? `<div class="attachments" style="margin-top:8px;">${o.adjuntos.map(a => `<span class="attachment-chip">📎 ${a.nombre || a}</span>`).join('')}</div>` : ''}
+    </div>
     <table style="font-size:12.5px;">
-      <thead><tr><th>Paciente</th><th>Prestación</th><th>Código</th><th>Fecha</th><th class="money-header">Monto</th><th></th></tr></thead>
-      <tbody>${items.length === 0 ? '<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:14px;">Planteo a nivel factura, sin prestaciones desagregadas.</td></tr>' :
+      <thead><tr>${acciones ? '<th style="width:26px;"></th>' : ''}<th>Paciente</th><th>Prestación</th><th>Código</th><th>Fecha</th><th class="money-header">Monto</th><th></th></tr></thead>
+      <tbody>${items.length === 0 ? `<tr><td colspan="${acciones ? 7 : 6}" style="color:var(--muted);text-align:center;padding:14px;">Planteo a nivel factura, sin prestaciones desagregadas.</td></tr>` :
         items.map(i => `<tr>
+          ${acciones ? `<td><input type="checkbox" data-sel-prest="${o.id}|${i.id}" title="Resolver solo esta prestación"></td>` : ''}
           <td><div>${i.paciente}</div><div style="color:var(--muted);font-size:11px;">DNI ${i.dni} · ${i.afiliado}</div></td>
           <td>${i.prestacion}</td><td><code>${i.codigo}</code></td><td style="color:var(--muted);">${i.fecha}</td>
           <td class="money">${money(i.monto)}</td>
           <td><button class="btn btn-secondary btn-sm" data-ver-paciente-fact="${f.nro}|${encodeURIComponent(i.paciente)}">Ver documentación</button></td>
         </tr>`).join('')}</tbody>
     </table>
-    ${o.adjuntos && o.adjuntos.length ? `<div style="margin-top:10px;">
-      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);font-weight:600;margin-bottom:4px;">Documentación del planteo</div>
-      <div class="attachments">${o.adjuntos.map(a => `<span class="attachment-chip">📎 ${a.nombre || a}</span>`).join('')}</div>
+    ${acciones && items.length > 1 ? `<div class="note note-blue" style="margin-top:8px;margin-bottom:0;">
+      El financiador objetó estas ${items.length} prestaciones con <strong>un mismo motivo</strong>, pero podés resolverlas por separado:
+      tildá las que querés tratar juntas y elegí la acción. Las que queden sin tildar siguen en ${o.id} para resolverse aparte.
+      Si no tildás ninguna, la acción alcanza a las ${items.length}.
     </div>` : ''}
-    ${o.respuestas && o.respuestas.length ? `<div style="margin-top:10px;">
-      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);font-weight:600;margin-bottom:4px;">Movimientos de este planteo</div>
-      ${o.respuestas.map(r => `<div class="planteo-mov from-${r.who}">
+    ${movs.length ? `<div style="margin-top:10px;">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);font-weight:600;margin-bottom:4px;">Movimientos posteriores</div>
+      ${movs.map(r => `<div class="planteo-mov from-${r.who}">
         <div><strong>${r.nombre}</strong> <span style="color:var(--muted);">· ${r.tipo} · ${r.when}</span></div>
         <div style="margin-top:2px;">${r.texto}</div>
         ${r.adjuntos && r.adjuntos.length ? `<div class="attachments" style="margin-top:5px;">${r.adjuntos.map(a => `<span class="attachment-chip">📎 ${a.nombre || a}</span>`).join('')}</div>` : ''}
@@ -974,19 +1056,23 @@ function viewPlanteo(f, o, rol) {
 }
 
 // Qué puede hacer cada rol con un planteo, según en qué instancia esté.
-function accionesPlanteo(f, o, rol) {
+/* `idsAcotados` limita la acción a un subconjunto de prestaciones del planteo. Lo usa el modal de
+   paciente: ahí la decisión es sobre las prestaciones de ESA persona, no sobre todo el lote. */
+function accionesPlanteo(f, o, rol, idsAcotados) {
   const k = `${f.nro}|${o.id}`;
+  const d = idsAcotados ? ` data-ids="${idsAcotados.join(",")}"` : '';
   if (!planteoAbierto(o)) return '';
   if (rol === "ministerio" && o.estado === "en_auditoria") return `
-    <button class="btn btn-success btn-sm" data-aud-desestimar="${k}">✓ Improcedente — desestimar</button>
-    <button class="btn btn-warn btn-sm" data-aud-derivar="${k}">→ Derivar al hospital</button>`;
+    <button class="btn btn-success btn-sm" data-aud-desestimar="${k}"${d}>✓ Improcedente — desestimar</button>
+    <button class="btn btn-warn btn-sm" data-aud-derivar="${k}"${d}>→ Derivar al hospital</button>
+    <button class="btn btn-danger btn-sm" data-aud-razon="${k}"${d}>Dar la razón al financiador</button>`;
   if (rol === "hospital" && o.estado === "derivado_hospital") return `
-    <button class="btn btn-primary btn-sm" data-hosp-responder="${k}">✎ Responder este planteo</button>
-    <button class="btn btn-warn btn-sm" data-hosp-nc="${k}">Aceptar y emitir nota de crédito</button>`;
+    <button class="btn btn-primary btn-sm" data-hosp-responder="${k}"${d}>✎ Responder</button>
+    <button class="btn btn-warn btn-sm" data-hosp-nc="${k}"${d}>Aceptar el planteo</button>`;
   if (rol === "financiador" && o.estado === "respondido") return `
-    <button class="btn btn-success btn-sm" data-fin-aceptar="${k}">✓ Aceptar la respuesta</button>
-    <button class="btn btn-warn btn-sm" data-fin-info="${k}">Pedir más información</button>
-    <button class="btn btn-danger btn-sm" data-fin-sostener="${k}">Mantener la objeción</button>`;
+    <button class="btn btn-success btn-sm" data-fin-aceptar="${k}"${d}>✓ Aceptar la respuesta</button>
+    <button class="btn btn-warn btn-sm" data-fin-info="${k}"${d}>Pedir más información</button>
+    <button class="btn btn-danger btn-sm" data-fin-sostener="${k}"${d}>Mantener la objeción</button>`;
   return '';
 }
 
@@ -999,11 +1085,23 @@ function viewPlanteosDeFactura(f, rol) {
   const abiertos = objs.filter(planteoAbierto).sort((a, b) => (planteoEsDe(b, rol) ? 1 : 0) - (planteoEsDe(a, rol) ? 1 : 0));
   const cerrados = objs.filter(o => !planteoAbierto(o));
   const mios = abiertos.filter(o => planteoEsDe(o, rol)).length;
+  const acreditables = planteosAcreditables(f);
+  const montoNC = acreditables.reduce((s, o) => s + o.monto, 0);
+  const enDiscusion = objecionesDe(f).filter(planteoEnDiscusion).length;
   return `<div class="card">
     <h3 class="card-title">Planteos sobre esta factura
       <span style="font-size:12px;font-weight:400;color:var(--muted);">${abiertos.length} abierto(s)${cerrados.length ? ` · ${cerrados.length} cerrado(s)` : ''} — ${money(montoEnDebate(f))} en debate</span>
     </h3>
     ${mios > 0 ? `<div class="note"><strong>${mios} planteo(s) esperan tu respuesta.</strong> Cada uno se responde por separado, con su propia documentación: no hace falta resolver toda la factura de una vez.</div>` : ''}
+    ${acreditables.length ? `<div class="nc-consolidada">
+      <div>
+        <strong>${acreditables.length} planteo(s) reconocido(s) por ${money(montoNC)}</strong> — ${acreditables.map(o => o.id).join(", ")}.
+        <div style="font-size:12px;color:var(--muted);margin-top:3px;">${enDiscusion > 0
+          ? `Esperando la resolución de ${enDiscusion} planteo(s) más para emitir <strong>una sola</strong> nota de crédito por la factura.`
+          : `Ya no queda nada en discusión: se puede emitir la nota de crédito consolidada.`}</div>
+      </div>
+      ${rol === "hospital" ? `<button class="btn ${enDiscusion ? 'btn-secondary' : 'btn-warn'} btn-sm" data-nc-consolidada="${f.nro}" ${enDiscusion ? 'disabled title="Faltan planteos por resolver"' : ''}>Emitir NC consolidada${enDiscusion ? '' : ` — ${money(montoNC)}`}</button>` : ''}
+    </div>` : ''}
     ${abiertos.map(o => viewPlanteo(f, o, rol)).join('')}
     ${cerrados.length ? `<details style="margin-top:10px;">
       <summary style="cursor:pointer;font-size:13px;color:var(--muted);font-weight:600;">Planteos cerrados (${cerrados.length})</summary>
@@ -1013,7 +1111,8 @@ function viewPlanteosDeFactura(f, rol) {
 }
 
 function renderMensaje(m) {
-  const rol = m.who === "financiador" ? "Financiador" : m.who === "hospital" ? "Hospital" : "Ministerio";
+  const rol = m.who === "financiador" ? "Financiador" : m.who === "hospital" ? "Hospital"
+    : m.who === "sistema" ? "Sistema" : "Ministerio";
   return `<div class="thread-msg from-${m.who}">
     <div class="who">${m.nombre}<span class="role-tag">${rol}</span><span class="when">${m.when}</span></div>
     <div>${m.text}</div>
@@ -1842,28 +1941,57 @@ function confirmarAccion({ titulo, mensaje, detalle, textoBoton, clase = "btn-pr
     </div>`);
 }
 
-/* Vista de un paciente: su documentación y todas sus prestaciones en esta factura,
-   para poder objetar solo una de las tres cosas que le facturan. */
+/* Vista de un paciente: su documentación y todas sus prestaciones en esta factura.
+   El modal es consciente del rol: objetar es una acción del financiador, así que la auditoría y el
+   hospital ven acá las acciones que les corresponden sobre los planteos que alcanzan a este paciente
+   (antes les aparecía "Objetar tildadas", que no era de ellos). */
 function openModalPaciente(nro, paciente) {
   const f = state.facturas.find(x => x.nro === nro); if (!f) return;
   const items = itemsDe(nro).filter(i => i.paciente === paciente);
   if (!items.length) return;
   const objs = objecionesDe(f);
+  const rol = state.role;
+  const puedeObjetar = rol === "financiador";
   const p = items[0];
+  // Planteos que alcanzan a alguna prestación de este paciente.
+  const idsPac = items.map(i => i.id);
+  const susPlanteos = objs.filter(o => o.items.some(id => idsPac.includes(id)));
   openModal(`<h3>${paciente}</h3>
     <p class="subtle">DNI ${p.dni} · ${p.afiliado} · ${items.length} prestación(es) en la factura ${nro} por ${money(items.reduce((s,i)=>s+i.monto,0))}</p>
     <label>Documentación de respaldo</label>
     <div class="attachments">${DOCS_PACIENTE.map(d => `<span class="attachment-chip">📎 ${d.toLowerCase().replace(/ /g,'_')}_${p.dni.replace(/\D/g,'')}.pdf</span>`).join('')}</div>
-    <label>Prestaciones facturadas — tildá las que querés objetar</label>
+    ${susPlanteos.length ? `<label>Planteos que alcanzan a este paciente</label>
+      ${susPlanteos.map(o => {
+        // La acción desde acá alcanza SOLO a las prestaciones de este paciente dentro del planteo.
+        const suyas = o.items.filter(id => idsPac.includes(id));
+        const its = itemsDe(nro).filter(i => suyas.includes(i.id));
+        const montoSuyo = its.reduce((s, i) => s + i.monto, 0);
+        const parcial = suyas.length < o.items.length;
+        const acc = accionesPlanteo(f, o, rol, suyas);
+        return `<div class="note ${planteoEsDe(o, rol) ? '' : 'note-blue'}" style="margin-bottom:8px;">
+          <div><strong>${o.id} · ${o.categoria}</strong> — ${money(o.monto)} ${chipPlanteo(o)}</div>
+          <div style="margin-top:4px;">${o.detalle}</div>
+          <div style="margin-top:6px;font-size:12px;">
+            <strong>De este paciente alcanza a ${suyas.length} prestación(es)</strong> por ${money(montoSuyo)}:
+            ${its.map(i => `${i.prestacion} (${i.codigo})`).join(" · ")}
+          </div>
+          ${parcial && acc ? `<div style="margin-top:6px;font-size:11.5px;color:var(--muted);">
+            El planteo abarca ${o.items.length} prestaciones en total. Lo que decidas acá se aplica solo a las de
+            <strong>${paciente}</strong>: el resto queda en ${o.id} para resolverse por separado.
+          </div>` : ''}
+          ${acc ? `<div class="actions-row" style="margin-top:8px;">${acc}</div>` : ''}
+        </div>`;
+      }).join('')}` : ''}
+    <label>Prestaciones facturadas${puedeObjetar ? ' — tildá las que querés objetar' : ''}</label>
     <div id="pac-items">
       ${items.map(it => {
         const o = objs.find(x => x.items.includes(it.id));
         return `<div class="paciente-item">
-          <input type="checkbox" class="pac-check" data-id="${it.id}" ${o ? 'disabled' : ''}>
+          ${puedeObjetar ? `<input type="checkbox" class="pac-check" data-id="${it.id}" ${o ? 'disabled' : ''}>` : ''}
           <div style="flex:1;">
             <div><strong>${it.prestacion}</strong> <code>${it.codigo}</code></div>
             <div style="font-size:11px;color:var(--muted);">Fecha: ${it.fecha} · ${money(it.monto)}</div>
-            ${o ? `<div style="margin-top:4px;"><span class="chip chip-esperando-hospital">Ya objetada: ${o.categoria}</span></div>` : ''}
+            ${o ? `<div style="margin-top:4px;"><span class="chip ${PLANTEO_LABEL[o.estado]?.cls || 'chip-esperando-hospital'}">${o.id} · ${o.categoria}</span></div>` : ''}
           </div>
           <div style="font-family:monospace;font-size:13px;">${money(it.monto)}</div>
         </div>`;
@@ -1871,10 +1999,13 @@ function openModalPaciente(nro, paciente) {
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cerrar</button>
-      <button class="btn btn-warn" onclick="objetarDesdePaciente('${nro}')">Objetar tildadas →</button>
+      ${puedeObjetar ? `<button class="btn btn-warn" onclick="objetarDesdePaciente('${nro}')">Objetar tildadas →</button>` : ''}
     </div>`);
   document.querySelectorAll('.pac-check').forEach(cb => cb.addEventListener('change', () =>
     cb.closest('.paciente-item').classList.toggle('checked', cb.checked)));
+  // Solo dentro del modal: si se cableara con `document`, los botones de la pantalla de fondo
+  // quedarían con listener duplicado y la acción se dispararía dos veces.
+  wireAccionesPlanteo($("#modal-content"));
 }
 window.objetarDesdePaciente = function(nro) {
   const ids = [...document.querySelectorAll('.pac-check')].filter(c => c.checked).map(c => c.dataset.id);
@@ -2846,53 +2977,103 @@ function wireEvents() {
         closeModal(); render(); showToast(`⚖ Intimación cursada a ${finNombre(p.financiador)}`);
       } });
   }));
-  /* ---- Acciones por planteo (las tres partes responden planteo por planteo) ---- */
+  wireAccionesPlanteo();
+  wireEventsResto();
+}
+
+/* Cableado de las acciones sobre planteos. Vive aparte de wireEvents() porque las mismas acciones
+   aparecen en dos lugares: la tarjeta de planteo y el modal de paciente. */
+function wireAccionesPlanteo(root = document) {
+  // Acotado a `root`: si se cablea con `document` desde el modal, los botones de la pantalla de
+  // fondo quedan con listener doble y la acción se dispara dos veces.
+  const $$ = (sel) => root.querySelectorAll(sel);
   const buscarPlanteo = (k) => {
     const [nro, objId] = k.split("|");
     const f = state.facturas.find(x => x.nro === nro);
     return { f, o: f && objecionesDe(f).find(x => x.id === objId) };
   };
-  document.querySelectorAll('[data-aud-desestimar]').forEach(el => el.addEventListener('click', () => {
-    const { f, o } = buscarPlanteo(el.dataset.audDesestimar); if (!o) return; openModalAudDesestimar(f, o);
+  /* Qué prestaciones alcanza la acción: las tildadas en la tarjeta, o las que el botón traiga
+     acotadas (es el caso del modal de paciente, donde la acción es sobre ese paciente). */
+  const idsDeAccion = (el, o) => {
+    if (el.dataset.ids) return el.dataset.ids.split(",");
+    const tildadas = [...document.querySelectorAll(`[data-sel-prest^="${o.id}|"]:checked`)]
+      .map(c => c.dataset.selPrest.split("|")[1]);
+    return tildadas.length ? tildadas : o.items.slice();
+  };
+  $$('[data-aud-desestimar]').forEach(el => el.addEventListener('click', () => {
+    const { f, o } = buscarPlanteo(el.dataset.audDesestimar); if (!o) return;
+    prepararAccionPlanteo(f, o, idsDeAccion(el, o)); openModalAudDesestimar(f, o);
   }));
-  document.querySelectorAll('[data-aud-derivar]').forEach(el => el.addEventListener('click', () => {
-    const { f, o } = buscarPlanteo(el.dataset.audDerivar); if (!o) return; openModalAudDerivar(f, o);
+  $$('[data-aud-derivar]').forEach(el => el.addEventListener('click', () => {
+    const { f, o } = buscarPlanteo(el.dataset.audDerivar); if (!o) return;
+    prepararAccionPlanteo(f, o, idsDeAccion(el, o)); openModalAudDerivar(f, o);
   }));
-  document.querySelectorAll('[data-hosp-responder]').forEach(el => el.addEventListener('click', () => {
-    const { f, o } = buscarPlanteo(el.dataset.hospResponder); if (!o) return; openModalDescargoPlanteo(f, o);
+  $$('[data-aud-razon]').forEach(el => el.addEventListener('click', () => {
+    const { f, o } = buscarPlanteo(el.dataset.audRazon); if (!o) return;
+    prepararAccionPlanteo(f, o, idsDeAccion(el, o)); openModalAudRazon(f, o);
   }));
-  document.querySelectorAll('[data-hosp-nc]').forEach(el => el.addEventListener('click', () => {
+  $$('[data-hosp-responder]').forEach(el => el.addEventListener('click', () => {
+    const { f, o } = buscarPlanteo(el.dataset.hospResponder); if (!o) return;
+    prepararAccionPlanteo(f, o, idsDeAccion(el, o)); openModalDescargoPlanteo(f, o);
+  }));
+  $$('[data-hosp-nc]').forEach(el => el.addEventListener('click', () => {
     const { f, o } = buscarPlanteo(el.dataset.hospNc); if (!o) return;
-    confirmarAccion({ titulo: "Aceptar el planteo y emitir nota de crédito", clase: "btn-warn", textoBoton: "Sí, emitir NC",
-      mensaje: `Vas a reconocer el planteo ${o.id} (${o.categoria}) por ${money(o.monto)} y emitir la nota de crédito correspondiente.`,
-      detalle: "El planteo se cierra, el monto se descuenta del saldo de la factura y la NC se notifica al financiador para que la reconcilie.",
-      onOk: () => { closeModal(); emitirNCDePlanteo(f, o); } });
+    prepararAccionPlanteo(f, o, idsDeAccion(el, o));
+    const its = itemsDeLaAccion(f, o);
+    const otros = objecionesDe(f).filter(x => x.id !== o.id && planteoEnDiscusion(x)).length;
+    const parcial = its.length < o.items.length;
+    confirmarAccion({ titulo: "Aceptar el planteo", clase: "btn-warn", textoBoton: "Sí, reconocerlo",
+      mensaje: `Vas a reconocer ${its.length} prestación(es) de ${o.id} (${o.categoria})${parcial ? ` — el planteo tiene ${o.items.length} en total` : ` por ${money(o.monto)}`}.`,
+      detalle: (parcial ? `Las prestaciones que no reconozcas siguen en ${o.id} para resolverse por separado. ` : "") + (otros > 0
+        ? `Queda <strong>pendiente de nota de crédito</strong>. La NC se emite una sola vez por factura: todavía ${otros === 1 ? 'hay 1 planteo' : `hay ${otros} planteos`} en discusión.`
+        : "Queda reconocido y, si no queda nada en discusión, vas a poder emitir la <strong>nota de crédito consolidada</strong> de la factura."),
+      onOk: () => { closeModal(); reconocerPlanteo(f, planteoDeLaAccion(f, o)); } });
   }));
-  document.querySelectorAll('[data-fin-aceptar]').forEach(el => el.addEventListener('click', () => {
+  // Emisión de la NC única de la factura, que cubre todos los planteos reconocidos.
+  document.querySelectorAll('[data-nc-consolidada]').forEach(el => el.addEventListener('click', () => {
+    const f = state.facturas.find(x => x.nro === el.dataset.ncConsolidada); if (!f) return;
+    const acreditables = planteosAcreditables(f);
+    const monto = Math.min(saldoPendiente(f), acreditables.reduce((s, o) => s + o.monto, 0));
+    confirmarAccion({ titulo: "Emitir la nota de crédito consolidada", clase: "btn-warn", textoBoton: "Sí, emitir NC",
+      mensaje: `Vas a emitir una nota de crédito por ${money(monto)} que cubre ${acreditables.length} planteo(s) reconocido(s) de la factura ${f.nro}.`,
+      detalle: `El monto se descuenta del saldo${monto >= saldoPendiente(f) ? ", que queda en cero y cierra la factura por NC" : `, que queda en ${money(saldoPendiente(f) - monto)}`}. La NC se notifica al financiador para que la reconcilie.`,
+      onOk: () => { closeModal(); emitirNCConsolidada(f); } });
+  }));
+  $$('[data-fin-aceptar]').forEach(el => el.addEventListener('click', () => {
     const { f, o } = buscarPlanteo(el.dataset.finAceptar); if (!o) return;
+    prepararAccionPlanteo(f, o, idsDeAccion(el, o));
+    const its = itemsDeLaAccion(f, o);
+    const parcial = its.length < o.items.length;
     confirmarAccion({ titulo: "Aceptar la respuesta", clase: "btn-success", textoBoton: "Sí, aceptar",
-      mensaje: `Vas a dar por resuelto el planteo ${o.id} (${o.categoria}) por ${money(o.monto)}.`,
-      detalle: `El planteo se cierra y esos ${money(o.monto)} vuelven a ser <strong>cobrables</strong>. Los demás planteos de la factura siguen su curso.`,
+      mensaje: `Vas a dar por resuelto ${its.length} prestación(es) de ${o.id} (${o.categoria})${parcial ? ` — el planteo tiene ${o.items.length} en total` : ` por ${money(o.monto)}`}.`,
+      detalle: `El planteo se cierra y ese monto vuelve a ser <strong>cobrable</strong>.${parcial ? ` Las prestaciones que no aceptes siguen en ${o.id}.` : ''} Los demás planteos de la factura siguen su curso.`,
       onOk: () => {
-        o.estado = "aceptado";
-        anotarPlanteo(f, o, { who: "financiador", nombre: "IOMA", tipo: "Respuesta aceptada",
-          texto: `Aceptamos la respuesta. Damos por resuelto el planteo por ${money(o.monto)}.`,
+        const p = planteoDeLaAccion(f, o);
+        p.estado = "aceptado";
+        anotarPlanteo(f, p, { who: "financiador", nombre: "IOMA", tipo: "Respuesta aceptada",
+          texto: `Aceptamos la respuesta. Damos por resuelto el planteo por ${money(p.monto)}.`,
           detalles: ["El monto vuelve a quedar reconocido y cobrable."] });
-        recalcularEstadoFactura(f); closeModal(); render(); showToast(`✓ ${o.id} cerrado — ${money(o.monto)} vuelven a ser cobrables`);
+        recalcularEstadoFactura(f); closeModal(); render(); showToast(`✓ ${p.id} cerrado — ${money(p.monto)} vuelven a ser cobrables`);
       } });
   }));
-  document.querySelectorAll('[data-fin-info]').forEach(el => el.addEventListener('click', () => {
-    const { f, o } = buscarPlanteo(el.dataset.finInfo); if (!o) return; openModalFinRespuesta(f, o, "info");
+  $$('[data-fin-info]').forEach(el => el.addEventListener('click', () => {
+    const { f, o } = buscarPlanteo(el.dataset.finInfo); if (!o) return;
+    prepararAccionPlanteo(f, o, idsDeAccion(el, o)); openModalFinRespuesta(f, o, "info");
   }));
-  document.querySelectorAll('[data-fin-sostener]').forEach(el => el.addEventListener('click', () => {
-    const { f, o } = buscarPlanteo(el.dataset.finSostener); if (!o) return; openModalFinRespuesta(f, o, "sostener");
+  $$('[data-fin-sostener]').forEach(el => el.addEventListener('click', () => {
+    const { f, o } = buscarPlanteo(el.dataset.finSostener); if (!o) return;
+    prepararAccionPlanteo(f, o, idsDeAccion(el, o)); openModalFinRespuesta(f, o, "sostener");
   }));
   // "Ver documentación" desde una tarjeta de planteo: la factura viene en el propio atributo.
-  document.querySelectorAll('[data-ver-paciente-fact]').forEach(el => el.addEventListener('click', (e) => {
+  $$('[data-ver-paciente-fact]').forEach(el => el.addEventListener('click', (e) => {
     e.stopPropagation();
     const [nro, pac] = el.dataset.verPacienteFact.split("|");
     openModalPaciente(nro, decodeURIComponent(pac));
   }));
+}
+
+/* Resto del cableado de la pantalla (no depende de los planteos). */
+function wireEventsResto() {
   /* ---- Switch de lectura de la tabla de prestaciones ---- */
   document.querySelectorAll('[data-vista-items]').forEach(el => el.addEventListener('click', () => {
     state.vistaItems = el.dataset.vistaItems; render();
@@ -2996,16 +3177,36 @@ window.confirmarNotif = function() {
 
 // Encabezado común: qué se está respondiendo exactamente.
 const cabeceraPlanteo = (f, o) => {
-  const items = itemsDe(f.nro).filter(i => o.items.includes(i.id));
-  return `<p class="subtle">Factura ${f.nro} · planteo <strong>${o.id}</strong> — ${o.categoria} por ${money(o.monto)}</p>
+  // Solo las prestaciones que la acción va a alcanzar, no todo el planteo: si se eligieron 2 de 6,
+  // el modal tiene que mostrar esas 2 y decir qué pasa con las otras 4.
+  const items = itemsDeLaAccion(f, o);
+  const parcial = items.length < o.items.length;
+  const montoAlcanzado = items.reduce((s, i) => s + i.monto, 0);
+  const totalItems = itemsDe(f.nro).filter(i => o.items.includes(i.id)).reduce((s, i) => s + i.monto, 0);
+  const montoProporcional = totalItems ? Math.round(o.monto * montoAlcanzado / totalItems) : o.monto;
+  return `<p class="subtle">Factura ${f.nro} · planteo <strong>${o.id}</strong> — ${o.categoria}</p>
     <div class="note" style="margin-bottom:12px;">${o.detalle}</div>
-    ${items.length ? `<label>Prestaciones alcanzadas</label>
-    <div style="max-height:150px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;">
+    ${items.length ? `<label>Prestaciones alcanzadas por esta decisión — ${items.length} de ${o.items.length} · ${money(montoProporcional)}</label>
+    <div style="max-height:170px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;">
       <table style="font-size:12px;"><tbody>${items.map(i => `<tr>
-        <td>${i.paciente}</td><td>${i.prestacion}</td><td><code>${i.codigo}</code></td><td class="money">${money(i.monto)}</td>
+        <td>${i.paciente}<div style="color:var(--muted);font-size:11px;">DNI ${i.dni}</div></td>
+        <td>${i.prestacion}</td><td><code>${i.codigo}</code></td><td style="color:var(--muted);">${i.fecha}</td><td class="money">${money(i.monto)}</td>
       </tr>`).join('')}</tbody></table>
-    </div>` : ''}`;
+    </div>
+    ${parcial ? `<div class="note note-blue" style="margin-top:8px;">Las otras <strong>${o.items.length - items.length} prestación(es)</strong> del planteo <strong>no</strong> se ven afectadas: quedan en ${o.id} para resolverse por separado.</div>` : ''}` : ''}`;
 };
+
+/* Bloque de adjuntos de la auditoría: los tres caminos pueden acompañar documentación.
+   Los checkboxes son el set típico; el file input queda para el caso suelto. */
+const adjuntosAuditoria = () => `
+    <label>Documentación que aporta la auditoría</label>
+    <div class="checkline"><input type="checkbox" class="aud-doc" value="constancia_padron.pdf" checked> Constancia de padrón con fecha y hora</div>
+    <div class="checkline"><input type="checkbox" class="aud-doc" value="convenio_vigente.pdf"> Convenio vigente con el financiador</div>
+    <div class="checkline"><input type="checkbox" class="aud-doc" value="historia_clinica.pdf"> Historia clínica / epicrisis</div>
+    <div class="checkline"><input type="checkbox" class="aud-doc" value="autorizacion_previa.pdf"> Autorización previa</div>
+    <div class="checkline"><input type="checkbox" class="aud-doc" value="formularios_f5_f8_f9.pdf"> Formularios F5 / F8 / F9</div>
+    <label>Adjuntar otros archivos</label><input type="file" multiple>`;
+const docsAuditoriaElegidos = () => [...document.querySelectorAll('.aud-doc:checked')].map(c => ({ nombre: c.value, tipo: "pdf" }));
 
 // --- Auditoría: desestimar por improcedente (vuelve al financiador con documentación) ---
 function openModalAudDesestimar(f, o) {
@@ -3014,51 +3215,77 @@ function openModalAudDesestimar(f, o) {
     <div class="note note-blue">La objeción se devuelve al financiador con la documentación que la refuta, para que reconsidere. El hospital no interviene.</div>
     <label>Fundamento de la auditoría</label>
     <textarea id="aud-fund" placeholder="Ej: el padrón consultado el día de la atención acredita cobertura activa."></textarea>
-    <label>Documentación que se aporta</label>
-    <div class="checkline"><input type="checkbox" checked> Constancia de padrón con fecha y hora</div>
-    <div class="checkline"><input type="checkbox"> Convenio vigente con el financiador</div>
-    <div class="checkline"><input type="checkbox"> Historia clínica / epicrisis</div>
-    <div class="checkline"><input type="checkbox"> Autorización previa</div>
+    ${adjuntosAuditoria()}
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
       <button class="btn btn-success" onclick="confirmarAudPlanteo('${f.nro}','${o.id}','desestimar')">Desestimar y devolver</button>
     </div>`);
 }
-// --- Auditoría: derivar al hospital ---
+// --- Auditoría: derivar al hospital para que revise y responda ---
 function openModalAudDerivar(f, o) {
   openModal(`<h3>Derivar el planteo al hospital</h3>
     ${cabeceraPlanteo(f, o)}
-    <div class="note">Reconocés que la objeción tiene sustento y el hospital debe responder: aportar lo que falta, refutar con evidencia, o emitir la nota de crédito.</div>
+    <div class="note">No podés resolverlo desde la auditoría: el hospital tiene que intervenir para aportar lo que falta, refutar con evidencia o reconocer el planteo.</div>
     <label>Instrucción para el hospital</label>
-    <textarea id="aud-fund" placeholder="Ej: no consta la autorización previa en el expediente. Adjuntar o emitir NC."></textarea>
+    <textarea id="aud-fund" placeholder="Ej: no consta la autorización previa en el expediente. Aportar o reconocer."></textarea>
+    ${adjuntosAuditoria()}
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
       <button class="btn btn-warn" onclick="confirmarAudPlanteo('${f.nro}','${o.id}','derivar')">Derivar al hospital</button>
     </div>`);
 }
+/* --- Auditoría: darle la razón al financiador ---
+   Distinto de derivar: acá la auditoría ya resolvió que el planteo corresponde, así que no hay nada
+   que discutir. El hospital no responde, solo tiene que acreditarlo por nota de crédito. */
+function openModalAudRazon(f, o) {
+  openModal(`<h3>Dar la razón al financiador</h3>
+    ${cabeceraPlanteo(f, o)}
+    <div class="note">La objeción es procedente y la auditoría la reconoce. El planteo queda <strong>reconocido, pendiente de nota de crédito</strong>: el hospital no lo discute, solo lo acredita.</div>
+    <div class="note note-blue">La NC se emite <strong>una sola vez por factura</strong>, cuando todos los planteos estén resueltos, para no generar varias notas de crédito sobre la misma factura.</div>
+    <label>Fundamento del reconocimiento</label>
+    <textarea id="aud-fund" placeholder="Ej: se verificó que la práctica no contaba con autorización previa y no era urgencia."></textarea>
+    ${adjuntosAuditoria()}
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-danger" onclick="confirmarAudPlanteo('${f.nro}','${o.id}','razon')">Reconocer el planteo</button>
+    </div>`);
+}
 window.confirmarAudPlanteo = function(nro, objId, accion) {
   const f = state.facturas.find(x => x.nro === nro); if (!f) return;
-  const o = objecionesDe(f).find(x => x.id === objId); if (!o) return;
+  const o0 = objecionesDe(f).find(x => x.id === objId); if (!o0) return;
   const fund = ($("#aud-fund")?.value || "").trim() || "(sin fundamento)";
+  const docs = docsAuditoriaElegidos();
+  // Recién acá se divide el planteo, si la decisión alcanzaba solo a parte de las prestaciones.
+  const o = planteoDeLaAccion(f, o0);
   o.fundamentoAuditoria = fund; o.fechaAuditoria = HOY;
+  let toast;
   if (accion === "desestimar") {
     o.estado = "respondido"; o.resolucion = "improcedente";
-    o.adjuntos.push({ nombre: "respaldo_auditoria_" + o.id.toLowerCase() + ".pdf", tipo: "pdf" });
     state.auditoria.resueltas++;
     anotarPlanteo(f, o, { who: "ministerio", nombre: "Auditoría central — SAMO", tipo: "Objeción improcedente",
       texto: `Desestimamos el planteo y lo devolvemos al financiador. ${fund}`,
       detalles: ["Se aporta documentación que refuta la objeción.", "El hospital no interviene en este planteo."],
-      adjuntos: [{ nombre: "respaldo_auditoria_" + o.id.toLowerCase() + ".pdf", tipo: "pdf" }] });
-  } else {
+      adjuntos: docs });
+    toast = `✓ ${o.id} desestimado — vuelve al financiador`;
+  } else if (accion === "derivar") {
     o.estado = "derivado_hospital"; o.resolucion = "derivada";
     state.auditoria.derivadas++;
-    anotarPlanteo(f, o, { who: "ministerio", nombre: "Auditoría central — SAMO", tipo: "Objeción procedente — derivada",
-      texto: `Derivamos el planteo al hospital. ${fund}`,
-      detalles: ["El hospital debe presentar descargo o emitir nota de crédito."] });
+    anotarPlanteo(f, o, { who: "ministerio", nombre: "Auditoría central — SAMO", tipo: "Derivado al hospital",
+      texto: `Derivamos el planteo al hospital para su intervención. ${fund}`,
+      detalles: ["El hospital debe aportar documentación, refutar o reconocer el planteo."], adjuntos: docs });
+    toast = `→ ${o.id} derivado al hospital`;
+  } else {
+    // Procedente: no se discute más, queda a la espera de la NC consolidada de la factura.
+    o.estado = "a_acreditar"; o.resolucion = "procedente";
+    state.auditoria.resueltas++;
+    anotarPlanteo(f, o, { who: "ministerio", nombre: "Auditoría central — SAMO", tipo: "Objeción procedente — reconocida",
+      texto: `Le damos la razón al financiador. ${fund}`,
+      detalles: [`El planteo queda reconocido por ${money(o.monto)}, pendiente de nota de crédito.`,
+        "La NC se emite consolidada por factura, cuando no queden planteos en discusión."], adjuntos: docs });
+    toast = `${o.id} reconocido — pendiente de nota de crédito`;
   }
   recalcularEstadoFactura(f);
-  closeModal(); render();
-  showToast(accion === "desestimar" ? `✓ ${o.id} desestimado — vuelve al financiador` : `→ ${o.id} derivado al hospital`);
+  closeModal(); render(); showToast(toast);
 };
 
 // --- Hospital: descargo de UN planteo, con las 6 categorías acotadas a ese planteo ---
@@ -3096,7 +3323,8 @@ function openModalDescargoPlanteo(f, o) {
 }
 window.confirmarDescargoPlanteo = function(nro, objId) {
   const f = state.facturas.find(x => x.nro === nro); if (!f) return;
-  const o = objecionesDe(f).find(x => x.id === objId); if (!o) return;
+  const o0 = objecionesDe(f).find(x => x.id === objId); if (!o0) return;
+  const o = planteoDeLaAccion(f, o0);
   const tipoId = document.querySelector('input[name="descargo-tipo"]:checked')?.value || "ratificar";
   const cat = CATEGORIAS_DESCARGO.find(c => c.id === tipoId);
   const texto = ($("#desc-texto")?.value || "").trim() || "(sin fundamento)";
@@ -3108,20 +3336,38 @@ window.confirmarDescargoPlanteo = function(nro, objId) {
   recalcularEstadoFactura(f);
   closeModal(); render(); showToast(`✓ Respuesta enviada sobre ${o.id} — vuelve al financiador`);
 };
-// El hospital reconoce el planteo: se cierra con nota de crédito por ese monto.
-function emitirNCDePlanteo(f, o) {
-  const monto = Math.min(saldoPendiente(f), o.monto);
+// El hospital reconoce el planteo: no se emite la NC todavía, queda a la espera de la consolidada.
+function reconocerPlanteo(f, o) {
+  o.estado = "a_acreditar"; o.resolucion = "reconocida_hospital";
+  anotarPlanteo(f, o, { who: "hospital", nombre: "Hosp. San Martín", tipo: "Planteo reconocido",
+    texto: `Reconocemos el planteo por ${money(o.monto)}. Queda pendiente de nota de crédito.`,
+    detalles: ["La NC se emite consolidada por factura, cuando no queden planteos en discusión."] });
+  recalcularEstadoFactura(f);
+  render(); showToast(`${o.id} reconocido — pendiente de la NC consolidada`);
+}
+
+/* Una sola nota de crédito por factura, que cubre todos los planteos reconocidos.
+   Evita emitir una NC por planteo, que del lado contable sería un lío. */
+function emitirNCConsolidada(f) {
+  const acreditables = planteosAcreditables(f);
+  if (!acreditables.length) return;
+  const monto = Math.min(saldoPendiente(f), acreditables.reduce((s, o) => s + o.monto, 0));
   const id = "NC-2026-" + String(state.notasCredito.length + 40).padStart(4, "0");
+  const total = monto >= saldoPendiente(f);
   state.notasCredito.push({ id, factura: f.nro, hospital: f.hospital, financiador: f.financiador,
-    monto, tipo: "parcial", motivo: o.categoria, fecha: HOY, estado: "notificada" });
+    monto, tipo: total ? "total" : "parcial",
+    motivo: acreditables.map(o => o.categoria).join(" · "), fecha: HOY, estado: "notificada" });
   f.notasCredito = (f.notasCredito || 0) + monto;
-  o.estado = "cerrado_nc"; o.notaCredito = id;
-  anotarPlanteo(f, o, { who: "hospital", nombre: "Hosp. San Martín", tipo: "Nota de crédito por el planteo",
-    texto: `Reconocemos el planteo y emitimos la nota de crédito ${id} por ${money(monto)}.`,
-    detalles: [`Saldo de la factura tras la NC: ${money(saldoPendiente(f))}.`, "Se notifica al financiador para que la reconcilie."],
-    adjuntos: [{ nombre: `${id.toLowerCase()}.pdf`, tipo: "pdf" }] });
+  acreditables.forEach(o => {
+    o.estado = "cerrado_nc"; o.notaCredito = id;
+    anotarPlanteo(f, o, { who: "hospital", nombre: "Hosp. San Martín", tipo: "Cerrado por nota de crédito",
+      texto: `Acreditado en la nota de crédito ${id}.`,
+      detalles: [`NC consolidada de la factura por ${money(monto)}, que cubre ${acreditables.length} planteo(s).`],
+      adjuntos: [{ nombre: `${id.toLowerCase()}.pdf`, tipo: "pdf" }] });
+  });
   if (saldoPendiente(f) <= 0) f.estado = "cerrada_nc"; else recalcularEstadoFactura(f);
-  render(); showToast(`✓ ${id} emitida por ${money(monto)} — ${o.id} cerrado`);
+  render();
+  showToast(`✓ ${id} emitida por ${money(monto)} — ${acreditables.length} planteo(s) cerrado(s)`);
 }
 
 // --- Financiador: pedir más info o mantener la objeción ---
@@ -3141,7 +3387,8 @@ function openModalFinRespuesta(f, o, modo) {
 }
 window.confirmarFinRespuesta = function(nro, objId, modo) {
   const f = state.facturas.find(x => x.nro === nro); if (!f) return;
-  const o = objecionesDe(f).find(x => x.id === objId); if (!o) return;
+  const o0 = objecionesDe(f).find(x => x.id === objId); if (!o0) return;
+  const o = planteoDeLaAccion(f, o0);
   const texto = ($("#fin-texto")?.value || "").trim() || "(sin detalle)";
   const sostener = modo === "sostener";
   // Toda vuelta atrás pasa otra vez por la auditoría: el financiador no le escribe directo al hospital.
@@ -3519,8 +3766,24 @@ state.facturas.forEach(f => {
    circuito y el estado de la factura se deriva de él (ver recalcularEstadoFactura). */
 state.facturas.forEach(f => {
   objecionesDe(f).forEach(o => {
-    o.adjuntos = o.adjuntos || [];
+    /* El planteo tiene que llegarle a la auditoría tal como lo mandó el financiador: con su
+       documentación de respaldo y su movimiento inicial. Sin esto, el auditor abre un planteo del
+       mock y ve la categoría pero no la evidencia, que es justo lo que necesita para resolver. */
+    if (!o.adjuntos || !o.adjuntos.length) {
+      o.adjuntos = [{ nombre: `respaldo_${o.id.toLowerCase()}_${f.nro}.pdf`, tipo: "pdf" },
+        { nombre: `detalle_prestaciones_objetadas.xlsx`, tipo: "pdf" }];
+    }
     o.respuestas = o.respuestas || [];
+    if (!o.respuestas.some(r => r.inicial)) {
+      const its = itemsDe(f.nro).filter(i => o.items.includes(i.id));
+      const pacs = [...new Set(its.map(i => i.paciente))];
+      o.respuestas.unshift({ who: "financiador", nombre: finNombre(f.financiador), when: o.fecha, inicial: true,
+        tipo: "Objeción planteada", texto: o.detalle, adjuntos: o.adjuntos });
+      if (!state.threads[f.nro]) state.threads[f.nro] = [];
+      state.threads[f.nro].unshift({ who: "financiador", nombre: finNombre(f.financiador), when: o.fecha,
+        text: `[${o.id}] Objetamos ${its.length} prestación(es) de ${pacs.length} paciente(s) por ${money(o.monto)}.`,
+        accion: { tipo: "Objeción por prestación", categorias: [o.categoria], detalles: [o.detalle] }, adjuntos: o.adjuntos });
+    }
     if (o.estado) return;
     // Se deduce del estado en que quedó la factura en el mock.
     o.estado = f.estado === "esperando_hospital" ? "derivado_hospital"
