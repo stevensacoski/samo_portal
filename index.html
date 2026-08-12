@@ -71,9 +71,14 @@
   .chip-emitida, .chip-cerrada { background: var(--neutral-soft); color: var(--neutral); }
   .chip-en-cola, .chip-notificada, .chip-vista, .chip-pago-informado { background: var(--info-soft); color: var(--info); }
   .chip-aceptada, .chip-pagada { background: var(--success-soft); color: var(--success); }
-  .chip-parcial, .chip-esperando-hospital, .chip-por-vencer { background: var(--warn-soft); color: var(--warn); }
+  .chip-parcial, .chip-esperando-hospital, .chip-por-vencer, .chip-pago-efectuado { background: var(--warn-soft); color: var(--warn); }
   .chip-rechazada, .chip-esperando-financiador, .chip-morosa { background: var(--danger-soft); color: var(--danger); }
   .chip-pago-parcial { background: var(--purple-soft); color: var(--purple); }
+  /* La auditoría central es acción del ministerio: se identifica con el violeta institucional, igual que el expediente. */
+  .chip-esperando-auditoria, .chip-judicializada { background: var(--purple-soft); color: var(--purple); }
+  /* Intimada es una etapa más dura que morosa: fondo pleno para que se lea como escalón previo a legales. */
+  .chip-intimada { background: var(--danger); color: #fff; }
+  .chip-cerrada-nc { background: var(--neutral-soft); color: var(--purple); }
   .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid transparent; text-decoration: none; }
   .btn-primary { background: var(--primary); color: white; border-color: var(--primary); }
   .btn-primary:hover { background: var(--primary-dark); }
@@ -171,6 +176,23 @@
   .paciente-item.checked { border-color: var(--warn); background: var(--warn-soft); }
   .decision-abierta { border: 1px dashed #b39ddb; background: #f7f4fc; border-radius: 6px; padding: 10px 12px; font-size: 12px; color: #4a3269; }
   .decision-abierta strong { color: #35204f; }
+  /* Switch de lectura de la tabla de prestaciones: dos vistas sobre los mismos datos. */
+  .switch-vista { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: white; }
+  .switch-vista button { border: none; background: white; padding: 6px 12px; font-size: 12.5px; cursor: pointer; color: var(--muted); font-family: inherit; }
+  .switch-vista button + button { border-left: 1px solid var(--border); }
+  .switch-vista button.active { background: var(--primary); color: white; font-weight: 600; }
+  .switch-vista button:not(.active):hover { background: var(--bg); }
+  tr.fila-paciente td { background: #f6f8fa; border-top: 2px solid var(--border); }
+  tr.sub-prestacion td { padding-top: 6px; padding-bottom: 6px; }
+  /* Cada planteo es una unidad de trabajo con su propia documentación, historial y acciones. */
+  .planteo { border: 1px solid var(--border); border-left: 4px solid var(--warn); border-radius: 8px; padding: 14px 16px; margin-bottom: 12px; }
+  .planteo.me-toca { border-left-color: var(--danger); background: #fffcfb; }
+  .planteo.cerrado { border-left-color: var(--neutral); opacity: 0.75; }
+  .planteo-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  .planteo-mov { border-left: 3px solid var(--border); padding: 6px 10px; margin-bottom: 6px; font-size: 12.5px; background: #fafbfc; border-radius: 0 4px 4px 0; }
+  .planteo-mov.from-hospital { border-left-color: var(--success); }
+  .planteo-mov.from-financiador { border-left-color: var(--warn); }
+  .planteo-mov.from-ministerio { border-left-color: var(--purple); }
 </style>
 </head>
 <body>
@@ -200,13 +222,21 @@ const HOSPITALES = [
   { id: "H004", nombre: "Hospital Zonal Ricardo Gutiérrez (La Plata)" },
   { id: "H005", nombre: "Hospital El Cruce (Florencio Varela)" },
 ];
+/* `habilitado` refleja que los financiadores se incorporan por etapas, no todos desde el día 1.
+   Mientras un financiador no tenga usuario habilitado en el portal, sus facturas NO son aptas para
+   notificar y no aparecen en la cola (principio de diseño de la reunión 11/8). */
 const FINANCIADORES = [
-  { id: "F001", nombre: "IOMA", tipo: "Obra Social Provincial" },
-  { id: "F002", nombre: "PAMI", tipo: "Obra Social Nacional" },
-  { id: "F003", nombre: "OSDE", tipo: "Prepaga" },
-  { id: "F004", nombre: "Swiss Medical", tipo: "Prepaga" },
-  { id: "F005", nombre: "OSECAC", tipo: "Obra Social Sindical" },
+  { id: "F001", nombre: "IOMA", tipo: "Obra Social Provincial", habilitado: true, alta: "2026-03-02" },
+  { id: "F002", nombre: "PAMI", tipo: "Obra Social Nacional", habilitado: true, alta: "2026-04-15" },
+  { id: "F003", nombre: "OSDE", tipo: "Prepaga", habilitado: true, alta: "2026-05-04" },
+  { id: "F004", nombre: "Swiss Medical", tipo: "Prepaga", habilitado: true, alta: "2026-06-01" },
+  { id: "F005", nombre: "OSECAC", tipo: "Obra Social Sindical", habilitado: true, alta: "2026-06-20" },
+  // Todavía sin usuario en el portal: sus facturas quedan retenidas, no se pueden notificar.
+  { id: "F006", nombre: "Medifé", tipo: "Prepaga", habilitado: false, alta: null },
 ];
+const finHabilitado = (id) => !!FINANCIADORES.find(f => f.id === id)?.habilitado;
+// Fecha del escenario. Todo el prototipo calcula contra esta fecha: cambiarla acá mueve el escenario entero.
+const HOY = "2026-08-03";
 // Unidad de medida judicial (mock, configurable) y umbral para habilitar expediente — ver 3.3/3.4 del brief.
 const JUS = 150000;
 const UMBRAL_JUS = 6;
@@ -215,13 +245,26 @@ const FACTURAS = [
   { nro: "0001-00042190", hospital: "H001", financiador: "F001", fecha: "2026-07-15", monto: 2310500, montoPagado: 0, estado: "esperando_financiador", pacientes: 8, montoDebate: 280400 },
   { nro: "0001-00042191", hospital: "H001", financiador: "F003", fecha: "2026-07-15", monto: 890400, montoPagado: 0, estado: "notificada", pacientes: 4 },
   { nro: "0001-00042192", hospital: "H001", financiador: "F004", fecha: "2026-07-15", monto: 1250000, montoPagado: 0, estado: "esperando_hospital", pacientes: 6, montoDebate: 210000 },
-  { nro: "0001-00042193", hospital: "H001", financiador: "F002", fecha: "2026-07-15", monto: 3100000, montoPagado: 0, estado: "esperando_hospital", pacientes: 14, montoDebate: 450000 },
+  // Objeción fresca todavía sin resolver: alimenta la bandeja de la auditoría central
+  { nro: "0001-00042193", hospital: "H001", financiador: "F002", fecha: "2026-07-15", monto: 3100000, montoPagado: 0, estado: "esperando_auditoria", pacientes: 14, montoDebate: 450000 },
+  /* Caso testigo de la auditoría: dos planteos sobre la misma factura, uno claramente improcedente
+     (el afiliado sí tenía cobertura) y otro procedente (falta la autorización). Sirve para demostrar
+     la resolución PARCIAL: se desestima uno y se deriva el otro al hospital. */
+  { nro: "0001-00042197", hospital: "H001", financiador: "F001", fecha: "2026-07-20", monto: 1490400, montoPagado: 0, estado: "esperando_auditoria", pacientes: 4,
+    montoDebate: 766000,
+    objeciones: [
+      { id: "OBJ-1", items: ["I-97-2"], categoria: "Afiliado no vigente / no corresponde", detalle: "El afiliado figuraría dado de baja al momento de la internación.", monto: 145200, fecha: "2026-07-28" },
+      { id: "OBJ-2", items: ["I-97-3"], categoria: "Falta autorización previa", detalle: "No consta autorización previa para la cirugía programada.", monto: 620800, fecha: "2026-07-28" }
+    ] },
   { nro: "0001-00042194", hospital: "H001", financiador: "F005", fecha: "2026-07-15", monto: 780000, montoPagado: 0, estado: "aceptada", pacientes: 3 },
-  { nro: "0001-00042210", hospital: "H001", financiador: "F001", fecha: "2026-06-18", monto: 1750000, montoPagado: 0, estado: "aceptada", pacientes: 8 },
-  { nro: "0001-00041000", hospital: "H001", financiador: "F002", fecha: "2026-05-15", monto: 2800000, montoPagado: 0, estado: "notificada", pacientes: 11 },
+  // IOMA ya transfirió por esta factura pero no imputó: el hospital puede intimarlo (ver PEF-001)
+  { nro: "0001-00042210", hospital: "H001", financiador: "F001", fecha: "2026-06-18", monto: 1750000, montoPagado: 0, estado: "pago_efectuado", pacientes: 8 },
+  // Ya intimada y sin pago: es la que sostiene el par H001–PAMI en el acumulador judicial (18,7 JUS)
+  { nro: "0001-00041000", hospital: "H001", financiador: "F002", fecha: "2026-05-15", monto: 2800000, montoPagado: 0, estado: "intimada", pacientes: 11, fechaIntimacion: "2026-07-20" },
   { nro: "0001-00040500", hospital: "H001", financiador: "F003", fecha: "2026-06-01", monto: 1100000, montoPagado: 550000, estado: "pago_parcial", pacientes: 5 },
   { nro: "0001-00040000", hospital: "H001", financiador: "F001", fecha: "2026-04-15", monto: 1200000, montoPagado: 1200000, estado: "cerrada", pacientes: 6 },
-  { nro: "0004-00028112", hospital: "H002", financiador: "F001", fecha: "2026-07-15", monto: 1120800, montoPagado: 0, estado: "esperando_hospital", pacientes: 6, montoDebate: 145200 },
+  // El hilo muestra que el hospital ya respondió: la pelota está del lado del financiador.
+  { nro: "0004-00028112", hospital: "H002", financiador: "F001", fecha: "2026-07-15", monto: 1120800, montoPagado: 0, estado: "esperando_financiador", pacientes: 6, montoDebate: 145200 },
   { nro: "0004-00028113", hospital: "H002", financiador: "F002", fecha: "2026-07-15", monto: 3450200, montoPagado: 0, estado: "notificada", pacientes: 15 },
   { nro: "0004-00028119", hospital: "H002", financiador: "F001", fecha: "2026-06-10", monto: 2100000, montoPagado: 0, estado: "aceptada", pacientes: 11 },
   { nro: "0007-00019845", hospital: "H003", financiador: "F001", fecha: "2026-07-15", monto: 780600, montoPagado: 0, estado: "aceptada", pacientes: 5 },
@@ -229,6 +272,9 @@ const FACTURAS = [
   { nro: "0015-00007712", hospital: "H005", financiador: "F001", fecha: "2026-07-15", monto: 4120700, montoPagado: 0, estado: "esperando_financiador", pacientes: 18, montoDebate: 620800 },
   { nro: "0004-00027000", hospital: "H002", financiador: "F001", fecha: "2026-05-20", monto: 1650000, montoPagado: 0, estado: "aceptada", pacientes: 8 },
   { nro: "0001-00042250", hospital: "H001", financiador: "F001", fecha: "2026-08-01", monto: 950000, montoPagado: 0, estado: "en_cola", pacientes: 5 },
+  // Financiador todavía no habilitado en el portal: quedan retenidas, no son aptas para notificar
+  { nro: "0001-00042251", hospital: "H001", financiador: "F006", fecha: "2026-08-01", monto: 1180000, montoPagado: 0, estado: "en_cola", pacientes: 6 },
+  { nro: "0004-00028310", hospital: "H002", financiador: "F006", fecha: "2026-08-01", monto: 740000, montoPagado: 0, estado: "en_cola", pacientes: 3 },
 
   // --- Notificación consolidada del 2026-08-01 a IOMA: recién recibida, ninguna revisada todavía ---
   // Es el lote al que apunta la alerta del panel: todas en "notificada", coherente con que acaba de llegar.
@@ -241,17 +287,17 @@ const FACTURAS = [
 
   // --- Par OSDE (F003) – Hospital Evita (H003): ejemplo canónico de acumulación por tandas (brief 3.3) ---
   // Tanda 1 — vencida a fines de junio, saldo moroso 1.500.000 = 10 JUS. Ya judicializada (EXP-2026-0001).
-  { nro: "0007-00019801", hospital: "H003", financiador: "F003", fecha: "2026-04-10", monto: 900000, montoPagado: 0, estado: "notificada", pacientes: 6, expediente: "EXP-2026-0001" },
-  { nro: "0007-00019802", hospital: "H003", financiador: "F003", fecha: "2026-04-10", monto: 800000, montoPagado: 300000, estado: "pago_parcial", pacientes: 4, expediente: "EXP-2026-0001" },
-  { nro: "0007-00019803", hospital: "H003", financiador: "F003", fecha: "2026-04-25", monto: 400000, montoPagado: 200000, notasCredito: 100000, estado: "pago_parcial", pacientes: 3, expediente: "EXP-2026-0001" },
-  // Tanda 2 — vencida en julio, saldo moroso acumulado 1.050.000 = 7 JUS
-  { nro: "0007-00019810", hospital: "H003", financiador: "F003", fecha: "2026-05-20", monto: 700000, montoPagado: 0, estado: "aceptada", pacientes: 5 },
-  { nro: "0007-00019811", hospital: "H003", financiador: "F003", fecha: "2026-05-28", monto: 600000, montoPagado: 250000, estado: "pago_parcial", pacientes: 4 },
+  { nro: "0007-00019801", hospital: "H003", financiador: "F003", fecha: "2026-04-10", monto: 900000, montoPagado: 0, estado: "judicializada", pacientes: 6, fechaIntimacion: "2026-06-15", expediente: "EXP-2026-0001" },
+  { nro: "0007-00019802", hospital: "H003", financiador: "F003", fecha: "2026-04-10", monto: 800000, montoPagado: 300000, estado: "judicializada", pacientes: 4, fechaIntimacion: "2026-06-15", expediente: "EXP-2026-0001" },
+  { nro: "0007-00019803", hospital: "H003", financiador: "F003", fecha: "2026-04-25", monto: 400000, montoPagado: 200000, notasCredito: 100000, estado: "judicializada", pacientes: 3, fechaIntimacion: "2026-06-15", expediente: "EXP-2026-0001" },
+  // Tanda 2 — ya intimadas y sin pago: acumulan 1.050.000 = 7 JUS, habilitadas para el segundo expediente
+  { nro: "0007-00019810", hospital: "H003", financiador: "F003", fecha: "2026-05-20", monto: 700000, montoPagado: 0, estado: "intimada", pacientes: 5, fechaIntimacion: "2026-07-24" },
+  { nro: "0007-00019811", hospital: "H003", financiador: "F003", fecha: "2026-05-28", monto: 600000, montoPagado: 250000, estado: "intimada", pacientes: 4, fechaIntimacion: "2026-07-31" },
   // Vencida con saldo 0 por pago parcial + nota de crédito → cierra, no cae en mora (D7 abierta)
   { nro: "0007-00019820", hospital: "H003", financiador: "F003", fecha: "2026-05-10", monto: 500000, montoPagado: 400000, notasCredito: 100000, estado: "pago_parcial", pacientes: 3 },
 
-  // Par por debajo del umbral: saldo moroso 500.000 = 3,3 JUS — no habilita expediente
-  { nro: "0012-00010150", hospital: "H004", financiador: "F004", fecha: "2026-05-25", monto: 700000, montoPagado: 200000, estado: "pago_parcial", pacientes: 4 },
+  // Par intimado pero por debajo del umbral: saldo 500.000 = 3,3 JUS — no habilita expediente
+  { nro: "0012-00010150", hospital: "H004", financiador: "F004", fecha: "2026-05-25", monto: 700000, montoPagado: 200000, estado: "intimada", pacientes: 4, fechaIntimacion: "2026-07-28" },
   // Vigente con nota de crédito parcial — el saldo baja pero el reloj sigue corriendo
   { nro: "0001-00042196", hospital: "H001", financiador: "F005", fecha: "2026-06-20", monto: 1400000, montoPagado: 0, notasCredito: 300000, estado: "aceptada", pacientes: 7 },
 
@@ -264,8 +310,8 @@ const FACTURAS = [
   { nro: "0012-00008800", hospital: "H004", financiador: "F001", fecha: "2025-07-22", monto: 1420000, montoPagado: 1420000, estado: "cerrada", pacientes: 8 },
   { nro: "0015-00006050", hospital: "H005", financiador: "F001", fecha: "2025-11-03", monto: 1660000, montoPagado: 1660000, estado: "cerrada", pacientes: 10 },
   // Morosas 2025 del par Evita–IOMA, ya judicializadas en su momento (EXP-2025-0007)
-  { nro: "0007-00017200", hospital: "H003", financiador: "F001", fecha: "2025-04-18", monto: 1650000, montoPagado: 400000, estado: "pago_parcial", pacientes: 10, expediente: "EXP-2025-0007" },
-  { nro: "0007-00017450", hospital: "H003", financiador: "F001", fecha: "2025-08-30", monto: 1280000, montoPagado: 0, estado: "notificada", pacientes: 7, expediente: "EXP-2025-0007" },
+  { nro: "0007-00017200", hospital: "H003", financiador: "F001", fecha: "2025-04-18", monto: 1650000, montoPagado: 400000, estado: "judicializada", pacientes: 10, fechaIntimacion: "2025-09-05", expediente: "EXP-2025-0007" },
+  { nro: "0007-00017450", hospital: "H003", financiador: "F001", fecha: "2025-08-30", monto: 1280000, montoPagado: 0, estado: "judicializada", pacientes: 7, fechaIntimacion: "2025-11-02", expediente: "EXP-2025-0007" },
 ];
 // `fecha` es la fecha de NOTIFICACIÓN (desde ahí corren los 60 días). La emisión del hospital es anterior:
 // se deriva para poder mostrar ambas sin duplicar datos a mano en cada factura.
@@ -298,11 +344,67 @@ const ITEMS_FACTURA = {
     { id: "I-95-10", paciente: "Suárez, Roberto", dni: "27.908.***", afiliado: "IOMA 4-504-661***", prestacion: "Cirugía menor + insumos", codigo: "710422", fecha: "2026-06-04", monto: 620800 },
     { id: "I-95-11", paciente: "Fernández, Lucía", dni: "35.677.***", afiliado: "IOMA 4-511-208***", prestacion: "Estudios de laboratorio", codigo: "310105", fecha: "2026-06-05", monto: 98400 },
     { id: "I-95-12", paciente: "Ibáñez, Marta", dni: "31.044.***", afiliado: "IOMA 4-506-914***", prestacion: "Internación clínica 2 días", codigo: "620301", fecha: "2026-06-06", monto: 480500 },
+  ],
+  // Factura del caso testigo de la auditoría (dos planteos con distinto destino).
+  "0001-00042197": [
+    { id: "I-97-1", paciente: "Ledesma, Hugo", dni: "26.771.***", afiliado: "IOMA 4-507-330***", prestacion: "Consulta guardia + estudios", codigo: "420101", fecha: "2026-07-09", monto: 145200 },
+    { id: "I-97-2", paciente: "Sosa, Norma", dni: "24.918.***", afiliado: "IOMA 4-502-118***", prestacion: "Internación clínica 2 días", codigo: "620301", fecha: "2026-07-10", monto: 145200 },
+    { id: "I-97-3", paciente: "Aguirre, Diego", dni: "37.556.***", afiliado: "IOMA 4-512-904***", prestacion: "Cirugía programada + insumos", codigo: "710422", fecha: "2026-07-12", monto: 620800 },
+    { id: "I-97-4", paciente: "Aguirre, Diego", dni: "37.556.***", afiliado: "IOMA 4-512-904***", prestacion: "Estudio de alta complejidad", codigo: "810301", fecha: "2026-07-13", monto: 579200 },
   ]
 };
-const itemsDe = (nro) => ITEMS_FACTURA[nro] || ITEMS_FACTURA["0001-00042189"];
-// Documentación adjunta por paciente (mock) — se consulta al revisar un paciente puntual.
-const DOCS_PACIENTE = ["Historia clínica", "Epicrisis firmada", "Consentimiento informado", "Orden médica", "Constancia de afiliación"];
+/* Las facturas cargadas a mano arriba son las de los casos testigo. Para todas las demás, las
+   prestaciones se generan una sola vez al arrancar: antes `itemsDe()` caía por defecto a la primera
+   factura, así que cualquier otra mostraba pacientes que no eran suyos. Ahora cada factura tiene su
+   propio detalle, con montos que cierran contra el total facturado.
+   El generador es determinístico (la semilla sale del N° de factura) para que el mismo caso se vea
+   igual en cada demo y las capturas no cambien entre sesiones. */
+const APELLIDOS_POOL = ["Gómez","Ramírez","Torres","Silva","Molina","Acosta","Benítez","Cabrera","Vega","Ortiz","Ferreyra","Quiroga","Medina","Ríos","Núñez","Peralta","Herrera","Sosa","Castro","Villalba"];
+const NOMBRES_POOL = ["Alberto","Mariana","Jorge","Silvina","Raúl","Claudia","Néstor","Patricia","Osvaldo","Verónica","Daniel","Andrea","Rubén","Gabriela","Sergio","Mónica"];
+const PRESTACIONES_POOL = [
+  { prestacion: "Consulta guardia", codigo: "420101", peso: 1 },
+  { prestacion: "Estudios de laboratorio", codigo: "310105", peso: 1 },
+  { prestacion: "Diagnóstico por imágenes", codigo: "340210", peso: 2 },
+  { prestacion: "Internación clínica 3 días", codigo: "620301", peso: 4 },
+  { prestacion: "Cirugía menor + insumos", codigo: "710422", peso: 5 },
+  { prestacion: "Estudio de alta complejidad", codigo: "810301", peso: 5 },
+  { prestacion: "Práctica kinesiológica", codigo: "250110", peso: 1 },
+];
+function generarItems(f) {
+  // PRNG chico y determinístico: misma factura → mismas prestaciones, siempre.
+  let seed = 0;
+  for (const c of f.nro) seed = (seed * 31 + c.charCodeAt(0)) >>> 0;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) >>> 0; return seed / 4294967296; };
+  const items = [];
+  const nPac = Math.max(1, f.pacientes || 1);
+  for (let p = 0; p < nPac; p++) {
+    const nombre = `${APELLIDOS_POOL[Math.floor(rnd()*APELLIDOS_POOL.length)]}, ${NOMBRES_POOL[Math.floor(rnd()*NOMBRES_POOL.length)]}`;
+    const dni = `${20 + Math.floor(rnd()*25)}.${String(Math.floor(rnd()*900)+100)}.***`;
+    const afiliado = `${finNombre(f.financiador)} ${4 + Math.floor(rnd()*3)}-${String(Math.floor(rnd()*900)+100)}-${String(Math.floor(rnd()*900)+100)}***`;
+    // Entre 1 y 3 prestaciones por paciente: la realidad es que a una persona le facturan varias cosas.
+    const nPrest = 1 + Math.floor(rnd() * 3);
+    for (let k = 0; k < nPrest; k++) {
+      const pr = PRESTACIONES_POOL[Math.floor(rnd()*PRESTACIONES_POOL.length)];
+      const d = new Date(f.fechaEmision); d.setDate(d.getDate() - Math.floor(rnd()*20));
+      items.push({ id: `I-${f.nro.slice(-5)}-${items.length+1}`, paciente: nombre, dni, afiliado,
+        prestacion: pr.prestacion, codigo: pr.codigo, fecha: d.toISOString().split("T")[0], peso: pr.peso });
+    }
+  }
+  // Los montos se reparten por peso y se ajusta el último para que la suma cierre exacto con la factura.
+  const pesoTotal = items.reduce((s,i)=>s+i.peso,0);
+  let acum = 0;
+  items.forEach((i, idx) => {
+    i.monto = idx === items.length - 1 ? f.monto - acum : Math.round((f.monto * i.peso / pesoTotal) / 100) * 100;
+    acum += i.monto; delete i.peso;
+  });
+  return items;
+}
+const itemsDe = (nro) => ITEMS_FACTURA[nro] || [];
+/* Documentación adjunta por paciente (mock) — se consulta al revisar un paciente puntual.
+   Los formularios F5/F8/F9 son los que hoy acompañan la facturación; el resto son los que el
+   documento de proceso propone incorporar. El set mínimo obligatorio por tipo de prestación
+   sigue a definir (una consulta de guardia no pide lo mismo que una cirugía programada). */
+const DOCS_PACIENTE = ["Formulario F5", "Formulario F8", "Formulario F9", "Historia clínica", "Epicrisis firmada", "Consentimiento informado", "Autorización previa", "Constancia de afiliación"];
 const THREADS_INITIAL = {
   "0001-00042190": [
     { who: "financiador", nombre: "IOMA", when: "28/07/2026 14:32", text: "Iniciamos discusión sobre 1 ítem por afiliado no vigente.",
@@ -312,9 +414,20 @@ const THREADS_INITIAL = {
       accion: { tipo: "Descargo del hospital", categorias: ["Ratificar cobertura con documentación"], detalles: ["Padrón consultado: 12/07/2026 08:41", "Estado registrado: ACTIVO", "Prestación efectuada: 12/07/2026 10:20"] },
       adjuntos: [{ nombre: "consulta_padron_ioma_12-07.pdf", tipo: "pdf" }, { nombre: "HC_perez_juan.pdf", tipo: "pdf" }, { nombre: "captura_padron.png", tipo: "img" }] }
   ],
+  // Objeción ya auditada y derivada: es el único camino por el que una objeción llega al hospital.
   "0001-00042192": [
     { who: "financiador", nombre: "Swiss Medical", when: "26/07/2026 11:20", text: "Falta autorización previa en cirugía programada.",
-      accion: { tipo: "Objeción iniciada", categorias: ["Falta autorización previa"], detalles: ["Prestación: Cirugía programada 710422"] }, adjuntos: [] }
+      accion: { tipo: "Objeción iniciada", categorias: ["Falta autorización previa"], detalles: ["Prestación: Cirugía programada 710422"] }, adjuntos: [] },
+    { who: "ministerio", nombre: "Auditoría central — SAMO", when: "27/07/2026 10:05", text: "La objeción es procedente. Derivamos al hospital para su descargo.",
+      accion: { tipo: "Objeción procedente — derivada al hospital", categorias: ["Procedente"],
+        detalles: ["Verificamos que no consta autorización previa en el expediente de la prestación.", "1 planteo derivado al hospital para nota de crédito o descargo."] },
+      adjuntos: [{ nombre: "respaldo_auditoria_central.pdf", tipo: "pdf" }] }
+  ],
+  "0001-00042197": [
+    { who: "financiador", nombre: "IOMA", when: "28/07/2026 09:40", text: "Objetamos 2 prestaciones de 2 pacientes por $ 766.000. Queda a resolución de la auditoría central.",
+      accion: { tipo: "Objeción por prestación", categorias: ["Afiliado no vigente / no corresponde", "Falta autorización previa"],
+        detalles: ["Sosa, Norma — Internación clínica 2 días (620301) $ 145.200", "Aguirre, Diego — Cirugía programada + insumos (710422) $ 620.800"] },
+      adjuntos: [{ nombre: "padron_ioma_julio_2026.pdf", tipo: "pdf" }] }
   ],
   "0001-00042193": [
     { who: "financiador", nombre: "PAMI", when: "25/07/2026 16:45", text: "Diferencia en códigos facturados y documentación incompleta en 3 prestaciones.",
@@ -352,8 +465,24 @@ let state = {
   filtrosPanelFin: { hospital: "TODOS", periodo: "TODOS" },
   filtrosFactFin: { hospital: "TODOS", estado: "TODOS", situacion: "TODOS", q: "" },
   filtrosNotifFin: { hospital: "TODOS", estado: "TODOS", q: "", fecha: "TODOS" },
+  // Contadores de gestión de la auditoría central (métrica pedida en T.4 del documento de proceso).
+  auditoria: { resueltas: 0, derivadas: 0 },
+  /* Transferencias declaradas por el financiador que todavía NO fueron imputadas a facturas concretas.
+     Es el escenario real: el hospital ve la plata en la cuenta pero no sabe qué facturas cancela, y por
+     eso puede intimarlo fehacientemente a que impute (definición 11/8). */
+  pagosEfectuados: [
+    { id: "PEF-001", financiador: "F001", hospital: "H001", facturas: ["0001-00042210"], monto: 1750000,
+      comprobante: "TRF-774512", fecha: "2026-07-29", imputado: false, intimaciones: [] }
+  ],
+  /* Notas de crédito emitidas por el hospital. No son un acto unilateral: se notifican al financiador
+     por el mismo canal fehaciente para que las reconcilie contra la factura original (Fase 6). */
+  notasCredito: [
+    { id: "NC-2026-0031", factura: "0004-00028112", hospital: "H002", financiador: "F001", monto: 145200,
+      tipo: "parcial", motivo: "Diferencia en código de prestación", fecha: "2026-07-25", estado: "notificada" }
+  ],
   // Selección y filtrado de prestaciones dentro del detalle de una factura (objeción en lote).
-  selItems: [], filtroItems: { codigo: "TODOS", q: "" }, focusSel: null
+  // `vistaItems` conmuta entre leer la factura por prestación o agrupada por paciente.
+  selItems: [], filtroItems: { codigo: "TODOS", q: "" }, vistaItems: "prestacion", focusSel: null
 };
 // Objeciones cargadas sobre prestaciones concretas de una factura.
 const objecionesDe = (f) => f.objeciones || [];
@@ -363,7 +492,7 @@ const NAV = {
     { label: "Panel general", view: "dashboard" },
     { label: "Cola de notificación", view: "cola" },
     { label: "Facturas notificadas", view: "notificadas" },
-    { label: "Discusiones abiertas", view: "discusiones" },
+    { label: "Auditoría central", view: "auditoria" },
     { label: "Morosidad → Legales", view: "morosidad" },
     { label: "Expedientes judiciales", view: "expedientes" },
   ],
@@ -382,9 +511,10 @@ const NAV = {
     { label: "Panel", view: "panel_financiador" },
     { label: "Notificaciones recibidas", view: "notificaciones" },
     { label: "Facturas a revisar", view: "facturas_financiador" },
+    { label: "Notas de crédito", view: "notas_credito" },
     { label: "Discusiones", view: "discusiones_financiador", sub: [
       { label: "Esperan mi respuesta", view: "disc_esperan_yo" },
-      { label: "Esperando al hospital", view: "disc_esperan_hosp" },
+      { label: "Esperando resolución", view: "disc_esperan_hosp" },
     ]},
     { label: "Informar pagos", view: "informar_pagos" },
     { label: "Historial", view: "historial_financiador" },
@@ -398,12 +528,17 @@ const hospCorto = (id) => hospNombre(id).replace("Hospital ", "").replace(" (La 
 const finNombre = (id) => FINANCIADORES.find(f => f.id === id)?.nombre || id;
 const finTipo = (id) => FINANCIADORES.find(f => f.id === id)?.tipo || "";
 const chip = (e) => {
-  const labels = { emitida:"Emitida", en_cola:"En cola", notificada:"Notificada", vista:"Vista", aceptada:"Aceptada", rechazada_parcial:"Rechazada parcial", rechazada_total:"Rechazada", esperando_financiador:"Esperando financiador", esperando_hospital:"Esperando hospital", pago_informado:"Pago informado", pago_parcial:"Pago parcial", pagada:"Pagada", morosa:"Morosa", cerrada:"Cerrada", por_vencer:"Por vencer" };
-  const cls = { emitida:"chip-emitida", en_cola:"chip-en-cola", notificada:"chip-notificada", vista:"chip-vista", aceptada:"chip-aceptada", rechazada_parcial:"chip-parcial", rechazada_total:"chip-rechazada", esperando_financiador:"chip-esperando-financiador", esperando_hospital:"chip-esperando-hospital", pago_informado:"chip-pago-informado", pago_parcial:"chip-pago-parcial", pagada:"chip-pagada", morosa:"chip-morosa", cerrada:"chip-cerrada", por_vencer:"chip-por-vencer" };
+  const labels = { emitida:"Emitida", en_cola:"En cola", notificada:"Notificada", vista:"Vista", aceptada:"Aceptada", rechazada_parcial:"Rechazada parcial", rechazada_total:"Rechazada", esperando_auditoria:"Esperando auditoría", esperando_financiador:"Esperando financiador", esperando_hospital:"Esperando hospital", pago_efectuado:"Pago efectuado", pago_informado:"Pago informado", pago_parcial:"Pago parcial", pagada:"Pagada", morosa:"Morosa", intimada:"Intimada", judicializada:"Judicializada", cerrada:"Cerrada", cerrada_nc:"Cerrada por NC", por_vencer:"Por vencer" };
+  const cls = { emitida:"chip-emitida", en_cola:"chip-en-cola", notificada:"chip-notificada", vista:"chip-vista", aceptada:"chip-aceptada", rechazada_parcial:"chip-parcial", rechazada_total:"chip-rechazada", esperando_auditoria:"chip-esperando-auditoria", esperando_financiador:"chip-esperando-financiador", esperando_hospital:"chip-esperando-hospital", pago_efectuado:"chip-pago-efectuado", pago_informado:"chip-pago-informado", pago_parcial:"chip-pago-parcial", pagada:"chip-pagada", morosa:"chip-morosa", intimada:"chip-intimada", judicializada:"chip-judicializada", cerrada:"chip-cerrada", cerrada_nc:"chip-cerrada-nc", por_vencer:"chip-por-vencer" };
   return `<span class="chip ${cls[e]||'chip-emitida'}">${labels[e]||e}</span>`;
 };
-const diasRestantes = (f) => 60 - Math.floor((new Date("2026-08-03") - new Date(f)) / 86400000);
-const isImpaga = (f) => !["cerrada","pagada","rechazada_total"].includes(f.estado);
+const diasRestantes = (f) => 60 - Math.floor((new Date(HOY) - new Date(f)) / 86400000);
+const isImpaga = (f) => !["cerrada","cerrada_nc","pagada","rechazada_total"].includes(f.estado);
+/* Etapas de la morosidad (reunión 11/8): al día 60 la factura cae en `morosa`, la auditoría la `intima`,
+   y solo si no entra el pago se acumula para expediente, quedando `judicializada`.
+   Las tres siguen siendo deuda vencida: para KPIs y tableros se leen juntas con esMorosa(). */
+const ESTADOS_MORA = ["morosa", "intimada", "judicializada"];
+const esMorosa = (f) => ESTADOS_MORA.includes(f.estado);
 // saldo = monto notificado − pagos imputados − notas de crédito (brief 3.2).
 const saldoPendiente = (f) => f.monto - (f.montoPagado||0) - (f.notasCredito||0);
 /* El saldo se parte en dos ejes independientes:
@@ -412,8 +547,52 @@ const saldoPendiente = (f) => f.monto - (f.montoPagado||0) - (f.notasCredito||0)
    Sin esta separación, objetar $100.000 de una factura de $2.000.000 congelaría el cobro
    de los $1.900.000 en los que nadie discrepa. */
 const enDiscusion = (f) => ["esperando_financiador","esperando_hospital","rechazada_parcial"].includes(f.estado);
+/* ---- El planteo como unidad de trabajo ----
+   Cada objeción camina sola por el circuito: la auditoría la desestima o la deriva, el hospital
+   responde, el financiador acepta o la sostiene. El estado de la FACTURA se deriva de sus planteos,
+   así que la "resolución parcial" deja de ser un caso especial: es que cada planteo siguió su camino. */
+const PLANTEO_CERRADO = ["aceptado", "cerrado_nc", "desestimado_firme"];
+const planteoAbierto = (o) => !PLANTEO_CERRADO.includes(o.estado);
+const planteosAbiertos = (f) => objecionesDe(f).filter(planteoAbierto);
+const PLANTEO_LABEL = {
+  en_auditoria: { txt: "En auditoría", cls: "chip-esperando-auditoria" },
+  derivado_hospital: { txt: "Derivado al hospital", cls: "chip-esperando-hospital" },
+  respondido: { txt: "Esperando al financiador", cls: "chip-esperando-financiador" },
+  aceptado: { txt: "Cerrado — respuesta aceptada", cls: "chip-aceptada" },
+  cerrado_nc: { txt: "Cerrado con nota de crédito", cls: "chip-cerrada-nc" },
+  desestimado_firme: { txt: "Cerrado — objeción desistida", cls: "chip-cerrada" },
+};
+const chipPlanteo = (o) => {
+  const l = PLANTEO_LABEL[o.estado] || PLANTEO_LABEL.en_auditoria;
+  return `<span class="chip ${l.cls}">${l.txt}</span>`;
+};
+// Quién tiene que actuar sobre este planteo, para que cada rol sepa si le toca.
+const planteoEsDe = (o, rol) =>
+  rol === "ministerio" ? o.estado === "en_auditoria"
+  : rol === "hospital" ? o.estado === "derivado_hospital"
+  : o.estado === "respondido";
+
+const ESTADOS_DISCUSION = ["esperando_auditoria", "esperando_hospital", "esperando_financiador", "rechazada_parcial"];
+function recalcularEstadoFactura(f) {
+  const abiertos = planteosAbiertos(f);
+  f.montoDebate = abiertos.reduce((s, o) => s + o.monto, 0);
+  // No pisar estados de pago ni de mora: la discusión solo gobierna cuando la factura está en discusión.
+  if (!ESTADOS_DISCUSION.includes(f.estado) && f.estado !== "aceptada") return;
+  if (!abiertos.length) { f.estado = saldoPendiente(f) <= 0 ? "cerrada" : "aceptada"; return; }
+  if (abiertos.some(o => o.estado === "derivado_hospital")) f.estado = "esperando_hospital";
+  else if (abiertos.some(o => o.estado === "en_auditoria")) f.estado = "esperando_auditoria";
+  else f.estado = "esperando_financiador";
+}
+// Registra un movimiento en el planteo y lo replica en el log general de la factura.
+function anotarPlanteo(f, o, { who, nombre, tipo, categoria, texto, detalles = [], adjuntos = [] }) {
+  o.respuestas.push({ who, nombre, when: HOY, tipo, texto, adjuntos });
+  if (!state.threads[f.nro]) state.threads[f.nro] = [];
+  state.threads[f.nro].push({ who, nombre, when: "hoy", text: `[${o.id}] ${texto}`,
+    accion: { tipo, categorias: [categoria || o.categoria], detalles }, adjuntos });
+}
+
 function montoEnDebate(f) {
-  const objs = (f.objeciones || []).filter(o => !o.resuelta);
+  const objs = planteosAbiertos(f);
   if (objs.length) return Math.min(saldoPendiente(f), objs.reduce((s, o) => s + o.monto, 0));
   return enDiscusion(f) ? Math.min(saldoPendiente(f), f.montoDebate || 0) : 0;
 }
@@ -425,17 +604,24 @@ const jus = (monto) => monto / JUS;
 function evaluarVencimientos() {
   state.facturas.forEach(f => {
     if (f.estado === "en_cola" || !isImpaga(f)) return;
+    // Una vez intimada o judicializada, la factura salió del automatismo y la gobierna la auditoría:
+    // volver a marcarla "morosa" en cada render borraría el avance del circuito de legales.
+    if (f.estado === "intimada" || f.estado === "judicializada") return;
     if (diasRestantes(f.fecha) > 0) return;
     f.estado = saldoPendiente(f) <= 0 ? "cerrada" : "morosa";
   });
 }
 
 /* ---- Acumulador de morosidad por par hospital–financiador (brief 3.3 / 3.4) ----
-   Solo cuentan las morosas que todavía NO fueron asignadas a un expediente: cuando se
-   genera un expediente esas facturas salen del acumulador y el par vuelve a cero. */
+   Solo cuentan las facturas YA INTIMADAS que no pagaron y que todavía no fueron asignadas a un
+   expediente. La morosa recién vencida NO entra al acumulador: primero tiene que pasar por la
+   intimación de la auditoría (definición 11/8). Al generar el expediente, esas facturas salen del
+   acumulador y el par vuelve a cero. */
 const UMBRAL_MONTO = JUS * UMBRAL_JUS;
-const morosasDelPar = (hospId, finId) => state.facturas.filter(f =>
-  f.estado === "morosa" && !f.expediente && f.hospital === hospId && f.financiador === finId);
+const intimadasDelPar = (hospId, finId) => state.facturas.filter(f =>
+  f.estado === "intimada" && !f.expediente && f.hospital === hospId && f.financiador === finId);
+// Morosas todavía sin intimar: es la bandeja de trabajo de la auditoría en la vista de morosidad.
+const morosasSinIntimar = (filtro = () => true) => state.facturas.filter(f => f.estado === "morosa" && filtro(f));
 const expedienteDe = (nro) => state.expedientes.find(e => e.facturas.includes(nro));
 // Pago informado por el financiador pero todavía no confirmado por el hospital: no reduce el saldo,
 // así que no frena la mora — pero conviene señalarlo para no leerlo como un dato inconsistente.
@@ -444,9 +630,20 @@ const marcaPagoPendiente = (nro) => pagoPendienteDe(nro)
   ? ` <span class="chip chip-pago-informado" title="Pago informado, pendiente de confirmación del hospital — todavía no reduce el saldo">Pago informado</span>` : '';
 const expedientesDelPar = (hospId, finId) => state.expedientes.filter(e => e.hospital === hospId && e.financiador === finId);
 
+/* Intimación fehaciente de la auditoría sobre las morosas. Es lo que habilita el acumulador:
+   una morosa sin intimar no suma para el umbral de JUS (definición 11/8). */
+function intimar(facturas) {
+  facturas.forEach(f => {
+    if (f.estado !== "morosa") return;
+    f.estado = "intimada";
+    f.fechaIntimacion = HOY;
+    f.intimaciones = (f.intimaciones || 0) + 1;
+  });
+}
+
 function acumuladoPorPar(filtro = () => true) {
   const g = {};
-  state.facturas.filter(f => f.estado === "morosa" && !f.expediente && filtro(f)).forEach(f => {
+  state.facturas.filter(f => f.estado === "intimada" && !f.expediente && filtro(f)).forEach(f => {
     const key = f.hospital + "|" + f.financiador;
     if (!g[key]) g[key] = { hospital: f.hospital, financiador: f.financiador, facturas: [], monto: 0 };
     g[key].facturas.push(f);
@@ -455,7 +652,8 @@ function acumuladoPorPar(filtro = () => true) {
   return Object.values(g).map(p => ({
     ...p,
     jus: p.monto / JUS,
-    habilitado: p.monto > UMBRAL_MONTO,
+    // El umbral se alcanza con la igualdad: exactamente 6 JUS ya habilita (definición 11/8).
+    habilitado: p.monto >= UMBRAL_MONTO,
     faltante: Math.max(0, UMBRAL_MONTO - p.monto),
     previos: expedientesDelPar(p.hospital, p.financiador).length,
   })).sort((a, b) => b.monto - a.monto);
@@ -464,16 +662,20 @@ function acumuladoPorPar(filtro = () => true) {
 // Barra de progreso hacia el umbral de 6 JUS.
 function barraJus(monto) {
   const pct = Math.min(100, (monto / UMBRAL_MONTO) * 100);
-  const superado = monto > UMBRAL_MONTO;
+  const superado = monto >= UMBRAL_MONTO;
   return `<div class="jus-bar ${superado ? 'superado' : ''}" title="${(monto/JUS).toFixed(2)} JUS de ${UMBRAL_JUS} JUS"><span style="width:${pct}%;"></span></div>`;
 }
 const etiquetaJus = (p) => p.habilitado
-  ? `<span class="chip chip-morosa">Supera ${UMBRAL_JUS} JUS</span>`
+  ? `<span class="chip chip-morosa">Alcanza ${UMBRAL_JUS} JUS</span>`
   : `<span class="chip chip-por-vencer">Faltan ${(p.faltante/JUS).toFixed(1)} JUS</span>`;
+/* Subestados de discusión leídos desde cada rol.
+   Para el financiador, "esperando_auditoria" y "esperando_hospital" son lo mismo: ya respondió y la
+   pelota está del otro lado. Para el hospital, en cambio, "esperando_auditoria" NO es asunto suyo:
+   solo actúa cuando la auditoría le deriva el caso (estado "esperando_hospital"). */
 const esDiscYo_fin = (f) => f.estado === "esperando_financiador";
-const esDiscHosp_fin = (f) => f.estado === "esperando_hospital";
+const esDiscHosp_fin = (f) => f.estado === "esperando_hospital" || f.estado === "esperando_auditoria";
 const esDiscYo_hosp = (f) => f.estado === "esperando_hospital";
-const esDiscOtro_hosp = (f) => f.estado === "esperando_financiador";
+const esDiscOtro_hosp = (f) => f.estado === "esperando_financiador" || f.estado === "esperando_auditoria";
 const showToast = (msg) => { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 3000); };
 
 function exportCSV(filename, rows) {
@@ -498,9 +700,9 @@ function agruparPorHospital_fin() {
     if (f.estado === "aceptada") d.aceptadoSinPagar += saldoPendiente(f);
     if (esDiscYo_fin(f)) { d.espYo++; d.enDiscusion++; }
     if (esDiscHosp_fin(f)) { d.espHosp++; d.enDiscusion++; }
-    if (f.estado === "morosa") d.vencidas++;
+    if (esMorosa(f)) d.vencidas++;
     const dias = diasRestantes(f.fecha);
-    if (dias > 0 && dias <= 15 && f.estado !== "morosa") d.porVencer++;
+    if (dias > 0 && dias <= 15 && !esMorosa(f)) d.porVencer++;
   });
   return g;
 }
@@ -540,16 +742,16 @@ function kpisFinanciador() {
     if (f.estado === "notificada") { k.notificadas++; k.notificadasMonto += s; }
     if (esDiscYo_fin(f)) { k.espYo++; k.espYoMonto += (f.montoDebate || s); }
     if (esDiscHosp_fin(f)) { k.espHosp++; k.espHospMonto += (f.montoDebate || s); }
-    if (f.estado === "morosa") { k.vencidas++; k.vencidasMonto += s; }
+    if (esMorosa(f)) { k.vencidas++; k.vencidasMonto += s; }
     const dias = diasRestantes(f.fecha);
-    if (dias > 0 && dias <= 15 && f.estado !== "morosa") { k.porVencer++; k.porVencerMonto += s; }
+    if (dias > 0 && dias <= 15 && !esMorosa(f)) { k.porVencer++; k.porVencerMonto += s; }
   });
   return k;
 }
 // Situación temporal de una factura — se usa para filtrar el listado desde las tarjetas del panel.
 function situacionFactura(f) {
   if (!isImpaga(f)) return "cerrada";
-  if (f.estado === "morosa") return "vencidas";
+  if (esMorosa(f)) return "vencidas";
   const dias = diasRestantes(f.fecha);
   if (dias > 0 && dias <= 15) return "por_vencer";
   return "vigente";
@@ -564,9 +766,9 @@ function agruparPorFinanciador_hosp() {
     if (f.estado === "pago_parcial") d.saldoParcial += saldoPendiente(f);
     if (esDiscYo_hosp(f)) d.espYo++;
     if (esDiscOtro_hosp(f)) d.espFin++;
-    if (f.estado === "morosa") d.vencidas++;
+    if (esMorosa(f)) d.vencidas++;
     const dias = diasRestantes(f.fecha);
-    if (dias > 0 && dias <= 15 && f.estado !== "morosa") d.porVencer++;
+    if (dias > 0 && dias <= 15 && !esMorosa(f)) d.porVencer++;
   });
   return g;
 }
@@ -582,9 +784,9 @@ function kpisHospital() {
     if (f.estado === "pago_parcial") { k.pagoParcial++; k.pagoParcialSaldo += s; }
     if (esDiscYo_hosp(f)) { k.espYo++; k.espYoMonto += (f.montoDebate || s); }
     if (esDiscOtro_hosp(f)) { k.espFin++; k.espFinMonto += (f.montoDebate || s); }
-    if (f.estado === "morosa") { k.vencidas++; k.vencidasMonto += s; }
+    if (esMorosa(f)) { k.vencidas++; k.vencidasMonto += s; }
     const dias = diasRestantes(f.fecha);
-    if (dias > 0 && dias <= 15 && f.estado !== "morosa") { k.porVencer++; k.porVencerMonto += s; }
+    if (dias > 0 && dias <= 15 && !esMorosa(f)) { k.porVencer++; k.porVencerMonto += s; }
   });
   return k;
 }
@@ -618,6 +820,198 @@ function renderSidebar() {
 }
 
 /* ========================================================= COMPONENTES ========================================================= */
+/* El portal como sitio web lo usan solo el ministerio y los financiadores. El hospital ve su parte
+   desde el sistema de facturación que ya usa hoy — sin link nuevo ni usuario nuevo (principio de
+   diseño de la reunión 11/8). Las pantallas del rol Hospital se muestran igual, pero aclarando que
+   van embebidas: el modo de integración (iframe, permiso por perfil, etc.) está por definirse. */
+const notaEmbebido = () => `<div class="decision-abierta" style="margin-bottom:16px;">
+  <strong>Vista embebida —</strong> estas pantallas <strong>no son un portal aparte para el hospital</strong>. El hospital no recibe un usuario ni un link nuevo:
+  ve esta sección desde el <strong>sistema de facturación que ya usa</strong>. <em>A definir:</em> si se integra embebida (iframe), como módulo nuevo, o habilitando una función para un perfil determinado.
+</div>`;
+
+/* ---- Tabla de prestaciones, compartida por los tres roles ----
+   Dos modos de lectura sobre los mismos datos: por prestación (una fila por ítem) o por paciente
+   (una fila de grupo por persona con sus prestaciones adentro). Una misma persona suele tener
+   varias prestaciones en la factura, y según lo que estés revisando conviene una vista u otra.
+   La selección vive siempre a nivel ítem (`state.selItems`), así que objetar funciona igual desde
+   los dos modos: el checkbox del paciente es un atajo que marca todas sus prestaciones visibles. */
+function viewTablaItems(f, { seleccionable = false } = {}) {
+  const items = itemsDe(f.nro);
+  const fi = state.filtroItems;
+  const modo = state.vistaItems;
+  const codigos = [...new Set(items.map(i => i.codigo))].sort();
+  const q = fi.q.toLowerCase();
+  const visibles = items.filter(i => (fi.codigo === "TODOS" || i.codigo === fi.codigo)
+    && (!q || (i.paciente + " " + i.prestacion + " " + i.dni).toLowerCase().includes(q)));
+  const sel = state.selItems;
+  const selVisibles = visibles.filter(i => sel.includes(i.id));
+  const montoSel = items.filter(i => sel.includes(i.id)).reduce((s, i) => s + i.monto, 0);
+  const objetados = objecionesDe(f);
+  const marcaObjecion = (it) => {
+    const o = objetados.find(x => x.items.includes(it.id));
+    return o ? `<div style="margin-top:3px;"><span class="chip ${PLANTEO_LABEL[o.estado]?.cls || 'chip-esperando-hospital'}" title="${o.detalle}">${o.id} · ${o.categoria}</span></div>` : '';
+  };
+  const colSpan = seleccionable ? 7 : 6;
+
+  // Modo paciente: fila de grupo por persona + sus prestaciones debajo.
+  const porPaciente = {};
+  visibles.forEach(i => { (porPaciente[i.paciente] = porPaciente[i.paciente] || []).push(i); });
+
+  const filasPrestacion = visibles.map(it => `<tr class="${sel.includes(it.id) ? 'row-sel' : ''}">
+    ${seleccionable ? `<td><input type="checkbox" data-sel-item="${it.id}" ${sel.includes(it.id) ? 'checked' : ''}></td>` : ''}
+    <td><div>${it.paciente} <span style="color:var(--muted);font-size:11px;">DNI ${it.dni}</span></div>
+        <div style="color:var(--muted);font-size:11px;">${it.afiliado}</div>${marcaObjecion(it)}</td>
+    <td>${it.prestacion}</td><td><code>${it.codigo}</code></td><td style="color:var(--muted);">${it.fecha}</td>
+    <td class="money">${money(it.monto)}</td>
+    <td><button class="btn btn-secondary btn-sm" data-ver-paciente="${encodeURIComponent(it.paciente)}">Ver paciente</button></td>
+  </tr>`).join('');
+
+  const filasPaciente = Object.entries(porPaciente).map(([pac, its]) => {
+    const p = its[0];
+    const todasSel = its.every(i => sel.includes(i.id));
+    const total = its.reduce((s,i)=>s+i.monto,0);
+    const objs = [...new Set(its.map(i => objetados.find(o => o.items.includes(i.id))).filter(Boolean))];
+    return `<tr class="fila-paciente">
+      ${seleccionable ? `<td><input type="checkbox" data-sel-paciente="${encodeURIComponent(pac)}" ${todasSel ? 'checked' : ''} title="Seleccionar todas las prestaciones de este paciente"></td>` : ''}
+      <td colspan="4"><strong>${pac}</strong> <span style="color:var(--muted);font-size:11px;">DNI ${p.dni} · ${p.afiliado} · ${its.length} prestación(es)</span>
+        ${objs.length ? `<div style="margin-top:3px;">${objs.map(o => `<span class="chip ${PLANTEO_LABEL[o.estado]?.cls || 'chip-esperando-hospital'}" title="${o.detalle}">${o.id} · ${o.categoria}</span>`).join(' ')}</div>` : ''}</td>
+      <td class="money"><strong>${money(total)}</strong></td>
+      <td><button class="btn btn-secondary btn-sm" data-ver-paciente="${encodeURIComponent(pac)}">Ver documentación</button></td>
+    </tr>
+    ${its.map(it => `<tr class="sub-prestacion ${sel.includes(it.id) ? 'row-sel' : ''}">
+      ${seleccionable ? `<td><input type="checkbox" data-sel-item="${it.id}" ${sel.includes(it.id) ? 'checked' : ''}></td>` : ''}
+      <td></td>
+      <td style="padding-left:18px;">${it.prestacion}</td><td><code>${it.codigo}</code></td><td style="color:var(--muted);">${it.fecha}</td>
+      <td class="money">${money(it.monto)}</td><td></td>
+    </tr>`).join('')}`;
+  }).join('');
+
+  return `
+    <h3 class="card-title">Prestaciones facturadas
+      <span style="font-size:12px;font-weight:400;color:var(--muted);">${visibles.length} de ${items.length} — ${money(visibles.reduce((s,i)=>s+i.monto,0))} · ${Object.keys(porPaciente).length} paciente(s)</span>
+    </h3>
+    ${seleccionable ? `<div class="note note-blue">Para objetar el mismo problema en varias prestaciones (por ejemplo, un valor de nomenclador mal cobrado en 6 pacientes): filtrá por código, tildá <em>todas</em> en el encabezado y usá <strong>Objetar seleccionadas</strong>. No hace falta ir una por una.</div>` : ''}
+    <div class="filter-bar">
+      <div class="switch-vista">
+        <button data-vista-items="prestacion" class="${modo === 'prestacion' ? 'active' : ''}">Ver por prestación</button>
+        <button data-vista-items="paciente" class="${modo === 'paciente' ? 'active' : ''}">Ver por paciente</button>
+      </div>
+      <select data-filtro-item="codigo">
+        <option value="TODOS">Todos los códigos</option>
+        ${codigos.map(c => `<option value="${c}" ${fi.codigo === c ? 'selected' : ''}>${c} (${items.filter(i=>i.codigo===c).length})</option>`).join('')}
+      </select>
+      <input data-filtro-item="q" value="${fi.q}" placeholder="Buscar paciente o prestación…" style="min-width:200px;">
+      ${(fi.codigo !== "TODOS" || fi.q) ? `<button class="btn btn-secondary btn-sm" data-filtro-item-reset="1">Limpiar</button>` : ''}
+    </div>
+    ${seleccionable && sel.length ? `<div class="sel-bar">
+      <div><strong>${sel.length} prestación(es) seleccionada(s)</strong> — ${money(montoSel)}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn btn-warn btn-sm" data-objetar-items="${f.nro}">✎ Objetar seleccionadas</button>
+        <button class="btn btn-secondary btn-sm" data-limpiar-sel="1">Limpiar selección</button>
+      </div>
+    </div>` : ''}
+    <table class="items-table">
+      <thead><tr>
+        ${seleccionable ? `<th style="width:28px;"><input type="checkbox" data-sel-todos="1" ${visibles.length > 0 && selVisibles.length === visibles.length ? 'checked' : ''} title="Seleccionar todas las visibles"></th>` : ''}
+        <th>${modo === 'paciente' ? 'Paciente / prestación' : 'Paciente'}</th><th>Prestación</th><th>Código</th><th>Fecha</th><th class="money-header">Monto</th><th></th>
+      </tr></thead>
+      <tbody>${visibles.length === 0
+        ? `<tr><td colspan="${colSpan}" style="text-align:center;padding:24px;color:var(--muted);">Sin prestaciones para este filtro.</td></tr>`
+        : (modo === 'paciente' ? filasPaciente : filasPrestacion)}</tbody>
+    </table>`;
+}
+
+/* ---- Tarjeta de planteo, compartida por los tres roles ----
+   Cada objeción se muestra con todo lo necesario para responderla sin salir de acá: las prestaciones
+   alcanzadas con su paciente, la documentación adjunta, el historial propio del planteo, y las
+   acciones que le corresponden a quien está mirando. Antes esto se resolvía en bloque desde el hilo,
+   y el que respondía no veía qué le habían objetado exactamente. */
+function viewPlanteo(f, o, rol) {
+  const items = itemsDe(f.nro).filter(i => o.items.includes(i.id));
+  const pacientes = [...new Set(items.map(i => i.paciente))];
+  const meToca = planteoEsDe(o, rol);
+  const cerrado = !planteoAbierto(o);
+  const acciones = accionesPlanteo(f, o, rol);
+  return `<div class="planteo ${cerrado ? 'cerrado' : meToca ? 'me-toca' : ''}">
+    <div class="planteo-head">
+      <div>
+        <div style="font-size:14px;font-weight:600;">${o.categoria}
+          <span style="font-weight:400;color:var(--muted);font-size:12px;">— ${o.id} · planteado el ${o.fecha}</span>
+        </div>
+        <div style="margin-top:5px;">${chipPlanteo(o)}
+          ${meToca ? '<span class="chip chip-morosa">Te toca responder</span>' : ''}</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-family:monospace;font-size:17px;font-weight:700;color:${cerrado ? 'var(--muted)' : 'var(--warn)'};">${money(o.monto)}</div>
+        <div style="font-size:11px;color:var(--muted);">${items.length} prestación(es) · ${pacientes.length} paciente(s)</div>
+      </div>
+    </div>
+    <div style="font-size:13px;margin:10px 0;padding:8px 10px;background:#fafbfc;border-radius:6px;">${o.detalle}</div>
+    <table style="font-size:12.5px;">
+      <thead><tr><th>Paciente</th><th>Prestación</th><th>Código</th><th>Fecha</th><th class="money-header">Monto</th><th></th></tr></thead>
+      <tbody>${items.length === 0 ? '<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:14px;">Planteo a nivel factura, sin prestaciones desagregadas.</td></tr>' :
+        items.map(i => `<tr>
+          <td><div>${i.paciente}</div><div style="color:var(--muted);font-size:11px;">DNI ${i.dni} · ${i.afiliado}</div></td>
+          <td>${i.prestacion}</td><td><code>${i.codigo}</code></td><td style="color:var(--muted);">${i.fecha}</td>
+          <td class="money">${money(i.monto)}</td>
+          <td><button class="btn btn-secondary btn-sm" data-ver-paciente-fact="${f.nro}|${encodeURIComponent(i.paciente)}">Ver documentación</button></td>
+        </tr>`).join('')}</tbody>
+    </table>
+    ${o.adjuntos && o.adjuntos.length ? `<div style="margin-top:10px;">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);font-weight:600;margin-bottom:4px;">Documentación del planteo</div>
+      <div class="attachments">${o.adjuntos.map(a => `<span class="attachment-chip">📎 ${a.nombre || a}</span>`).join('')}</div>
+    </div>` : ''}
+    ${o.respuestas && o.respuestas.length ? `<div style="margin-top:10px;">
+      <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);font-weight:600;margin-bottom:4px;">Movimientos de este planteo</div>
+      ${o.respuestas.map(r => `<div class="planteo-mov from-${r.who}">
+        <div><strong>${r.nombre}</strong> <span style="color:var(--muted);">· ${r.tipo} · ${r.when}</span></div>
+        <div style="margin-top:2px;">${r.texto}</div>
+        ${r.adjuntos && r.adjuntos.length ? `<div class="attachments" style="margin-top:5px;">${r.adjuntos.map(a => `<span class="attachment-chip">📎 ${a.nombre || a}</span>`).join('')}</div>` : ''}
+      </div>`).join('')}
+    </div>` : ''}
+    ${acciones ? `<div class="actions-row">${acciones}</div>` : ''}
+  </div>`;
+}
+
+// Qué puede hacer cada rol con un planteo, según en qué instancia esté.
+function accionesPlanteo(f, o, rol) {
+  const k = `${f.nro}|${o.id}`;
+  if (!planteoAbierto(o)) return '';
+  if (rol === "ministerio" && o.estado === "en_auditoria") return `
+    <button class="btn btn-success btn-sm" data-aud-desestimar="${k}">✓ Improcedente — desestimar</button>
+    <button class="btn btn-warn btn-sm" data-aud-derivar="${k}">→ Derivar al hospital</button>`;
+  if (rol === "hospital" && o.estado === "derivado_hospital") return `
+    <button class="btn btn-primary btn-sm" data-hosp-responder="${k}">✎ Responder este planteo</button>
+    <button class="btn btn-warn btn-sm" data-hosp-nc="${k}">Aceptar y emitir nota de crédito</button>`;
+  if (rol === "financiador" && o.estado === "respondido") return `
+    <button class="btn btn-success btn-sm" data-fin-aceptar="${k}">✓ Aceptar la respuesta</button>
+    <button class="btn btn-warn btn-sm" data-fin-info="${k}">Pedir más información</button>
+    <button class="btn btn-danger btn-sm" data-fin-sostener="${k}">Mantener la objeción</button>`;
+  return '';
+}
+
+/* Bloque de planteos de una factura. Ordena primero los que le tocan a quien está mirando y deja
+   los cerrados al final, colapsados pero visibles: son parte de la trazabilidad que puede terminar
+   en el expediente judicial. */
+function viewPlanteosDeFactura(f, rol) {
+  const objs = objecionesDe(f);
+  if (!objs.length) return '';
+  const abiertos = objs.filter(planteoAbierto).sort((a, b) => (planteoEsDe(b, rol) ? 1 : 0) - (planteoEsDe(a, rol) ? 1 : 0));
+  const cerrados = objs.filter(o => !planteoAbierto(o));
+  const mios = abiertos.filter(o => planteoEsDe(o, rol)).length;
+  return `<div class="card">
+    <h3 class="card-title">Planteos sobre esta factura
+      <span style="font-size:12px;font-weight:400;color:var(--muted);">${abiertos.length} abierto(s)${cerrados.length ? ` · ${cerrados.length} cerrado(s)` : ''} — ${money(montoEnDebate(f))} en debate</span>
+    </h3>
+    ${mios > 0 ? `<div class="note"><strong>${mios} planteo(s) esperan tu respuesta.</strong> Cada uno se responde por separado, con su propia documentación: no hace falta resolver toda la factura de una vez.</div>` : ''}
+    ${abiertos.map(o => viewPlanteo(f, o, rol)).join('')}
+    ${cerrados.length ? `<details style="margin-top:10px;">
+      <summary style="cursor:pointer;font-size:13px;color:var(--muted);font-weight:600;">Planteos cerrados (${cerrados.length})</summary>
+      <div style="margin-top:10px;">${cerrados.map(o => viewPlanteo(f, o, rol)).join('')}</div>
+    </details>` : ''}
+  </div>`;
+}
+
 function renderMensaje(m) {
   const rol = m.who === "financiador" ? "Financiador" : m.who === "hospital" ? "Hospital" : "Ministerio";
   return `<div class="thread-msg from-${m.who}">
@@ -631,6 +1025,30 @@ function renderMensaje(m) {
 }
 function renderHilo(nro) { const t = state.threads[nro]; if (!t) return ''; return `<div class="thread">${t.map(renderMensaje).join('')}</div>`; }
 
+/* El hilo dejó de ser el lugar donde se trabaja (eso ahora son los planteos) y pasó a ser lo que
+   corresponde: el registro completo de todo lo actuado, consultable y descargable. */
+function viewLogDiscusion(nro) {
+  const t = state.threads[nro] || [];
+  return `<div class="card">
+    <h3 class="card-title">Registro de la discusión
+      <button class="btn btn-excel btn-sm" onclick="exportLogDiscusion('${nro}')">⬇ Descargar log</button>
+    </h3>
+    <div class="note note-blue" style="margin-bottom:0;">Log completo de la factura, en orden cronológico. Las acciones sobre cada planteo se responden en las tarjetas de arriba; acá quedan asentadas con su referencia (<code>OBJ-n</code>).</div>
+    ${t.length ? renderHilo(nro) : '<div style="color:var(--muted);padding:16px;text-align:center;">Sin movimientos registrados.</div>'}
+  </div>`;
+}
+window.exportLogDiscusion = function(nro) {
+  const t = state.threads[nro] || [];
+  const f = state.facturas.find(x => x.nro === nro);
+  const rows = [["REGISTRO DE DISCUSIÓN", nro], ["Hospital", hospNombre(f.hospital)], ["Financiador", finNombre(f.financiador)], [],
+    ["Fecha","Autor","Rol","Acción","Categorías","Mensaje","Detalles","Adjuntos"]];
+  t.forEach(m => rows.push([m.when, m.nombre, m.who, m.accion?.tipo || "—", (m.accion?.categorias || []).join(" · "),
+    m.text, (m.accion?.detalles || []).join(" | "), (m.adjuntos || []).map(a => a.nombre).join(" | ")]));
+  rows.push([], ["PLANTEOS"], ["ID","Categoría","Estado","Monto","Prestaciones","Detalle"]);
+  objecionesDe(f).forEach(o => rows.push([o.id, o.categoria, o.estado, o.monto, o.items.join(" | "), o.detalle]));
+  exportCSV(`log_discusion_${nro}.csv`, rows);
+};
+
 /* ========================================================= VISTAS HOSPITAL ========================================================= */
 function viewHospital_Panel() {
   const k = kpisHospital();
@@ -640,6 +1058,7 @@ function viewHospital_Panel() {
       <div><h1>Panel — Hospital Interzonal San Martín</h1><div class="sub">Situación consolidada de facturación con financiadores</div></div>
       <div class="page-actions"><button class="btn btn-excel" onclick="exportPanelHosp()">⬇ Descargar Excel</button></div>
     </div>
+    ${notaEmbebido()}
     ${k.espYo > 0 ? `<div class="action-required-banner">
       <div><strong>⚠ Tenés ${k.espYo} discusión(es) esperando tu descargo</strong> — ${money(k.espYoMonto)} en debate. Un financiador objetó facturas y espera respuesta.</div>
       <button class="btn btn-danger btn-sm" data-goto="disc_h_esperan_yo">Revisar →</button>
@@ -788,45 +1207,20 @@ function viewHospital_DetalleFactura(nro) {
       <div>${chip(f.estado)}</div>
     </div>
     ${requiereMiRespuesta ? `<div class="action-required-banner">
-      <div><strong>${finNombre(f.financiador)} planteó una objeción</strong> — ${f.montoDebate ? money(f.montoDebate) + ' en debate. ' : ''}Necesitás enviar descargo, aportar documentación, o aceptar el planteo.</div>
+      <div><strong>La auditoría central te derivó ${planteosAbiertos(f).filter(o => o.estado === "derivado_hospital").length} planteo(s)</strong> — ${money(montoEnDebate(f))} en debate. Respondé cada uno por separado, con su documentación.</div>
     </div>` : ""}
     <div class="two-col">
       <div>
+        ${viewPlanteosDeFactura(f, "hospital")}
         <div class="card">
-          <h3 class="card-title">Prestaciones facturadas
-            <div style="font-size:12px;font-weight:400;color:var(--muted);">${items.length} ítems — ${money(items.reduce((s,i)=>s+i.monto,0))}</div>
-          </h3>
-          <table class="items-table">
-            <thead><tr><th>Paciente</th><th>Prestación</th><th>Código</th><th class="money-header">Monto</th></tr></thead>
-            <tbody>${items.map(it => `<tr>
-              <td><div>${it.paciente}</div><div style="color:var(--muted);font-size:11px;">${it.afiliado}</div></td>
-              <td>${it.prestacion}</td><td><code>${it.codigo}</code></td><td class="money">${money(it.monto)}</td>
-            </tr>`).join('')}</tbody>
-          </table>
+          ${viewTablaItems(f, { seleccionable: false })}
           <div class="actions-row">
             <button class="btn btn-secondary btn-sm">📎 Descargar factura PDF</button>
             <button class="btn btn-secondary btn-sm">📎 Ver documentación adjunta</button>
-            <button class="btn btn-secondary btn-sm">Emitir nota de crédito</button>
+            ${isImpaga(f) ? `<button class="btn btn-warn btn-sm" data-emitir-nc="${f.nro}">Emitir nota de crédito</button>` : ''}
           </div>
         </div>
-        ${thread ? `<div class="card">
-          <h3 class="card-title">Hilo de discusión <span style="font-size:12px;font-weight:400;color:var(--muted);">${thread.length} mensaje(s)</span></h3>
-          ${renderHilo(nro)}
-          ${requiereMiRespuesta ? `<div class="thread-composer">
-            <div style="margin-bottom:8px;font-size:12px;color:var(--muted);">Podés responder con texto rápido o abrir un descargo estructurado con categorías.</div>
-            <textarea placeholder="Escribí una respuesta rápida…"></textarea>
-            <div class="composer-actions">
-              <div><button class="btn btn-secondary btn-sm">📎 Adjuntar</button></div>
-              <div style="display:flex;gap:6px;">
-                <button class="btn btn-warn btn-sm" onclick="openModalDescargoHosp()">Descargo estructurado</button>
-                <button class="btn btn-primary btn-sm" onclick="responderRapidoHosp('${nro}')">Responder</button>
-              </div>
-            </div>
-          </div>` : `<div class="note note-blue" style="margin-top:12px;">
-            <strong>Esperando al financiador.</strong> Ya enviaste tu descargo. Si no responde en un tiempo razonable, podés escalar al ministerio.
-            <div style="margin-top:6px;"><button class="btn btn-secondary btn-sm">Escalar al ministerio</button></div>
-          </div>`}
-        </div>` : `<div class="card">
+        ${thread ? viewLogDiscusion(nro) : `<div class="card">
           <h3 class="card-title">Sin discusiones abiertas</h3>
           <div style="color:var(--muted);font-size:13px;">Esta factura no tiene objeciones. Podés adjuntar documentación preventiva.</div>
           <div class="actions-row"><button class="btn btn-secondary btn-sm">📎 Adjuntar documentación de respaldo</button></div>
@@ -850,7 +1244,7 @@ function viewHospital_DetalleFactura(nro) {
               <div><span style="color:var(--muted);">Cobrable ahora:</span> <strong style="color:var(--success);">${money(montoCobrable(f))}</strong></div>
               <div style="font-size:11px;color:var(--muted);line-height:1.5;margin-top:4px;">El financiador objetó solo una parte. El resto está reconocido y podés reclamar su cobro sin esperar a que se resuelva la discusión.</div>
             </div>` : ''}
-            ${f.estado === "morosa" ? `<div style="margin-top:6px;color:var(--danger);font-size:12px;">Morosa por saldo — venció el ${vence} sin cancelar. El reloj no se renueva con pagos parciales.</div>` : ''}
+            ${esMorosa(f) ? `<div style="margin-top:6px;color:var(--danger);font-size:12px;">Morosa por saldo — venció el ${vence} sin cancelar. El reloj no se renueva con pagos parciales.${f.estado === "intimada" ? ` <strong>La auditoría ya intimó al financiador</strong> el ${f.fechaIntimacion || "—"}.` : ''}${f.estado === "judicializada" ? ` <strong>Ya está judicializada.</strong>` : ''}</div>` : ''}
             ${(() => { const e = expedienteDe(f.nro); return e ? `<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);">
               <div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Judicializada</div>
               <div style="margin-top:4px;"><strong>${e.id}</strong></div>
@@ -872,34 +1266,38 @@ function viewHospital_DetalleFactura(nro) {
     </div>
   `;
 }
-window.responderRapidoHosp = function(nro) {
-  const f = state.facturas.find(x => x.nro === nro); if (f) f.estado = "esperando_financiador";
-  state.threads[nro].push({ who: "hospital", nombre: "Hosp. San Martín", when: "hoy", text: "(Respuesta rápida enviada)", accion: null, adjuntos: [] });
-  render(); showToast("Respuesta enviada — pelota del lado del financiador");
-};
+/* La respuesta rápida a nivel factura se eliminó: el hospital responde planteo por planteo
+   (openModalDescargoPlanteo), que es lo que permite ver qué le objetaron exactamente. */
 
 function viewHospital_Discusiones(subestado) {
   const facts = state.facturas.filter(f => f.hospital === "H001" && (subestado === "yo" ? esDiscYo_hosp(f) : esDiscOtro_hosp(f)));
-  const titulo = subestado === "yo" ? "Discusiones — Esperan mi descargo" : "Discusiones — Esperando al financiador";
-  const sub = subestado === "yo" ? "El financiador objetó y espera que respondas o aportes documentación." : "Ya enviaste tu descargo. Esperás la respuesta del financiador.";
+  const titulo = subestado === "yo" ? "Discusiones — Derivadas por la auditoría" : "Discusiones — Esperando resolución";
+  const sub = subestado === "yo"
+    ? "La auditoría central del ministerio revisó la objeción del financiador, la consideró procedente y te la derivó para descargo o nota de crédito."
+    : "Ya enviaste tu descargo, o el caso está en manos de la auditoría central. No hay nada pendiente de tu lado.";
   return `
-    <div class="breadcrumb"><a data-nav="panel_hospital">Panel</a> / Discusiones / ${subestado === "yo" ? "Esperan mi descargo" : "Esperando al financiador"}</div>
+    <div class="breadcrumb"><a data-nav="panel_hospital">Panel</a> / Discusiones / ${subestado === "yo" ? "Derivadas por la auditoría" : "Esperando resolución"}</div>
     <div class="page-header">
       <div><h1>${titulo}</h1><div class="sub">${sub}</div></div>
-      <button class="btn btn-excel" onclick="exportCSV('disc_hosp.csv', [['Factura','Financiador','Emisión','Días','Monto','En debate']])">⬇ Excel</button>
+      <button class="btn btn-excel" onclick="exportDiscHosp('${subestado}')">⬇ Excel</button>
     </div>
-    ${subestado === "yo" ? `<div class="note"><strong>Priorizá por vencimiento:</strong> el plazo de 60 días sigue corriendo.</div>` : `<div class="note note-blue"><strong>Ya enviaste tu descargo.</strong> Si el financiador no responde en un tiempo razonable, podés escalar al ministerio para mediación.</div>`}
+    ${subestado === "yo"
+      ? `<div class="note"><strong>Solo llegan acá los casos que la auditoría central te deriva.</strong> El financiador no te objeta de forma directa: sus planteos los recibe primero el ministerio, que los desestima o te los deriva. Priorizá por vencimiento — el plazo de 60 días sigue corriendo.</div>
+         <div class="decision-abierta" style="margin-bottom:16px;"><strong>D1 — a definir:</strong> cuánto tiempo sin respuesta habilita el escalamiento al ministerio. Se asume por ahora <strong>10 a 15 días hábiles</strong>, y falta decidir si el plazo es fijo o depende del vencimiento restante de la factura (no es lo mismo que queden 45 días a que queden 5).</div>`
+      : `<div class="note note-blue"><strong>Nada pendiente de tu lado.</strong> Las discusiones en <em>auditoría</em> todavía no fueron resueltas ni derivadas por el ministerio; las que están en <em>financiador</em> esperan que él re-evalúe tu descargo.</div>`}
     ${facts.length === 0 ? `<div class="card" style="text-align:center;color:var(--muted);padding:40px;">Sin discusiones en este subestado.</div>` : `
     <div class="card" style="padding:0;">
       <table>
-        <thead><tr><th>Factura</th><th>Financiador</th><th>Emisión</th><th>Días</th><th class="money-header">Monto</th><th class="money-header">En debate</th><th>Últ. mensaje</th><th></th></tr></thead>
+        <thead><tr><th>Factura</th><th>Financiador</th>${subestado !== "yo" ? '<th>Pelota en</th>' : ''}<th>Emisión</th><th>Días</th><th class="money-header">Monto</th><th class="money-header">En debate</th><th>Últ. mensaje</th><th></th></tr></thead>
         <tbody>${facts.map(f => {
           const t = state.threads[f.nro] || []; const last = t[t.length-1];
           return `<tr class="clickable" data-open-fact-hosp="${f.nro}">
-            <td><code>${f.nro}</code></td><td>${finNombre(f.financiador)}</td><td>${f.fecha}</td>
+            <td><code>${f.nro}</code></td><td>${finNombre(f.financiador)}</td>
+            ${subestado !== "yo" ? `<td>${f.estado === "esperando_auditoria" ? '<span class="chip chip-esperando-auditoria">Auditoría</span>' : '<span class="chip chip-esperando-financiador">Financiador</span>'}</td>` : ''}
+            <td>${f.fecha}</td>
             <td style="color:${diasRestantes(f.fecha) < 15 ? 'var(--danger)' : 'var(--muted)'};font-weight:600;">${diasRestantes(f.fecha)}</td>
             <td class="money">${money(f.monto)}</td>
-            <td class="money" style="color:var(--warn);font-weight:600;">${money(f.montoDebate||0)}</td>
+            <td class="money" style="color:var(--warn);font-weight:600;">${money(montoEnDebate(f) || f.montoDebate || 0)}</td>
             <td style="font-size:12px;color:var(--muted);">${last ? last.nombre + ' — ' + last.when : '—'}</td>
             <td><button class="btn ${subestado === 'yo' ? 'btn-primary' : 'btn-secondary'} btn-sm">${subestado === 'yo' ? 'Responder →' : 'Ver hilo'}</button></td>
           </tr>`;
@@ -909,10 +1307,42 @@ function viewHospital_Discusiones(subestado) {
   `;
 }
 
+// El export de discusiones bajaba solo los encabezados: ahora incluye las filas del subestado que se está viendo.
+window.exportDiscHosp = function(subestado) {
+  const facts = state.facturas.filter(f => f.hospital === "H001" && (subestado === "yo" ? esDiscYo_hosp(f) : esDiscOtro_hosp(f)));
+  const donde = { esperando_auditoria: "Auditoría central", esperando_financiador: "Financiador", esperando_hospital: "Hospital (yo)" };
+  const rows = [["Factura","Financiador","Pelota en","Emisión","Días","Monto","En debate"]];
+  facts.forEach(f => rows.push([f.nro, finNombre(f.financiador), donde[f.estado] || f.estado, f.fecha, diasRestantes(f.fecha), f.monto, montoEnDebate(f) || f.montoDebate || 0]));
+  exportCSV(`discusiones_hospital_${subestado === "yo" ? "derivadas" : "en_resolucion"}.csv`, rows);
+};
+
 function viewHospital_Pagos() {
   const pagos = state.pagosInformados.filter(p => p.estado === "pendiente_confirmacion" && p.hospital === "H001");
+  const sinImputar = state.pagosEfectuados.filter(p => !p.imputado && p.hospital === "H001");
   return `
-    <div class="page-header"><div><h1>Pagos por confirmar</h1><div class="sub">Pagos informados por financiadores</div></div></div>
+    <div class="page-header"><div><h1>Pagos por confirmar</h1><div class="sub">Transferencias recibidas y pagos informados por los financiadores</div></div></div>
+    ${sinImputar.length > 0 ? `<div class="card">
+      <h3 class="card-title">Pagos recibidos sin imputar <span style="font-size:12px;font-weight:400;color:var(--muted);">${sinImputar.length} transferencia(s)</span></h3>
+      <div class="note"><strong>Recibiste la transferencia pero el financiador no declaró a qué facturas corresponde.</strong> Sin esa imputación no se puede cerrar ninguna factura. Podés <strong>intimarlo fehacientemente</strong> por el portal —  usa el mismo canal con validez jurídica que la notificación original.</div>
+      ${sinImputar.map(p => `<div style="border:1px solid var(--warn);border-radius:6px;padding:14px;margin-bottom:10px;background:var(--warn-soft);">
+        <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <div>
+            <strong>${finNombre(p.financiador)}</strong> transfirió sin imputar
+            <div style="color:var(--muted);font-size:12px;">${p.comprobante} — ${p.fecha}</div>
+            ${p.intimaciones.length ? `<div style="font-size:12px;color:var(--danger);margin-top:6px;"><strong>${p.intimaciones.length} intimación(es) cursada(s):</strong> ${p.intimaciones.join(" · ")}</div>`
+              : `<div style="font-size:12px;color:var(--muted);margin-top:6px;">Todavía no lo intimaste.</div>`}
+          </div>
+          <div style="text-align:right;">
+            <div style="font-family:monospace;font-size:18px;font-weight:700;">${money(p.monto)}</div>
+            <div style="font-size:11px;color:var(--warn);">sin imputar a facturas</div>
+          </div>
+        </div>
+        <div class="actions-row">
+          <button class="btn btn-danger btn-sm" data-intimar-pago="${p.id}">⚖ Intimar a que impute</button>
+        </div>
+      </div>`).join('')}
+      <div class="decision-abierta"><strong>D3 — a definir:</strong> cómo se articulan los tres estados de la fase de pago — <em>Pago efectuado</em> (transferido, sin imputar), <em>Pago informado</em> (imputado, sin confirmar) y <em>Pago parcial</em> (confirmado pero insuficiente): si se mantienen separados o se fusionan en uno con monto cubierto y estado de confirmación. Falta definir también qué dispara el paso a “Pago efectuado”, cuántas intimaciones se admiten sobre un mismo pago sin imputar, con qué plazo entre una y otra, y si el reclamo se suma al hilo de la factura o corre por un canal separado.</div>
+    </div>` : ''}
     <div class="note note-blue"><strong>Cierre del circuito:</strong> confirmá que el pago efectivamente entró.</div>
     <div class="card">
       ${pagos.length === 0 ? '<div style="color:var(--muted);padding:20px;text-align:center;">Sin pagos pendientes.</div>' :
@@ -941,7 +1371,7 @@ function viewHospital_Pagos() {
 }
 
 function viewHospital_Morosidad() {
-  const morosas = state.facturas.filter(f => f.hospital === "H001" && f.estado === "morosa");
+  const morosas = state.facturas.filter(f => f.hospital === "H001" && esMorosa(f));
   const pares = acumuladoPorPar(f => f.hospital === "H001");
   const exps = state.expedientes.filter(e => e.hospital === "H001");
   const saldoTotal = morosas.reduce((s,f)=>s+saldoPendiente(f),0);
@@ -983,23 +1413,32 @@ function viewHospital_Morosidad() {
     </div>` : ''}`;
 }
 window.exportHospMorosidad = function() {
-  const morosas = state.facturas.filter(f => f.hospital === "H001" && f.estado === "morosa");
-  const rows = [["Factura","Financiador","Emisión","Vencida hace (días)","Monto","Cobrado","Notas de crédito","Saldo moroso","Expediente"]];
-  morosas.forEach(f => rows.push([f.nro, finNombre(f.financiador), f.fecha, Math.abs(diasRestantes(f.fecha)), f.monto, f.montoPagado||0, f.notasCredito||0, saldoPendiente(f), f.expediente || "(en acumulador)"]));
+  const morosas = state.facturas.filter(f => f.hospital === "H001" && esMorosa(f));
+  const rows = [["Factura","Financiador","Emisión","Vencida hace (días)","Etapa","Intimada el","Monto","Cobrado","Notas de crédito","Saldo moroso","Expediente"]];
+  morosas.forEach(f => rows.push([f.nro, finNombre(f.financiador), f.fecha, Math.abs(diasRestantes(f.fecha)), f.estado, f.fechaIntimacion || "—", f.monto, f.montoPagado||0, f.notasCredito||0, saldoPendiente(f), f.expediente || "(en acumulador)"]));
   exportCSV("morosidad_hospital.csv", rows);
 };
 
 function viewHospital_Cerradas() {
-  const cerradas = state.facturas.filter(f => f.hospital === "H001" && (f.estado === "cerrada" || f.estado === "rechazada_total"));
+  const cerradas = state.facturas.filter(f => f.hospital === "H001" && !isImpaga(f));
+  const ncs = state.notasCredito.filter(n => n.hospital === "H001");
   return `
-    <div class="page-header"><div><h1>Historial</h1></div><button class="btn btn-excel" onclick="exportFacturasHosp()">⬇ Excel</button></div>
+    <div class="page-header"><div><h1>Historial</h1><div class="sub">Facturas cerradas por pago o por nota de crédito</div></div><button class="btn btn-excel" onclick="exportFacturasHosp()">⬇ Excel</button></div>
     <div class="card" style="padding:0;">
       <table>
-        <thead><tr><th>Factura</th><th>Financiador</th><th>Fecha</th><th class="money-header">Monto</th><th>Estado</th></tr></thead>
-        <tbody>${cerradas.length === 0 ? '<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--muted);">Sin historial.</td></tr>' :
-          cerradas.map(f => `<tr><td><code>${f.nro}</code></td><td>${finNombre(f.financiador)}</td><td>${f.fecha}</td><td class="money">${money(f.monto)}</td><td>${chip(f.estado)}</td></tr>`).join('')}</tbody>
+        <thead><tr><th>Factura</th><th>Financiador</th><th>Fecha</th><th class="money-header">Monto</th><th class="money-header">Cobrado</th><th class="money-header">Notas de crédito</th><th>Cierre</th></tr></thead>
+        <tbody>${cerradas.length === 0 ? '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted);">Sin historial.</td></tr>' :
+          cerradas.map(f => `<tr><td><code>${f.nro}</code></td><td>${finNombre(f.financiador)}</td><td>${f.fecha}</td><td class="money">${money(f.monto)}</td><td class="money">${money(f.montoPagado||0)}</td><td class="money" style="color:${(f.notasCredito||0)>0?'var(--purple)':'var(--muted)'};">${(f.notasCredito||0)>0?money(f.notasCredito):'—'}</td><td>${chip(f.estado)}</td></tr>`).join('')}</tbody>
       </table>
     </div>
+    ${ncs.length > 0 ? `<div class="card">
+      <h3 class="card-title">Notas de crédito emitidas</h3>
+      <div class="note note-blue">Cada NC se notifica al financiador por el mismo canal fehaciente que la factura, para que la reconcilie contra la original.</div>
+      <table>
+        <thead><tr><th>N° NC</th><th>Factura</th><th>Financiador</th><th>Fecha</th><th>Tipo</th><th>Motivo</th><th class="money-header">Monto</th><th>Estado</th></tr></thead>
+        <tbody>${ncs.map(n => `<tr><td><span class="exp-gdeba">${n.id}</span></td><td><code>${n.factura}</code></td><td>${finNombre(n.financiador)}</td><td>${n.fecha}</td><td>${n.tipo}</td><td style="font-size:12px;">${n.motivo}</td><td class="money" style="color:var(--purple);font-weight:600;">${money(n.monto)}</td><td>${n.estado === "reconciliada" ? '<span class="chip chip-aceptada">Reconciliada</span>' : '<span class="chip chip-notificada">Notificada</span>'}</td></tr>`).join('')}</tbody>
+      </table>
+    </div>` : ''}
   `;
 }
 
@@ -1129,8 +1568,8 @@ const GRUPOS_ESTADO = {
   responder_yo: { label: "Esperan mi respuesta", estados: ["esperando_financiador"] },
   esperando_hosp: { label: "Esperando al hospital", estados: ["esperando_hospital"] },
   con_pago: { label: "Con pago informado / parcial", estados: ["pago_informado", "pago_parcial"] },
-  vencidas: { label: "Vencidas (morosas)", estados: ["morosa"] },
-  cerradas: { label: "Cerradas / pagadas", estados: ["cerrada", "pagada", "rechazada_total"] },
+  vencidas: { label: "Vencidas (morosas)", estados: ESTADOS_MORA },
+  cerradas: { label: "Cerradas / pagadas", estados: ["cerrada", "cerrada_nc", "pagada", "rechazada_total"] },
 };
 const grupoDe = (estado) => Object.keys(GRUPOS_ESTADO).find(g => GRUPOS_ESTADO[g].estados.includes(estado)) || "otros";
 const selectGrupos = (sel, attr) => `<select ${attr}>
@@ -1294,13 +1733,7 @@ function viewFinanciador_DetalleFactura(nro) {
   const items = itemsDe(nro);
   const thread = state.threads[nro];
   const vence = new Date(new Date(f.fecha).getTime() + 60*86400000).toISOString().split("T")[0];
-  const fi = state.filtroItems;
-  const codigos = [...new Set(items.map(i => i.codigo))].sort();
-  const visibles = items.filter(i => (fi.codigo === "TODOS" || i.codigo === fi.codigo)
-    && (!fi.q || (i.paciente + " " + i.prestacion + " " + i.dni).toLowerCase().includes(fi.q.toLowerCase())));
   const sel = state.selItems;
-  const selVisibles = visibles.filter(i => sel.includes(i.id));
-  const montoSel = items.filter(i => sel.includes(i.id)).reduce((s, i) => s + i.monto, 0);
   const objetados = objecionesDe(f);
   const idsObjetados = objetados.flatMap(o => o.items);
   const pacientes = [...new Set(items.map(i => i.paciente))];
@@ -1317,44 +1750,9 @@ function viewFinanciador_DetalleFactura(nro) {
     ${objetados.length ? `<div class="note"><strong>${idsObjetados.length} prestación(es) objetada(s)</strong> en ${objetados.length} planteo(s), por ${money(objetados.reduce((s,o)=>s+o.monto,0))}. Quedan marcadas en la tabla.</div>` : ''}
     <div class="two-col">
       <div>
+        ${viewPlanteosDeFactura(f, "financiador")}
         <div class="card">
-          <h3 class="card-title">Prestaciones facturadas
-            <span style="font-size:12px;font-weight:400;color:var(--muted);">${visibles.length} de ${items.length} — ${money(visibles.reduce((s,i)=>s+i.monto,0))}</span>
-          </h3>
-          <div class="note note-blue">Para objetar el mismo problema en varias prestaciones (por ejemplo, un valor de nomenclador mal cobrado en 6 pacientes): filtrá por código, tildá <em>todas</em> en el encabezado y usá <strong>Objetar seleccionadas</strong>. No hace falta ir una por una.</div>
-          <div class="filter-bar">
-            <select data-filtro-item="codigo">
-              <option value="TODOS">Todos los códigos</option>
-              ${codigos.map(c => `<option value="${c}" ${fi.codigo === c ? 'selected' : ''}>${c} (${items.filter(i=>i.codigo===c).length})</option>`).join('')}
-            </select>
-            <input data-filtro-item="q" value="${fi.q}" placeholder="Buscar paciente o prestación…" style="min-width:200px;">
-            ${(fi.codigo !== "TODOS" || fi.q) ? `<button class="btn btn-secondary btn-sm" data-filtro-item-reset="1">Limpiar</button>` : ''}
-          </div>
-          ${sel.length ? `<div class="sel-bar">
-            <div><strong>${sel.length} prestación(es) seleccionada(s)</strong> — ${money(montoSel)}</div>
-            <div style="display:flex;gap:6px;flex-wrap:wrap;">
-              <button class="btn btn-warn btn-sm" data-objetar-items="${nro}">✎ Objetar seleccionadas</button>
-              <button class="btn btn-secondary btn-sm" data-limpiar-sel="1">Limpiar selección</button>
-            </div>
-          </div>` : ''}
-          <table class="items-table">
-            <thead><tr>
-              <th style="width:28px;"><input type="checkbox" data-sel-todos="1" ${visibles.length > 0 && selVisibles.length === visibles.length ? 'checked' : ''} title="Seleccionar todas las visibles"></th>
-              <th>Paciente</th><th>Prestación</th><th>Código</th><th>Fecha</th><th class="money-header">Monto</th><th></th>
-            </tr></thead>
-            <tbody>${visibles.length === 0 ? '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">Sin prestaciones para este filtro.</td></tr>' :
-              visibles.map(it => {
-                const obj = objetados.find(o => o.items.includes(it.id));
-                return `<tr class="${sel.includes(it.id) ? 'row-sel' : ''}">
-                <td><input type="checkbox" data-sel-item="${it.id}" ${sel.includes(it.id) ? 'checked' : ''}></td>
-                <td><div>${it.paciente} <span style="color:var(--muted);font-size:11px;">DNI ${it.dni}</span></div>
-                    <div style="color:var(--muted);font-size:11px;">${it.afiliado}</div>
-                    ${obj ? `<div style="margin-top:3px;"><span class="chip chip-esperando-hospital" title="${obj.detalle}">Objetada: ${obj.categoria}</span></div>` : ''}</td>
-                <td>${it.prestacion}</td><td><code>${it.codigo}</code></td><td style="color:var(--muted);">${it.fecha}</td>
-                <td class="money">${money(it.monto)}</td>
-                <td><button class="btn btn-secondary btn-sm" data-ver-paciente="${encodeURIComponent(it.paciente)}">Ver paciente</button></td>
-              </tr>`;}).join('')}</tbody>
-          </table>
+          ${viewTablaItems(f, { seleccionable: true })}
           <div class="resumen-respuesta">
             <div class="rr-titulo">Resumen de tu respuesta</div>
             <div class="rr-grid">
@@ -1378,20 +1776,7 @@ function viewFinanciador_DetalleFactura(nro) {
             <strong>Rechazar todo</strong>: desconocés la factura íntegra. El hospital puede presentar descargo, no es definitivo.
           </div>
         </div>
-        ${thread ? `<div class="card">
-          <h3 class="card-title">Hilo de discusión</h3>${renderHilo(nro)}
-          ${esDiscYo_fin(f) ? `<div class="thread-composer">
-            <textarea placeholder="Escribí tu respuesta…"></textarea>
-            <div class="composer-actions">
-              <div><button class="btn btn-secondary btn-sm">📎 Adjuntar</button></div>
-              <div style="display:flex;gap:6px;">
-                <button class="btn btn-success btn-sm" onclick="cerrarDiscFin('${nro}', true)">Aceptar descargo</button>
-                <button class="btn btn-warn btn-sm" onclick="responderDiscFin('${nro}')">Pedir más info</button>
-                <button class="btn btn-danger btn-sm" onclick="cerrarDiscFin('${nro}', false)">Mantener rechazo</button>
-              </div>
-            </div>
-          </div>` : ''}
-        </div>` : ''}
+        ${thread ? viewLogDiscusion(nro) : ''}
       </div>
       <div><div class="card">
         <h3 class="card-title">Datos</h3>
@@ -1498,14 +1883,16 @@ window.objetarDesdePaciente = function(nro) {
   openModalObjetarItems(nro);
 };
 
+/* Lista canónica de tipologías de objeción, cerrada en la reunión del 11/8: son las 4 del documento
+   de proceso. Se retiraron "Prestación no cubierta por el plan" y "Prestación duplicada", y las
+   diferencias de código y de valor van juntas en una sola categoría (el detalle las distingue).
+   El documento deja anotadas otras candidatas a evaluar más adelante (doble cobertura, fuera de
+   cartilla, carencia, diferencia de cantidad, prestación no realizada, tope/coseguro). */
 const CATEGORIAS_OBJECION = [
-  "Diferencia en valor de nomenclador",
-  "Diferencia en código de prestación",
+  "Diferencia en código / valor de prestación",
   "Afiliado no vigente / no corresponde",
   "Falta autorización previa",
-  "Prestación no cubierta por el plan",
   "Documentación incompleta",
-  "Prestación duplicada",
 ];
 
 function openModalObjetarItems(nro) {
@@ -1551,45 +1938,44 @@ window.confirmarObjecionItems = function(nro) {
   if (!categoria) { showToast("⚠ Elegí el motivo de la objeción"); return; }
   const detalle = $("#obj-detalle").value.trim() || "(sin detalle)";
   const monto = Math.max(0, Number($("#obj-monto").value) || 0);
-  f.objeciones = [...objecionesDe(f), { id: "OBJ-" + (objecionesDe(f).length + 1), items: ids, categoria, detalle, monto, fecha: "2026-08-03" }];
-  f.montoDebate = objecionesDe(f).reduce((s, o) => s + o.monto, 0);
-  f.estado = "esperando_hospital";
+  // Toda objeción entra por la auditoría central: el hospital solo interviene si ésta se la deriva.
+  const nuevo = { id: "OBJ-" + (objecionesDe(f).length + 1), items: ids, categoria, detalle, monto, fecha: HOY,
+    estado: "en_auditoria", adjuntos: [{ nombre: `respaldo_objecion_${nro}.pdf`, tipo: "pdf" }], respuestas: [] };
+  f.objeciones = [...objecionesDe(f), nuevo];
+  f.estado = "esperando_auditoria";
   const pacientes = [...new Set(items.map(i => i.paciente))];
-  if (!state.threads[nro]) state.threads[nro] = [];
-  state.threads[nro].push({
-    who: "financiador", nombre: "IOMA", when: "hoy",
-    text: `Objetamos ${items.length} prestación(es) de ${pacientes.length} paciente(s) por ${money(monto)}.`,
-    accion: { tipo: "Objeción por prestación", categorias: [categoria],
-      detalles: [detalle, ...items.slice(0, 6).map(i => `${i.paciente} — ${i.prestacion} (${i.codigo}) ${money(i.monto)}`),
-        ...(items.length > 6 ? [`…y ${items.length - 6} prestación(es) más`] : [])] },
-    adjuntos: []
-  });
+  anotarPlanteo(f, nuevo, { who: "financiador", nombre: "IOMA", tipo: "Objeción por prestación", categoria,
+    texto: `Objetamos ${items.length} prestación(es) de ${pacientes.length} paciente(s) por ${money(monto)}. Queda a resolución de la auditoría central.`,
+    detalles: [detalle, ...items.slice(0, 6).map(i => `${i.paciente} — ${i.prestacion} (${i.codigo}) ${money(i.monto)}`),
+      ...(items.length > 6 ? [`…y ${items.length - 6} prestación(es) más`] : [])],
+    adjuntos: nuevo.adjuntos });
+  recalcularEstadoFactura(f);
   state.selItems = [];
   closeModal(); render();
-  showToast(`✎ Objeción enviada — ${money(monto)} en debate, ${money(montoCobrable(f))} quedan cobrables`);
+  showToast(`✎ Objeción elevada a la auditoría — ${money(monto)} en debate, ${money(montoCobrable(f))} quedan cobrables`);
 };
 
-window.responderDiscFin = function(nro) {
-  const f = state.facturas.find(x => x.nro === nro); if (f) f.estado = "esperando_hospital";
-  state.threads[nro].push({ who: "financiador", nombre: "IOMA", when: "hoy", text: "(Respuesta, pidiendo más info)", accion: { tipo: "Solicitud de info", categorias: ["Pedido de doc"], detalles: [] }, adjuntos: [] });
-  render(); showToast("Respuesta enviada");
-};
-window.cerrarDiscFin = function(nro, aceptar) {
-  const f = state.facturas.find(x => x.nro === nro); if (f) f.estado = aceptar ? "aceptada" : "rechazada_parcial";
-  render(); showToast(aceptar ? "Discusión cerrada — aceptada" : "Discusión cerrada — rechazo confirmado");
-};
+/* Las tres acciones globales del financiador ("aceptar descargo" / "pedir info" / "mantener rechazo")
+   se eliminaron: cerraban toda la factura de una vez, sin poder distinguir entre planteos. Ahora cada
+   planteo se acepta, se cuestiona o se sostiene por separado (data-fin-*). */
 
 function viewFinanciador_Discusiones(subestado) {
   const facts = state.facturas.filter(f => f.financiador === "F001" && (subestado === "yo" ? esDiscYo_fin(f) : esDiscHosp_fin(f)));
-  const titulo = subestado === "yo" ? "Esperan mi respuesta" : "Esperando al hospital";
+  const titulo = subestado === "yo" ? "Esperan mi respuesta" : "Esperando resolución";
+  const sub = subestado === "yo"
+    ? "La auditoría o el hospital ya respondieron: te toca re-evaluar."
+    : "Ya planteaste tu objeción. La resuelve la auditoría central del ministerio, que puede desestimarla o derivarla al hospital.";
   return `
-    <div class="page-header"><div><h1>Discusiones — ${titulo}</h1></div></div>
+    <div class="page-header"><div><h1>Discusiones — ${titulo}</h1><div class="sub">${sub}</div></div></div>
+    ${subestado !== "yo" ? `<div class="note note-blue"><strong>Toda objeción pasa primero por la auditoría central del ministerio.</strong> No se plantea directamente al hospital: el ministerio unifica criterios y filtra los planteos antes de derivarlos.</div>` : ''}
     ${facts.length === 0 ? `<div class="card" style="text-align:center;color:var(--muted);padding:40px;">Sin discusiones.</div>` : `
     <div class="card" style="padding:0;"><table>
-      <thead><tr><th>Factura</th><th>Hospital</th><th>Días</th><th class="money-header">En debate</th><th></th></tr></thead>
+      <thead><tr><th>Factura</th><th>Hospital</th>${subestado !== "yo" ? '<th>Pelota en</th>' : ''}<th>Días</th><th class="money-header">En debate</th><th></th></tr></thead>
       <tbody>${facts.map(f => `<tr class="clickable" data-open-fact-fin="${f.nro}">
-        <td><code>${f.nro}</code></td><td>${hospCorto(f.hospital)}</td><td>${diasRestantes(f.fecha)}</td>
-        <td class="money" style="color:var(--warn);font-weight:600;">${money(f.montoDebate||0)}</td>
+        <td><code>${f.nro}</code></td><td>${hospCorto(f.hospital)}</td>
+        ${subestado !== "yo" ? `<td>${f.estado === "esperando_auditoria" ? '<span class="chip chip-esperando-auditoria">Auditoría</span>' : '<span class="chip chip-esperando-hospital">Hospital</span>'}</td>` : ''}
+        <td>${diasRestantes(f.fecha)}</td>
+        <td class="money" style="color:var(--warn);font-weight:600;">${money(montoEnDebate(f) || f.montoDebate || 0)}</td>
         <td><button class="btn ${subestado === 'yo' ? 'btn-primary' : 'btn-secondary'} btn-sm">${subestado === 'yo' ? 'Responder →' : 'Ver'}</button></td>
       </tr>`).join('')}</tbody>
     </table></div>`}
@@ -1598,11 +1984,31 @@ function viewFinanciador_Discusiones(subestado) {
 
 function viewFinanciador_InformarPagos() {
   const pagos = state.pagosInformados.filter(p => p.financiador === "F001");
+  const sinImputar = state.pagosEfectuados.filter(p => !p.imputado && p.financiador === "F001");
   return `<div class="page-header">
       <div><h1>Informar pago</h1><div class="sub">Cada pago se imputa a facturas concretas de un único hospital</div></div>
-      <button class="btn btn-primary" id="btn-nuevo-pago">+ Nuevo pago</button>
+      <div class="page-actions">
+        <button class="btn btn-secondary" id="btn-pago-efectuado">💵 Declarar pago efectuado</button>
+        <button class="btn btn-primary" id="btn-nuevo-pago">+ Informar e imputar pago</button>
+      </div>
     </div>
     <div class="note note-blue"><strong>Un pago no puede cruzar hospitales.</strong> Puede cubrir varias facturas, pero todas del mismo hospital — así queda registrado, factura por factura, cuál se canceló y cuál quedó con saldo.</div>
+    <div class="note"><strong>Dos momentos distintos.</strong> <em>Pago efectuado</em> es la transferencia hecha fuera del portal, sin repartir todavía entre facturas. <em>Informar e imputar</em> es declarar cuánto va a cada factura — es lo único que permite cerrarlas. Mientras no impute, el hospital puede intimarte fehacientemente.</div>
+    ${sinImputar.length > 0 ? `<div class="card">
+      <h3 class="card-title">Transferencias sin imputar</h3>
+      ${sinImputar.map(p => `<div style="border:1px solid var(--warn);border-radius:6px;padding:14px;margin-bottom:10px;background:var(--warn-soft);">
+        <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <div><strong>${hospCorto(p.hospital)}</strong> <span style="color:var(--muted);font-size:12px;">— ${p.fecha} · <code>${p.comprobante}</code></span>
+            ${p.intimaciones.length ? `<div style="font-size:12px;color:var(--danger);margin-top:4px;"><strong>⚖ El hospital te intimó ${p.intimaciones.length} vez(ces)</strong> — ${p.intimaciones.join(" · ")}</div>` : `<div style="font-size:12px;color:var(--muted);margin-top:4px;">Todavía sin imputar a facturas.</div>`}
+          </div>
+          <div style="text-align:right;">
+            <div style="font-family:monospace;font-size:16px;font-weight:700;">${money(p.monto)}</div>
+            <div>${chip("pago_efectuado")}</div>
+          </div>
+        </div>
+        <div class="actions-row"><button class="btn btn-primary btn-sm" data-imputar-pef="${p.id}">Imputar a facturas →</button></div>
+      </div>`).join('')}
+    </div>` : ''}
     <div class="card">
       ${pagos.length === 0 ? '<div style="color:var(--muted);padding:24px;text-align:center;">Todavía no informaste pagos.</div>' :
         pagos.map(p => `<div style="border:1px solid var(--border);border-radius:6px;padding:14px;margin-bottom:10px;">
@@ -1626,12 +2032,58 @@ function viewFinanciador_InformarPagos() {
         </div>`).join('')}
     </div>`;
 }
+/* Notas de crédito recibidas por el financiador. La NC modifica la facturación registrada de ambas
+   partes, por eso no alcanza con que el hospital la emita: se notifica y el financiador la reconcilia. */
+function viewFinanciador_NotasCredito() {
+  const ncs = state.notasCredito.filter(n => n.financiador === "F001");
+  const pendientes = ncs.filter(n => n.estado === "notificada");
+  const total = ncs.reduce((s,n)=>s+n.monto,0);
+  return `<div class="page-header">
+      <div><h1>Notas de crédito</h1><div class="sub">Emitidas por los hospitales y notificadas por el mismo canal fehaciente</div></div>
+      <button class="btn btn-excel" onclick="exportNotasCredito()">⬇ Excel</button>
+    </div>
+    <div class="note note-blue"><strong>Qué es esto.</strong> Cuando se acuerda retirar prestaciones de una factura —total o parcialmente— el hospital emite una nota de crédito. Te la notificamos para que la <strong>reconcilies contra la factura original</strong>: baja el saldo que se te reclama y modifica la facturación registrada de ambas partes.</div>
+    ${pendientes.length > 0 ? `<div class="action-required-banner">
+      <div><strong>${pendientes.length} nota(s) de crédito sin reconciliar</strong> por ${money(pendientes.reduce((s,n)=>s+n.monto,0))}.</div>
+    </div>` : ''}
+    <div class="kpi-grid">
+      <div class="kpi ${pendientes.length?'action-required':'good'}"><div class="label">Sin reconciliar</div><div class="value ${pendientes.length?'danger':'success'}">${pendientes.length}</div></div>
+      <div class="kpi"><div class="label">Total acreditado</div><div class="value money">${money(total)}</div><div class="hint">${ncs.length} nota(s)</div></div>
+    </div>
+    <div class="card" style="padding:0;">
+      <table>
+        <thead><tr><th>N° NC</th><th>Factura</th><th>Hospital</th><th>Fecha</th><th>Tipo</th><th>Motivo</th><th class="money-header">Monto acreditado</th><th class="money-header">Saldo de la factura</th><th></th></tr></thead>
+        <tbody>${ncs.length === 0 ? '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--muted);">Sin notas de crédito recibidas.</td></tr>' :
+          ncs.map(n => {
+            const f = state.facturas.find(x => x.nro === n.factura);
+            return `<tr>
+              <td><span class="exp-gdeba">${n.id}</span></td>
+              <td><code>${n.factura}</code></td><td>${hospCorto(n.hospital)}</td><td>${n.fecha}</td>
+              <td>${n.tipo === "total" ? '<span class="chip chip-rechazada">Total</span>' : '<span class="chip chip-parcial">Parcial</span>'}</td>
+              <td style="font-size:12px;">${n.motivo}</td>
+              <td class="money" style="color:var(--purple);font-weight:700;">${money(n.monto)}</td>
+              <td class="money">${f ? money(saldoPendiente(f)) : '—'}</td>
+              <td style="text-align:right;">${n.estado === "notificada"
+                ? `<button class="btn btn-primary btn-sm" data-reconciliar-nc="${n.id}">Reconciliar</button>`
+                : '<span class="chip chip-aceptada">Reconciliada</span>'}</td>
+            </tr>`;
+          }).join('')}</tbody>
+      </table>
+    </div>`;
+}
+window.exportNotasCredito = function() {
+  const ncs = state.notasCredito.filter(n => n.financiador === "F001");
+  const rows = [["N° NC","Factura","Hospital","Fecha","Tipo","Motivo","Monto acreditado","Estado"]];
+  ncs.forEach(n => rows.push([n.id, n.factura, hospNombre(n.hospital), n.fecha, n.tipo, n.motivo, n.monto, n.estado]));
+  exportCSV("notas_credito_ioma.csv", rows);
+};
+
 function viewFinanciador_Historial() {
-  const cerradas = state.facturas.filter(f => f.financiador === "F001" && f.estado === "cerrada");
+  const cerradas = state.facturas.filter(f => f.financiador === "F001" && (f.estado === "cerrada" || f.estado === "cerrada_nc"));
   return `<div class="page-header"><div><h1>Historial</h1></div></div>
     <div class="card" style="padding:0;"><table>
-      <thead><tr><th>Factura</th><th>Hospital</th><th>Fecha</th><th class="money-header">Monto</th></tr></thead>
-      <tbody>${cerradas.map(f => `<tr><td><code>${f.nro}</code></td><td>${hospCorto(f.hospital)}</td><td>${f.fecha}</td><td class="money">${money(f.monto)}</td></tr>`).join('')}</tbody>
+      <thead><tr><th>Factura</th><th>Hospital</th><th>Fecha</th><th class="money-header">Monto</th><th>Cierre</th></tr></thead>
+      <tbody>${cerradas.map(f => `<tr><td><code>${f.nro}</code></td><td>${hospCorto(f.hospital)}</td><td>${f.fecha}</td><td class="money">${money(f.monto)}</td><td>${chip(f.estado)}</td></tr>`).join('')}</tbody>
     </table></div>`;
 }
 
@@ -1641,6 +2093,7 @@ function kpisMinisterio() {
   const activas = state.facturas.filter(f => isImpaga(f));
   const k = { enCola:0, enColaMonto:0, notificado:0, notificadoMonto:0, deudaTotal:0,
     aceptado:0, aceptadoMonto:0, espFin:0, espFinMonto:0, espHosp:0, espHospMonto:0,
+    espAud:0, espAudMonto:0, sinIntimar:0, sinIntimarMonto:0, intimadas:0, judicializadas:0,
     porVencer:0, porVencerMonto:0, morosas:0, morosasMonto:0, total: activas.length };
   activas.forEach(f => {
     const s = saldoPendiente(f);
@@ -1651,9 +2104,13 @@ function kpisMinisterio() {
     // desde la óptica del ministerio: esperando_financiador = pelota del financiador; esperando_hospital = pelota del hospital
     if (f.estado === "esperando_financiador") { k.espFin++; k.espFinMonto += (f.montoDebate || s); }
     if (f.estado === "esperando_hospital") { k.espHosp++; k.espHospMonto += (f.montoDebate || s); }
-    if (f.estado === "morosa") { k.morosas++; k.morosasMonto += s; }
+    if (esMorosa(f)) { k.morosas++; k.morosasMonto += s; }
+    if (f.estado === "morosa") { k.sinIntimar++; k.sinIntimarMonto += s; }
+    if (f.estado === "intimada") k.intimadas++;
+    if (f.estado === "judicializada") k.judicializadas++;
+    if (f.estado === "esperando_auditoria") { k.espAud++; k.espAudMonto += (f.montoDebate || s); }
     const dias = diasRestantes(f.fecha);
-    if (dias > 0 && dias <= 15 && f.estado !== "morosa" && f.estado !== "en_cola") { k.porVencer++; k.porVencerMonto += s; }
+    if (dias > 0 && dias <= 15 && !esMorosa(f) && f.estado !== "en_cola") { k.porVencer++; k.porVencerMonto += s; }
   });
   return k;
 }
@@ -1662,15 +2119,16 @@ function agruparMinisterioPor(dim) { // dim = "financiador" | "hospital"
   const g = {};
   activas.forEach(f => {
     const key = f[dim];
-    if (!g[key]) g[key] = { count:0, deuda:0, aceptado:0, espFin:0, espHosp:0, porVencer:0, morosas:0 };
+    if (!g[key]) g[key] = { count:0, deuda:0, aceptado:0, espAud:0, espFin:0, espHosp:0, porVencer:0, morosas:0 };
     const d = g[key]; const s = saldoPendiente(f);
     d.count++; d.deuda += s;
     if (f.estado === "aceptada") d.aceptado += s;
+    if (f.estado === "esperando_auditoria") d.espAud++;
     if (f.estado === "esperando_financiador") d.espFin++;
     if (f.estado === "esperando_hospital") d.espHosp++;
-    if (f.estado === "morosa") d.morosas++;
+    if (esMorosa(f)) d.morosas++;
     const dias = diasRestantes(f.fecha);
-    if (dias > 0 && dias <= 15 && f.estado !== "morosa") d.porVencer++;
+    if (dias > 0 && dias <= 15 && !esMorosa(f)) d.porVencer++;
   });
   return g;
 }
@@ -1679,7 +2137,7 @@ function viewMinisterio_Dashboard() {
   const k = kpisMinisterio();
   const porFin = agruparMinisterioPor("financiador");
   const porHosp = agruparMinisterioPor("hospital");
-  const enDiscusion = k.espFin + k.espHosp;
+  const enDiscusion = k.espAud + k.espFin + k.espHosp;
   return `
     <div class="page-header">
       <div><h1>Panel general</h1><div class="sub">Visión consolidada de todo el circuito de recuperación de costos</div></div>
@@ -1689,18 +2147,22 @@ function viewMinisterio_Dashboard() {
       </div>
     </div>
 
-    ${k.morosas > 0 ? `<div class="action-required-banner">
-      <div><strong>⚠ Hay ${k.morosas} factura(s) en morosidad</strong> — ${money(k.morosasMonto)} vencido. Pendiente de derivar a legales.</div>
-      <button class="btn btn-danger btn-sm" data-goto="morosidad">Ver morosidad →</button>
+    ${k.sinIntimar > 0 ? `<div class="action-required-banner">
+      <div><strong>⚠ ${k.sinIntimar} factura(s) morosa(s) sin intimar</strong> — ${money(k.sinIntimarMonto)} vencido. La intimación es el paso previo al acumulador judicial.</div>
+      <button class="btn btn-danger btn-sm" data-goto="morosidad">Intimar →</button>
+    </div>` : ""}
+    ${k.espAud > 0 ? `<div class="action-required-banner" style="background:var(--purple-soft);border-color:#b39ddb;">
+      <div><strong style="color:var(--purple);">⚖ ${k.espAud} objeción(es) esperando a la auditoría central</strong> — ${money(k.espAudMonto)} en debate. Ninguna fue resuelta ni derivada todavía.</div>
+      <button class="btn btn-secondary btn-sm" data-goto="auditoria">Ir a auditoría →</button>
     </div>` : ""}
 
     <div class="kpi-grid">
       <div class="kpi"><div class="label">Deuda total del sistema</div><div class="value money">${money(k.deudaTotal)}</div><div class="hint">${k.total} facturas activas</div></div>
       <div class="kpi"><div class="label">En cola de notificación</div><div class="value">${k.enCola}</div><div class="hint money">${money(k.enColaMonto)}</div></div>
       <div class="kpi good"><div class="label">Aceptado sin pagar</div><div class="value success">${k.aceptado}</div><div class="hint money">${money(k.aceptadoMonto)}</div></div>
-      <div class="kpi"><div class="label">En discusión</div><div class="value">${enDiscusion}</div><div class="hint">${k.espFin} financ. · ${k.espHosp} hosp.</div></div>
+      <div class="kpi"><div class="label">En discusión</div><div class="value">${enDiscusion}</div><div class="hint">${k.espAud} auditoría · ${k.espFin} financ. · ${k.espHosp} hosp.</div></div>
       <div class="kpi warning"><div class="label">Por vencer (&lt;15d)</div><div class="value warn">${k.porVencer}</div><div class="hint money">${money(k.porVencerMonto)}</div></div>
-      <div class="kpi action-required"><div class="label">Morosas</div><div class="value danger">${k.morosas}</div><div class="hint money">${money(k.morosasMonto)}</div></div>
+      <div class="kpi action-required"><div class="label">En mora</div><div class="value danger">${k.morosas}</div><div class="hint money">${money(k.morosasMonto)}</div><div class="hint">${k.sinIntimar} sin intimar · ${k.intimadas} intimadas · ${k.judicializadas} judicializadas</div></div>
     </div>
 
     <div class="card">
@@ -1731,7 +2193,7 @@ function viewMinisterio_Dashboard() {
           ${FINANCIADORES.map(f => {
             const d = porFin[f.id] || { count:0, deuda:0, aceptado:0, espFin:0, espHosp:0, porVencer:0, morosas:0 };
             return `<tr class="clickable" data-min-fin="${f.id}">
-              <td><strong>${f.nombre}</strong> <span style="color:var(--muted);font-size:11px;">${f.tipo}</span></td>
+              <td><strong>${f.nombre}</strong> <span style="color:var(--muted);font-size:11px;">${f.tipo}</span>${f.habilitado ? '' : ' <span class="chip chip-por-vencer" title="Sin usuario habilitado en el portal">Sin habilitar</span>'}</td>
               <td style="text-align:center;">${d.count}</td>
               <td class="money">${money(d.deuda)}</td>
               <td class="money" style="color:${d.aceptado>0?'var(--success)':'var(--muted)'};">${d.aceptado>0?money(d.aceptado):'—'}</td>
@@ -1817,29 +2279,52 @@ function viewMinisterio_DetalleActor(dim, id) {
 
 function viewMinisterio_Cola() {
   const enCola = state.facturas.filter(f => f.estado === "en_cola");
+  // Solo son aptas para notificar las facturas de financiadores ya habilitados en el portal.
+  const aptas = enCola.filter(f => finHabilitado(f.financiador));
+  const retenidas = enCola.filter(f => !finHabilitado(f.financiador));
   const porFin = {};
-  enCola.forEach(f => { if (!porFin[f.financiador]) porFin[f.financiador] = []; porFin[f.financiador].push(f); });
-  const totalMonto = enCola.reduce((s,f)=>s+f.monto,0);
+  aptas.forEach(f => { if (!porFin[f.financiador]) porFin[f.financiador] = []; porFin[f.financiador].push(f); });
+  const porFinRet = {};
+  retenidas.forEach(f => { if (!porFinRet[f.financiador]) porFinRet[f.financiador] = []; porFinRet[f.financiador].push(f); });
+  const totalMonto = aptas.reduce((s,f)=>s+f.monto,0);
+  const sinHabilitar = FINANCIADORES.filter(f => !f.habilitado);
   return `<div class="page-header">
       <div><h1>Cola de notificación</h1><div class="sub">Facturas emitidas pendientes de notificación consolidada</div></div>
-      <button class="btn btn-primary" id="btn-notificar">Ejecutar notificación consolidada</button>
+      <button class="btn btn-primary" id="btn-notificar" ${aptas.length ? '' : 'disabled'}>Ejecutar notificación consolidada</button>
     </div>
     <div class="note"><strong>Cada financiador recibe una sola notificación consolidada.</strong> A partir de esa fecha corren los 60 días.</div>
+    <div class="note note-blue"><strong>Los financiadores se incorporan por etapas.</strong> Una factura solo es apta para notificar si su financiador ya tiene usuario habilitado en el portal. Las de financiadores sin habilitar quedan retenidas en la cola y no se notifican.</div>
     <div class="kpi-grid">
-      <div class="kpi"><div class="label">Facturas a notificar</div><div class="value">${enCola.length}</div></div>
-      <div class="kpi"><div class="label">Financiadores</div><div class="value">${Object.keys(porFin).length}</div></div>
-      <div class="kpi"><div class="label">Hospitales</div><div class="value">${new Set(enCola.map(f=>f.hospital)).size}</div></div>
-      <div class="kpi"><div class="label">Monto total</div><div class="value money">${money(totalMonto)}</div></div>
+      <div class="kpi"><div class="label">Aptas para notificar</div><div class="value">${aptas.length}</div><div class="hint money">${money(totalMonto)}</div></div>
+      <div class="kpi ${retenidas.length?'warning':''}"><div class="label">Retenidas</div><div class="value ${retenidas.length?'warn':''}">${retenidas.length}</div><div class="hint">financiador sin habilitar</div></div>
+      <div class="kpi"><div class="label">Financiadores a notificar</div><div class="value">${Object.keys(porFin).length}</div><div class="hint">${sinHabilitar.length} sin habilitar en el portal</div></div>
+      <div class="kpi"><div class="label">Hospitales</div><div class="value">${new Set(aptas.map(f=>f.hospital)).size}</div></div>
     </div>
     <div class="card" style="padding:0;">
-      ${Object.entries(porFin).map(([finId, fs]) => `
+      ${aptas.length === 0 ? '<div style="color:var(--muted);padding:24px;text-align:center;">Sin facturas aptas para notificar.</div>' :
+        Object.entries(porFin).map(([finId, fs]) => `
         <div class="group-header"><span class="caret">▾</span><strong>${finNombre(finId)}</strong><span style="color:var(--muted);font-weight:400;">— ${fs.length} factura(s) — ${money(fs.reduce((s,f)=>s+f.monto,0))}</span></div>
         <table>
           <thead><tr><th>Factura</th><th>Hospital</th><th>Fecha</th><th>Pacientes</th><th class="money-header">Monto</th></tr></thead>
           <tbody>${fs.map(f => `<tr><td><code>${f.nro}</code></td><td>${hospCorto(f.hospital)}</td><td>${f.fecha}</td><td>${f.pacientes}</td><td class="money">${money(f.monto)}</td></tr>`).join('')}</tbody>
         </table>
       `).join('')}
-    </div>`;
+    </div>
+    ${retenidas.length > 0 ? `<div class="card">
+      <h3 class="card-title">Retenidas — financiador sin habilitar</h3>
+      <div class="note"><strong>No son aptas para notificar.</strong> Al dar de alta el usuario del financiador en el portal, estas facturas pasan automáticamente a la cola notificable.</div>
+      ${Object.entries(porFinRet).map(([finId, fs]) => `
+        <div class="group-header"><span class="caret">▾</span><strong>${finNombre(finId)}</strong>
+          <span class="chip chip-por-vencer">Sin habilitar</span>
+          <span style="color:var(--muted);font-weight:400;">— ${fs.length} factura(s) — ${money(fs.reduce((s,f)=>s+f.monto,0))}</span>
+          <button class="btn btn-primary btn-sm" style="margin-left:auto;" data-habilitar-fin="${finId}">Habilitar financiador</button>
+        </div>
+        <table>
+          <thead><tr><th>Factura</th><th>Hospital</th><th>Fecha</th><th>Pacientes</th><th class="money-header">Monto</th></tr></thead>
+          <tbody>${fs.map(f => `<tr><td><code>${f.nro}</code></td><td>${hospCorto(f.hospital)}</td><td>${f.fecha}</td><td>${f.pacientes}</td><td class="money">${money(f.monto)}</td></tr>`).join('')}</tbody>
+        </table>
+      `).join('')}
+    </div>` : ''}`;
 }
 function viewMinisterio_Notificadas() {
   const n = state.facturas.filter(f => f.estado !== "en_cola");
@@ -1864,39 +2349,140 @@ window.exportMinNotificadas = function() {
   n.forEach(f => rows.push([f.nro, hospNombre(f.hospital), finNombre(f.financiador), f.fecha, diasRestantes(f.fecha), f.estado, f.monto]));
   exportCSV("facturas_notificadas.csv", rows);
 };
-function viewMinisterio_Discusiones() {
-  const facts = state.facturas.filter(f => esDiscYo_fin(f) || esDiscHosp_fin(f));
-  const espFin = facts.filter(f => f.estado === "esperando_financiador");
-  const espHosp = facts.filter(f => f.estado === "esperando_hospital");
-  const fila = (f) => {
+/* ---- AUDITORÍA CENTRAL (definición 11/8) ----
+   Toda objeción del financiador entra acá. La auditoría resuelve directamente (objeción improcedente,
+   aportando documentación y devolviendo al financiador) o deriva al hospital (objeción procedente, para
+   que emita NC o presente descargo). Si hay varias objeciones en la misma factura y se resuelven con
+   criterios distintos, el resultado es una resolución parcial: alcanza con que una se derive para que la
+   pelota quede del lado del hospital. El hospital NUNCA recibe la objeción original sin pasar por acá. */
+function viewMinisterio_Auditoria() {
+  const enAuditoria = state.facturas.filter(f => f.estado === "esperando_auditoria");
+  const derivadas = state.facturas.filter(f => f.estado === "esperando_hospital");
+  const devueltas = state.facturas.filter(f => f.estado === "esperando_financiador");
+  const debate = (f) => montoEnDebate(f) || f.montoDebate || 0;
+  const filaSeguimiento = (f, pelota) => {
     const t = state.threads[f.nro] || []; const last = t[t.length-1];
-    const pelota = f.estado === "esperando_financiador" ? '<span class="chip chip-esperando-hospital">Financiador</span>' : '<span class="chip chip-esperando-financiador">Hospital</span>';
-    return `<tr><td><code>${f.nro}</code></td><td>${hospCorto(f.hospital)}</td><td>${finNombre(f.financiador)}</td><td>${pelota}</td><td class="money" style="color:var(--warn);font-weight:600;">${money(f.montoDebate||0)}</td><td style="color:${diasRestantes(f.fecha)<15?'var(--danger)':'var(--muted)'};font-weight:600;">${diasRestantes(f.fecha)}</td><td style="font-size:12px;color:var(--muted);">${last ? last.nombre+' — '+last.when : '—'}</td></tr>`;
+    return `<tr class="clickable" data-open-fact-aud="${f.nro}"><td><code>${f.nro}</code></td><td>${hospCorto(f.hospital)}</td><td>${finNombre(f.financiador)}</td><td>${pelota}</td>
+      <td class="money" style="color:var(--warn);font-weight:600;">${money(debate(f))}</td>
+      <td style="color:${diasRestantes(f.fecha)<15?'var(--danger)':'var(--muted)'};font-weight:600;">${diasRestantes(f.fecha)}</td>
+      <td style="font-size:12px;color:var(--muted);">${last ? last.nombre+' — '+last.when : '—'}</td></tr>`;
   };
   return `<div class="page-header">
-      <div><h1>Discusiones abiertas</h1><div class="sub">Todas las discusiones del sistema y quién debe actuar</div></div>
-      <button class="btn btn-excel" onclick="exportMinDiscusiones()">⬇ Excel</button>
+      <div><h1>Auditoría central</h1><div class="sub">Toda objeción del financiador entra por acá: se resuelve o se deriva al hospital</div></div>
+      <button class="btn btn-excel" onclick="exportMinAuditoria()">⬇ Excel</button>
     </div>
-    <div class="note note-blue"><strong>Decisión abierta:</strong> el rol del ministerio acá (observador / auditor / mediador) todavía está por definir. El prototipo asume que puede ver todo y, eventualmente, intervenir.</div>
+    <div class="note"><strong>El hospital no recibe objeciones directas.</strong> La auditoría puede: (a) desestimar la objeción por <em>improcedente</em> y devolverla al financiador con la documentación que la refuta; (b) reconocerla <em>procedente</em> y derivarla al hospital para que emita la nota de crédito o presente descargo; o (c) resolver <em>parcialmente</em>, cerrando algunos planteos y derivando otros.</div>
+    <div class="decision-abierta" style="margin-bottom:16px;"><strong>D2 — a definir:</strong> si la intervención del ministerio <em>suspende</em> el reloj de 60 días o si sigue corriendo. <strong>Hoy el prototipo lo deja correr.</strong> Falta definir además si la auditoría central cuenta como “mediación” a estos efectos, ya que interviene desde el arranque de toda discusión y no solo cuando el caso escala.</div>
     <div class="kpi-grid">
-      <div class="kpi warning"><div class="label">Esperando al financiador</div><div class="value warn">${espFin.length}</div><div class="hint money">${money(espFin.reduce((s,f)=>s+(f.montoDebate||0),0))}</div></div>
-      <div class="kpi good"><div class="label">Esperando al hospital</div><div class="value success">${espHosp.length}</div><div class="hint money">${money(espHosp.reduce((s,f)=>s+(f.montoDebate||0),0))}</div></div>
-      <div class="kpi"><div class="label">Total en debate</div><div class="value money">${money(facts.reduce((s,f)=>s+(f.montoDebate||0),0))}</div></div>
+      <div class="kpi ${enAuditoria.length?'action-required':''}"><div class="label">Esperan mi resolución</div><div class="value ${enAuditoria.length?'danger':''}">${enAuditoria.length}</div><div class="hint money">${money(enAuditoria.reduce((s,f)=>s+debate(f),0))}</div></div>
+      <div class="kpi warning"><div class="label">Derivadas al hospital</div><div class="value warn">${derivadas.length}</div><div class="hint money">${money(derivadas.reduce((s,f)=>s+debate(f),0))}</div></div>
+      <div class="kpi"><div class="label">En manos del financiador</div><div class="value">${devueltas.length}</div><div class="hint money">${money(devueltas.reduce((s,f)=>s+debate(f),0))}</div></div>
+      <div class="kpi"><div class="label">Resueltas por la auditoría</div><div class="value">${state.auditoria.resueltas}</div><div class="hint">${state.auditoria.derivadas} derivadas al hospital</div></div>
     </div>
-    <div class="card" style="padding:0;"><table>
-      <thead><tr><th>Factura</th><th>Hospital</th><th>Financiador</th><th>Pelota en</th><th class="money-header">En debate</th><th>Días</th><th>Últ. mensaje</th></tr></thead>
-      <tbody>${facts.map(fila).join('')}</tbody>
-    </table></div>`;
+    <div class="card">
+      <h3 class="card-title">Bandeja — objeciones a resolver</h3>
+      ${enAuditoria.length === 0 ? `<div style="color:var(--muted);padding:24px;text-align:center;">No hay objeciones esperando resolución.</div>` : `
+      <table>
+        <thead><tr><th>Factura</th><th>Hospital</th><th>Financiador</th><th style="text-align:center;">Planteos</th><th class="money-header">En debate</th><th>Días</th><th></th></tr></thead>
+        <tbody>${enAuditoria.map(f => {
+          const objs = objecionesDe(f);
+          return `<tr>
+            <td><code>${f.nro}</code></td><td>${hospCorto(f.hospital)}</td><td>${finNombre(f.financiador)}</td>
+            <td style="text-align:center;">${objs.length || 1}</td>
+            <td class="money" style="color:var(--warn);font-weight:600;">${money(debate(f))}</td>
+            <td style="color:${diasRestantes(f.fecha)<15?'var(--danger)':'var(--muted)'};font-weight:600;">${diasRestantes(f.fecha)}</td>
+            <td style="text-align:right;"><button class="btn btn-primary btn-sm" data-open-fact-min="${f.nro}">Revisar y resolver →</button></td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>`}
+    </div>
+    <div class="card" style="padding:0;">
+      <div class="group-header"><strong>Seguimiento</strong> <span style="color:var(--muted);font-weight:400;">— discusiones ya encaminadas, para ver quién está frenando el circuito</span></div>
+      <table>
+        <thead><tr><th>Factura</th><th>Hospital</th><th>Financiador</th><th>Pelota en</th><th class="money-header">En debate</th><th>Días</th><th>Últ. mensaje</th></tr></thead>
+        <tbody>${[...derivadas.map(f => filaSeguimiento(f, '<span class="chip chip-esperando-hospital">Hospital</span>')),
+                  ...devueltas.map(f => filaSeguimiento(f, '<span class="chip chip-esperando-financiador">Financiador</span>'))].join('')
+                  || '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">Sin discusiones en seguimiento.</td></tr>'}</tbody>
+      </table>
+    </div>`;
 }
-window.exportMinDiscusiones = function() {
-  const facts = state.facturas.filter(f => esDiscYo_fin(f) || esDiscHosp_fin(f));
-  const rows = [["Factura","Hospital","Financiador","Pelota en","En debate","Días"]];
-  facts.forEach(f => rows.push([f.nro, hospNombre(f.hospital), finNombre(f.financiador), f.estado === "esperando_financiador" ? "Financiador" : "Hospital", f.montoDebate||0, diasRestantes(f.fecha)]));
-  exportCSV("discusiones_sistema.csv", rows);
+window.exportMinAuditoria = function() {
+  const facts = state.facturas.filter(f => ["esperando_auditoria","esperando_hospital","esperando_financiador"].includes(f.estado));
+  const rows = [["Factura","Hospital","Financiador","Pelota en","Planteos","En debate","Días"]];
+  const donde = { esperando_auditoria: "Auditoría", esperando_hospital: "Hospital", esperando_financiador: "Financiador" };
+  facts.forEach(f => rows.push([f.nro, hospNombre(f.hospital), finNombre(f.financiador), donde[f.estado], objecionesDe(f).length, montoEnDebate(f) || f.montoDebate || 0, diasRestantes(f.fecha)]));
+  exportCSV("auditoria_central.csv", rows);
 };
+
+/* Detalle de factura para la auditoría. Antes esto era un modal que obligaba a decidir sin poder ver
+   qué le estaban objetando: ni las prestaciones, ni el paciente, ni la documentación. Ahora es una
+   vista completa, igual a la del hospital y la del financiador, con la diferencia de que la auditoría
+   puede además derivar planteos puntuales. */
+function viewMinisterio_DetalleFactura(nro) {
+  const f = state.facturas.find(x => x.nro === nro); if (!f) return "Factura no encontrada.";
+  const items = itemsDe(nro);
+  const pacientes = [...new Set(items.map(i => i.paciente))];
+  const vence = new Date(new Date(f.fecha).getTime() + 60*86400000).toISOString().split("T")[0];
+  const enAud = objecionesDe(f).filter(o => o.estado === "en_auditoria").length;
+  return `
+    <div class="breadcrumb"><a data-nav="auditoria">Auditoría central</a> / ${nro}</div>
+    <div class="page-header">
+      <div><h1>Factura ${nro}</h1>
+        <div class="sub">${hospNombre(f.hospital)} · ${finNombre(f.financiador)} — Notificada ${f.fecha} — Vence ${vence} — ${pacientes.length} paciente(s), ${items.length} prestación(es)</div>
+      </div>
+      <div style="text-align:right;">${chip(f.estado)}
+        <div class="page-actions" style="margin-top:8px;">
+          <button class="btn btn-excel btn-sm" onclick="exportFacturaCompleta('${nro}')">⬇ Factura completa</button>
+        </div>
+      </div>
+    </div>
+    ${enAud > 0 ? `<div class="action-required-banner">
+      <div><strong>${enAud} planteo(s) esperan tu resolución.</strong> Revisá la prestación, el paciente y la documentación antes de decidir. Podés desestimar unos y derivar otros: la resolución parcial sale de eso.</div>
+    </div>` : `<div class="note note-blue">No hay planteos pendientes de resolución en esta factura.</div>`}
+    <div class="two-col">
+      <div>
+        ${viewPlanteosDeFactura(f, "ministerio")}
+        <div class="card">${viewTablaItems(f, { seleccionable: false })}</div>
+        ${viewLogDiscusion(nro)}
+      </div>
+      <div>
+        <div class="card">
+          <h3 class="card-title">Datos</h3>
+          <div style="font-size:12.5px;line-height:1.9;">
+            <div><span style="color:var(--muted);">Hospital:</span> <strong>${hospNombre(f.hospital)}</strong></div>
+            <div><span style="color:var(--muted);">Financiador:</span> <strong>${finNombre(f.financiador)}</strong></div>
+            <div><span style="color:var(--muted);">Emisión:</span> ${f.fechaEmision}</div>
+            <div><span style="color:var(--muted);">Notificación:</span> ${f.fecha}</div>
+            <div><span style="color:var(--muted);">Vencimiento:</span> ${vence}</div>
+            <div><span style="color:var(--muted);">Días restantes:</span> <strong style="color:${diasRestantes(f.fecha)<15?'var(--danger)':'var(--text)'};">${diasRestantes(f.fecha)}</strong></div>
+            <div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border);">
+              <div><span style="color:var(--muted);">Monto:</span> <strong>${money(f.monto)}</strong></div>
+              ${f.montoPagado ? `<div><span style="color:var(--muted);">Pagado:</span> <strong style="color:var(--success);">${money(f.montoPagado)}</strong></div>` : ''}
+              ${f.notasCredito ? `<div><span style="color:var(--muted);">Notas de crédito:</span> <strong style="color:var(--purple);">${money(f.notasCredito)}</strong></div>` : ''}
+              <div><span style="color:var(--muted);">Saldo:</span> <strong>${money(saldoPendiente(f))}</strong></div>
+              <div><span style="color:var(--muted);">En debate:</span> <strong style="color:var(--warn);">${money(montoEnDebate(f))}</strong></div>
+              <div><span style="color:var(--muted);">Cobrable:</span> <strong style="color:var(--success);">${money(montoCobrable(f))}</strong></div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <h3 class="card-title">Criterio de la auditoría</h3>
+          <div style="font-size:12px;color:var(--muted);line-height:1.7;">
+            <strong style="color:var(--text);">Improcedente</strong> — la objeción no tiene sustento: se desestima y se devuelve al financiador con la documentación que la refuta. El hospital no se entera.<br><br>
+            <strong style="color:var(--text);">Procedente</strong> — la objeción tiene razón: se deriva al hospital para que emita la nota de crédito o presente descargo.<br><br>
+            Resolver unos planteos y derivar otros en la misma factura es lo que el proceso llama <strong>resolución parcial</strong>.
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
 function viewMinisterio_Morosidad() {
-  const m = state.facturas.filter(f => f.estado === "morosa");
+  const m = state.facturas.filter(f => esMorosa(f));
+  const sinIntimar = morosasSinIntimar();
+  const intimadas = state.facturas.filter(f => f.estado === "intimada" && !f.expediente);
   const totalSaldo = m.reduce((s,f)=>s+saldoPendiente(f),0);
+  const montoSinIntimar = sinIntimar.reduce((s,f)=>s+saldoPendiente(f),0);
   const porFin = {};
   m.forEach(f => { porFin[f.financiador] = (porFin[f.financiador]||0) + saldoPendiente(f); });
   const parciales = m.filter(f => (f.montoPagado||0) > 0 || (f.notasCredito||0) > 0).length;
@@ -1908,19 +2494,51 @@ function viewMinisterio_Morosidad() {
       </div>
     </div>
     <div class="note"><strong>Regla:</strong> al día 60 se evalúa el saldo (monto notificado − pagos imputados − notas de crédito). Si el saldo es 0 la factura se cierra; si queda saldo, cae en mora <em>por ese saldo</em>. El reloj es único por factura: los pagos parciales no lo renuevan.</div>
-    <div class="decision-abierta" style="margin-bottom:16px;"><strong>D7 — a definir:</strong> cuando el saldo se cancela con una nota de crédito, falta decidir si la factura va a <em>“Factura cerrada”</em> (como hace hoy el prototipo) o a un estado propio de <em>“Cierre por nota de crédito”</em>.</div>
+    <div class="note note-blue"><strong>La morosa no va directo al acumulador judicial.</strong> Primero la auditoría <strong>intima</strong> al financiador — esto aplica a todas las morosas, sin esperar el umbral de ${UMBRAL_JUS} JUS. Si el pago entra tras la intimación, la factura cierra. Recién si no entra, el saldo se suma al acumulador del par y puede terminar en expediente.</div>
+    <div class="decision-abierta" style="margin-bottom:16px;"><strong>D5 — a definir:</strong> cuando el saldo se cancela con una nota de crédito, falta decidir si la factura va a <em>“Factura cerrada”</em> o a un estado propio de <em>“Cierre por nota de crédito”</em>.</div>
     <div class="decision-abierta" style="margin-bottom:16px;"><strong>D8 — a definir:</strong> si al día 60 hay una parte <em>en debate</em> sin resolver, falta decidir si esa parte cae en mora junto con el resto o si el reloj queda suspendido sobre ella hasta que cierre la discusión. <strong>El prototipo hoy la cuenta como morosa</strong> (el saldo total es el que se evalúa), pero la parte reconocida se puede cobrar antes sin esperar a la resolución.</div>
     <div class="kpi-grid">
-      <div class="kpi action-required"><div class="label">Facturas morosas</div><div class="value danger">${m.length}</div><div class="hint">${parciales} con pago parcial o NC</div></div>
-      <div class="kpi action-required"><div class="label">Saldo moroso total</div><div class="value money danger">${money(totalSaldo)}</div><div class="hint">${jus(totalSaldo).toFixed(1)} JUS</div></div>
+      <div class="kpi action-required"><div class="label">Morosas sin intimar</div><div class="value danger">${sinIntimar.length}</div><div class="hint money">${money(montoSinIntimar)}</div></div>
+      <div class="kpi warning"><div class="label">Intimadas — acumulando</div><div class="value warn">${intimadas.length}</div><div class="hint">esperando el pago</div></div>
+      <div class="kpi"><div class="label">Saldo moroso total</div><div class="value money danger">${money(totalSaldo)}</div><div class="hint">${jus(totalSaldo).toFixed(1)} JUS · ${parciales} con pago parcial o NC</div></div>
       <div class="kpi"><div class="label">Financiadores con mora</div><div class="value">${Object.keys(porFin).length}</div></div>
     </div>
+    ${sinIntimar.length > 0 ? `<div class="card">
+      <h3 class="card-title">Paso 1 — Intimación de pago
+        <button class="btn btn-danger btn-sm" data-intimar-todas="1">Intimar las ${sinIntimar.length} morosas</button>
+      </h3>
+      <div class="note"><strong>Toda morosa se intima</strong>, sin esperar el umbral. La intimación usa el mismo canal fehaciente que la notificación original (domicilio electrónico). Solo después de intimada la factura entra al acumulador del par.</div>
+      <table>
+        <thead><tr><th>Factura</th><th>Hospital</th><th>Financiador</th><th>Vencida hace</th><th class="money-header">Saldo moroso</th><th></th></tr></thead>
+        <tbody>${sinIntimar.map(f => `<tr>
+          <td><code>${f.nro}</code>${marcaPagoPendiente(f.nro)}</td>
+          <td>${hospCorto(f.hospital)}</td><td>${finNombre(f.financiador)}</td>
+          <td style="color:var(--danger);font-weight:600;">${Math.abs(diasRestantes(f.fecha))} días</td>
+          <td class="money" style="color:var(--danger);font-weight:700;">${money(saldoPendiente(f))}</td>
+          <td style="text-align:right;"><button class="btn btn-danger btn-sm" data-intimar="${f.nro}">Intimar →</button></td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>` : `<div class="card"><h3 class="card-title">Paso 1 — Intimación de pago</h3>
+      <div style="color:var(--muted);padding:16px;text-align:center;">No hay morosas pendientes de intimar.</div></div>`}
+    ${intimadas.length > 0 ? `<div class="card">
+      <h3 class="card-title">Paso 2 — Intimadas sin pago <span style="font-size:12px;font-weight:400;color:var(--muted);">si el financiador paga, la factura cierra y sale del acumulador</span></h3>
+      <table>
+        <thead><tr><th>Factura</th><th>Hospital</th><th>Financiador</th><th>Intimada el</th><th class="money-header">Saldo reclamado</th><th></th></tr></thead>
+        <tbody>${intimadas.map(f => `<tr>
+          <td><code>${f.nro}</code></td><td>${hospCorto(f.hospital)}</td><td>${finNombre(f.financiador)}</td>
+          <td>${f.fechaIntimacion || '—'}</td>
+          <td class="money" style="color:var(--danger);font-weight:700;">${money(saldoPendiente(f))}</td>
+          <td style="text-align:right;"><button class="btn btn-success btn-sm" data-pago-intimacion="${f.nro}">✓ Entró el pago</button></td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>` : ''}
+    <h3 style="margin:20px 0 8px;font-size:15px;">Paso 3 — Acumulador judicial</h3>
     ${viewParesJus(acumuladoPorPar(), true)}
     <div class="card" style="padding:0;">
-      <div class="group-header"><strong>Detalle de facturas morosas</strong></div>
+      <div class="group-header"><strong>Detalle de facturas en mora</strong> <span style="color:var(--muted);font-weight:400;">— incluye morosas, intimadas y judicializadas</span></div>
       <table>
-      <thead><tr><th>Factura</th><th>Hospital</th><th>Financiador</th><th>Emisión</th><th>Vencida hace</th><th class="money-header">Monto</th><th class="money-header">Pagado</th><th class="money-header">NC</th><th class="money-header">Saldo moroso</th><th>Expediente</th></tr></thead>
-      <tbody>${m.map(f => `<tr><td><code>${f.nro}</code>${marcaPagoPendiente(f.nro)}</td><td>${hospCorto(f.hospital)}</td><td>${finNombre(f.financiador)}</td><td>${f.fecha}</td><td style="color:var(--danger);font-weight:600;">${Math.abs(diasRestantes(f.fecha))} días</td><td class="money">${money(f.monto)}</td><td class="money" style="color:${(f.montoPagado||0)>0?'var(--success)':'var(--muted)'};">${(f.montoPagado||0)>0?money(f.montoPagado):'—'}</td><td class="money" style="color:${(f.notasCredito||0)>0?'var(--purple)':'var(--muted)'};">${(f.notasCredito||0)>0?money(f.notasCredito):'—'}</td><td class="money" style="color:var(--danger);font-weight:700;">${money(saldoPendiente(f))}</td><td>${f.expediente ? `<span class="exp-gdeba">${f.expediente}</span>` : '<span style="color:var(--muted);font-size:12px;">En acumulador</span>'}</td></tr>`).join('')}</tbody>
+      <thead><tr><th>Factura</th><th>Hospital</th><th>Financiador</th><th>Emisión</th><th>Vencida hace</th><th>Etapa</th><th class="money-header">Monto</th><th class="money-header">Pagado</th><th class="money-header">NC</th><th class="money-header">Saldo moroso</th><th>Expediente</th></tr></thead>
+      <tbody>${m.map(f => `<tr><td><code>${f.nro}</code>${marcaPagoPendiente(f.nro)}</td><td>${hospCorto(f.hospital)}</td><td>${finNombre(f.financiador)}</td><td>${f.fecha}</td><td style="color:var(--danger);font-weight:600;">${Math.abs(diasRestantes(f.fecha))} días</td><td>${chip(f.estado)}</td><td class="money">${money(f.monto)}</td><td class="money" style="color:${(f.montoPagado||0)>0?'var(--success)':'var(--muted)'};">${(f.montoPagado||0)>0?money(f.montoPagado):'—'}</td><td class="money" style="color:${(f.notasCredito||0)>0?'var(--purple)':'var(--muted)'};">${(f.notasCredito||0)>0?money(f.notasCredito):'—'}</td><td class="money" style="color:var(--danger);font-weight:700;">${money(saldoPendiente(f))}</td><td>${f.expediente ? `<span class="exp-gdeba">${f.expediente}</span>` : `<span style="color:var(--muted);font-size:12px;">${f.estado === "intimada" ? 'En acumulador' : 'Sin intimar'}</span>`}</td></tr>`).join('')}</tbody>
     </table></div>`;
 }
 
@@ -1929,14 +2547,14 @@ function viewMinisterio_Morosidad() {
 function viewParesJus(pares, conAccion) {
   const habilitados = pares.filter(p => p.habilitado).length;
   return `<div class="card">
-    <h3 class="card-title">Acumulado de morosidad por par vs. umbral de ${UMBRAL_JUS} JUS
+    <h3 class="card-title">Acumulado de deuda intimada por par vs. umbral de ${UMBRAL_JUS} JUS
       <span style="font-size:12px;font-weight:400;color:var(--muted);">1 JUS = ${money(JUS)} · umbral = ${money(UMBRAL_MONTO)}</span>
     </h3>
-    <div class="note"><strong>Solo se puede abrir expediente cuando la deuda morosa acumulada del par supera ${UMBRAL_JUS} JUS.</strong>
+    <div class="note"><strong>Solo acumulan las facturas ya intimadas que no pagaron</strong>, y solo se puede abrir expediente cuando ese acumulado del par alcanza ${UMBRAL_JUS} JUS.
       Al generar el expediente, esas facturas salen del acumulador y el par vuelve a cero para la próxima tanda — por eso un mismo par puede terminar con varios expedientes.</div>
-    ${pares.length === 0 ? `<div style="color:var(--muted);padding:20px;text-align:center;">Ningún par con morosidad pendiente de judicializar.</div>` : `
+    ${pares.length === 0 ? `<div style="color:var(--muted);padding:20px;text-align:center;">Ningún par con deuda intimada pendiente de judicializar.</div>` : `
     <table>
-      <thead><tr><th>Hospital</th><th>Financiador</th><th style="text-align:center;">Facturas</th><th class="money-header">Saldo moroso acumulado</th><th>Avance hacia ${UMBRAL_JUS} JUS</th><th style="text-align:center;">Estado</th><th style="text-align:center;">Exp. previos</th>${conAccion ? '<th></th>' : ''}</tr></thead>
+      <thead><tr><th>Hospital</th><th>Financiador</th><th style="text-align:center;">Facturas</th><th class="money-header">Deuda intimada acumulada</th><th>Avance hacia ${UMBRAL_JUS} JUS</th><th style="text-align:center;">Estado</th><th style="text-align:center;">Exp. previos</th>${conAccion ? '<th></th>' : ''}</tr></thead>
       <tbody>${pares.map(p => `<tr>
         <td><strong>${hospCorto(p.hospital)}</strong></td>
         <td>${finNombre(p.financiador)}</td>
@@ -2023,9 +2641,9 @@ window.exportMinExpedientes = function() {
 };
 
 window.exportMinMorosidad = function() {
-  const m = state.facturas.filter(f => f.estado === "morosa");
-  const rows = [["Factura","Hospital","Financiador","Emisión","Vencida hace (días)","Monto","Pagado","Notas de crédito","Saldo moroso"]];
-  m.forEach(f => rows.push([f.nro, hospNombre(f.hospital), finNombre(f.financiador), f.fecha, Math.abs(diasRestantes(f.fecha)), f.monto, f.montoPagado||0, f.notasCredito||0, saldoPendiente(f)]));
+  const m = state.facturas.filter(f => esMorosa(f));
+  const rows = [["Factura","Hospital","Financiador","Emisión","Vencida hace (días)","Etapa","Intimada el","Monto","Pagado","Notas de crédito","Saldo moroso","Expediente"]];
+  m.forEach(f => rows.push([f.nro, hospNombre(f.hospital), finNombre(f.financiador), f.fecha, Math.abs(diasRestantes(f.fecha)), f.estado, f.fechaIntimacion || "—", f.monto, f.montoPagado||0, f.notasCredito||0, saldoPendiente(f), f.expediente || "—"]));
   exportCSV("morosidad_legales.csv", rows);
 };
 
@@ -2039,7 +2657,8 @@ function render() {
     if (view === "dashboard") html = viewMinisterio_Dashboard();
     else if (view === "cola") html = viewMinisterio_Cola();
     else if (view === "notificadas") html = viewMinisterio_Notificadas();
-    else if (view === "discusiones") html = viewMinisterio_Discusiones();
+    else if (view === "auditoria" || view === "discusiones") html = viewMinisterio_Auditoria();
+    else if (view === "min_detalle_factura") html = viewMinisterio_DetalleFactura(state.context.factura);
     else if (view === "morosidad") html = viewMinisterio_Morosidad();
     else if (view === "expedientes") html = viewMinisterio_Expedientes();
     else if (view === "min_detalle_fin") html = viewMinisterio_DetalleActor("financiador", state.context.actor);
@@ -2059,6 +2678,7 @@ function render() {
     else if (view === "detalle_hospital") html = viewFinanciador_DetalleHospital(state.context.hospital);
     else if (view === "notificaciones") html = viewFinanciador_Notificaciones();
     else if (view === "facturas_financiador") html = viewFinanciador_Facturas();
+    else if (view === "notas_credito") html = viewFinanciador_NotasCredito();
     else if (view === "detalle_factura") html = viewFinanciador_DetalleFactura(state.context.factura);
     else if (view === "discusiones_financiador" || view === "disc_esperan_yo") html = viewFinanciador_Discusiones("yo");
     else if (view === "disc_esperan_hosp") html = viewFinanciador_Discusiones("hosp");
@@ -2066,10 +2686,12 @@ function render() {
     else if (view === "historial_financiador") html = viewFinanciador_Historial();
   }
   html += `<div class="legend"><h4>Ciclo de vida — estados</h4><div class="legend-items">
-    ${chip("emitida")} ${chip("en_cola")} ${chip("notificada")} ${chip("aceptada")}
-    ${chip("esperando_financiador")} ${chip("esperando_hospital")}
+    ${chip("en_cola")} ${chip("notificada")} ${chip("aceptada")}
+    ${chip("esperando_auditoria")} ${chip("esperando_hospital")} ${chip("esperando_financiador")}
     ${chip("rechazada_parcial")} ${chip("rechazada_total")}
-    ${chip("pago_informado")} ${chip("pago_parcial")} ${chip("pagada")} ${chip("morosa")} ${chip("cerrada")}
+    ${chip("pago_efectuado")} ${chip("pago_informado")} ${chip("pago_parcial")}
+    ${chip("morosa")} ${chip("intimada")} ${chip("judicializada")}
+    ${chip("cerrada")} ${chip("cerrada_nc")}
   </div></div>`;
   main.innerHTML = html;
   wireEvents();
@@ -2112,6 +2734,14 @@ function wireEvents() {
   }));
   document.querySelectorAll('[data-open-fact-hosp]').forEach(el => el.addEventListener('click', () => { state.view = "detalle_factura_hosp"; state.context.factura = el.dataset.openFactHosp; render(); }));
   const bN = $("#btn-notificar"); if (bN) bN.addEventListener('click', () => openModalNotificar());
+  // Alta del usuario del financiador: sus facturas retenidas pasan a ser aptas para notificar.
+  document.querySelectorAll('[data-habilitar-fin]').forEach(el => el.addEventListener('click', () => {
+    const fin = FINANCIADORES.find(x => x.id === el.dataset.habilitarFin); if (!fin) return;
+    confirmarAccion({ titulo: `Habilitar a ${fin.nombre} en el portal`, textoBoton: "Sí, habilitar",
+      mensaje: `Vas a dar de alta el usuario de ${fin.nombre} (${fin.tipo}).`,
+      detalle: "Sus facturas dejan de estar retenidas y pasan a la cola como <strong>aptas para notificar</strong>. Recién con la notificación arranca el reloj de 60 días.",
+      onOk: () => { fin.habilitado = true; fin.alta = HOY; closeModal(); render(); showToast(`✓ ${fin.nombre} habilitado — sus facturas ya son notificables`); } });
+  }));
   // Toda acción sobre la factura pasa por una confirmación explícita.
   const factActual = () => state.facturas.find(x => x.nro === state.context.factura);
   const bA = $("#btn-aceptar-total"); if (bA) bA.addEventListener('click', () => {
@@ -2131,14 +2761,14 @@ function wireEvents() {
     const f = factActual(); if (!f) return;
     confirmarAccion({ titulo: "Rechazar la factura completa", clase: "btn-danger", textoBoton: "Sí, rechazar todo",
       mensaje: `Vas a desconocer íntegramente la factura ${f.nro} por ${money(f.monto)}.`,
-      detalle: "Queda el total en debate y <strong>nada cobrable</strong> hasta que se resuelva. No es definitivo: el hospital puede presentar descargo. Si en realidad discrepás solo con algunas prestaciones, objetá esas y el resto queda cobrable.",
+      detalle: "Queda el total en debate y <strong>nada cobrable</strong> hasta que se resuelva. El planteo lo recibe primero la <strong>auditoría central del ministerio</strong>, que puede desestimarlo o derivarlo al hospital. No es definitivo. Si en realidad discrepás solo con algunas prestaciones, objetá esas y el resto queda cobrable.",
       onOk: () => {
-        f.estado = "esperando_hospital"; f.rechazoTotal = true; f.montoDebate = saldoPendiente(f);
+        f.estado = "esperando_auditoria"; f.rechazoTotal = true; f.montoDebate = saldoPendiente(f);
         if (!state.threads[f.nro]) state.threads[f.nro] = [];
         state.threads[f.nro].push({ who: "financiador", nombre: "IOMA", when: "hoy",
           text: `Rechazamos la factura en su totalidad (${money(f.monto)}).`,
-          accion: { tipo: "Rechazo total", categorias: ["Desconocimiento íntegro de la factura"], detalles: ["El hospital puede presentar descargo o aceptar el rechazo."] }, adjuntos: [] });
-        closeModal(); render(); showToast("Factura rechazada en su totalidad — el hospital debe responder");
+          accion: { tipo: "Rechazo total", categorias: ["Desconocimiento íntegro de la factura"], detalles: ["Queda a resolución de la auditoría central, que puede desestimarlo o derivarlo al hospital."] }, adjuntos: [] });
+        closeModal(); render(); showToast("Factura rechazada — elevada a la auditoría central");
       } });
   });
   /* ---- Filtros del panel del financiador ---- */
@@ -2189,10 +2819,125 @@ function wireEvents() {
     e.stopPropagation(); openModalPaciente(state.context.factura, decodeURIComponent(el.dataset.verPaciente));
   }));
   const bNP = $("#btn-nuevo-pago"); if (bNP) bNP.addEventListener('click', () => openModalNuevoPago());
+  const bPE = $("#btn-pago-efectuado"); if (bPE) bPE.addEventListener('click', () => openModalPagoEfectuado());
+  document.querySelectorAll('[data-imputar-pef]').forEach(el => el.addEventListener('click', () => openModalNuevoPago(el.dataset.imputarPef)));
   document.querySelectorAll('[data-gen-exp]').forEach(el => el.addEventListener('click', (e) => {
     e.stopPropagation();
     const [hospId, finId] = el.dataset.genExp.split(":");
     openModalPaqueteJudicial(hospId, finId);
+  }));
+  /* ---- Nota de crédito: emisión (hospital) y reconciliación (financiador) ---- */
+  document.querySelectorAll('[data-emitir-nc]').forEach(el => el.addEventListener('click', () => openModalNotaCredito(el.dataset.emitirNc)));
+  document.querySelectorAll('[data-reconciliar-nc]').forEach(el => el.addEventListener('click', () => {
+    const n = state.notasCredito.find(x => x.id === el.dataset.reconciliarNc); if (!n) return;
+    confirmarAccion({ titulo: "Reconciliar la nota de crédito", clase: "btn-primary", textoBoton: "Sí, reconciliar",
+      mensaje: `Vas a reconciliar ${n.id} por ${money(n.monto)} contra la factura ${n.factura}.`,
+      detalle: "Confirmás que impactaste la NC en tu propia facturación. El saldo reclamado por esa factura ya está neteado en el portal.",
+      onOk: () => { n.estado = "reconciliada"; closeModal(); render(); showToast(`✓ ${n.id} reconciliada`); } });
+  }));
+  /* ---- Intimación del hospital por pago recibido sin imputar ---- */
+  document.querySelectorAll('[data-intimar-pago]').forEach(el => el.addEventListener('click', () => {
+    const p = state.pagosEfectuados.find(x => x.id === el.dataset.intimarPago); if (!p) return;
+    confirmarAccion({ titulo: "Intimar al financiador a imputar el pago", clase: "btn-danger", textoBoton: "Sí, intimar",
+      mensaje: `Vas a intimar a ${finNombre(p.financiador)} a que declare a qué facturas corresponde la transferencia de ${money(p.monto)} (${p.comprobante}).`,
+      detalle: "La intimación se cursa por el <strong>mismo canal fehaciente</strong> que la notificación de la facturación. Hasta que el financiador impute, ninguna factura puede cerrarse y el reloj de 60 días sigue corriendo.",
+      onOk: () => {
+        p.intimaciones.push(HOY);
+        closeModal(); render(); showToast(`⚖ Intimación cursada a ${finNombre(p.financiador)}`);
+      } });
+  }));
+  /* ---- Acciones por planteo (las tres partes responden planteo por planteo) ---- */
+  const buscarPlanteo = (k) => {
+    const [nro, objId] = k.split("|");
+    const f = state.facturas.find(x => x.nro === nro);
+    return { f, o: f && objecionesDe(f).find(x => x.id === objId) };
+  };
+  document.querySelectorAll('[data-aud-desestimar]').forEach(el => el.addEventListener('click', () => {
+    const { f, o } = buscarPlanteo(el.dataset.audDesestimar); if (!o) return; openModalAudDesestimar(f, o);
+  }));
+  document.querySelectorAll('[data-aud-derivar]').forEach(el => el.addEventListener('click', () => {
+    const { f, o } = buscarPlanteo(el.dataset.audDerivar); if (!o) return; openModalAudDerivar(f, o);
+  }));
+  document.querySelectorAll('[data-hosp-responder]').forEach(el => el.addEventListener('click', () => {
+    const { f, o } = buscarPlanteo(el.dataset.hospResponder); if (!o) return; openModalDescargoPlanteo(f, o);
+  }));
+  document.querySelectorAll('[data-hosp-nc]').forEach(el => el.addEventListener('click', () => {
+    const { f, o } = buscarPlanteo(el.dataset.hospNc); if (!o) return;
+    confirmarAccion({ titulo: "Aceptar el planteo y emitir nota de crédito", clase: "btn-warn", textoBoton: "Sí, emitir NC",
+      mensaje: `Vas a reconocer el planteo ${o.id} (${o.categoria}) por ${money(o.monto)} y emitir la nota de crédito correspondiente.`,
+      detalle: "El planteo se cierra, el monto se descuenta del saldo de la factura y la NC se notifica al financiador para que la reconcilie.",
+      onOk: () => { closeModal(); emitirNCDePlanteo(f, o); } });
+  }));
+  document.querySelectorAll('[data-fin-aceptar]').forEach(el => el.addEventListener('click', () => {
+    const { f, o } = buscarPlanteo(el.dataset.finAceptar); if (!o) return;
+    confirmarAccion({ titulo: "Aceptar la respuesta", clase: "btn-success", textoBoton: "Sí, aceptar",
+      mensaje: `Vas a dar por resuelto el planteo ${o.id} (${o.categoria}) por ${money(o.monto)}.`,
+      detalle: `El planteo se cierra y esos ${money(o.monto)} vuelven a ser <strong>cobrables</strong>. Los demás planteos de la factura siguen su curso.`,
+      onOk: () => {
+        o.estado = "aceptado";
+        anotarPlanteo(f, o, { who: "financiador", nombre: "IOMA", tipo: "Respuesta aceptada",
+          texto: `Aceptamos la respuesta. Damos por resuelto el planteo por ${money(o.monto)}.`,
+          detalles: ["El monto vuelve a quedar reconocido y cobrable."] });
+        recalcularEstadoFactura(f); closeModal(); render(); showToast(`✓ ${o.id} cerrado — ${money(o.monto)} vuelven a ser cobrables`);
+      } });
+  }));
+  document.querySelectorAll('[data-fin-info]').forEach(el => el.addEventListener('click', () => {
+    const { f, o } = buscarPlanteo(el.dataset.finInfo); if (!o) return; openModalFinRespuesta(f, o, "info");
+  }));
+  document.querySelectorAll('[data-fin-sostener]').forEach(el => el.addEventListener('click', () => {
+    const { f, o } = buscarPlanteo(el.dataset.finSostener); if (!o) return; openModalFinRespuesta(f, o, "sostener");
+  }));
+  // "Ver documentación" desde una tarjeta de planteo: la factura viene en el propio atributo.
+  document.querySelectorAll('[data-ver-paciente-fact]').forEach(el => el.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const [nro, pac] = el.dataset.verPacienteFact.split("|");
+    openModalPaciente(nro, decodeURIComponent(pac));
+  }));
+  /* ---- Switch de lectura de la tabla de prestaciones ---- */
+  document.querySelectorAll('[data-vista-items]').forEach(el => el.addEventListener('click', () => {
+    state.vistaItems = el.dataset.vistaItems; render();
+  }));
+  document.querySelectorAll('[data-sel-paciente]').forEach(el => el.addEventListener('change', () => {
+    const pac = decodeURIComponent(el.dataset.selPaciente);
+    const ids = itemsDe(state.context.factura).filter(i => i.paciente === pac).map(i => i.id);
+    state.selItems = el.checked ? [...new Set([...state.selItems, ...ids])] : state.selItems.filter(x => !ids.includes(x));
+    render();
+  }));
+  /* ---- Auditoría central: abre la factura completa para resolver planteo por planteo ---- */
+  const irAFacturaMin = (nro) => {
+    if (state.context.factura !== nro) { state.selItems = []; state.filtroItems = { codigo: "TODOS", q: "" }; }
+    state.view = "min_detalle_factura"; state.context.factura = nro; render();
+  };
+  document.querySelectorAll('[data-open-fact-min]').forEach(el => el.addEventListener('click', () => irAFacturaMin(el.dataset.openFactMin)));
+  document.querySelectorAll('[data-open-fact-aud]').forEach(el => el.addEventListener('click', () => irAFacturaMin(el.dataset.openFactAud)));
+  /* ---- Intimación de morosas (paso previo al acumulador judicial) ---- */
+  document.querySelectorAll('[data-intimar]').forEach(el => el.addEventListener('click', () => {
+    const f = state.facturas.find(x => x.nro === el.dataset.intimar); if (!f) return;
+    confirmarAccion({ titulo: "Intimar al financiador", clase: "btn-danger", textoBoton: "Sí, intimar",
+      mensaje: `Vas a intimar a ${finNombre(f.financiador)} por el saldo impago de la factura ${f.nro}: ${money(saldoPendiente(f))}.`,
+      detalle: "La intimación se cursa por el mismo canal fehaciente que la notificación original. A partir de acá, si el pago no entra, el saldo <strong>se suma al acumulador del par</strong> y puede terminar en expediente judicial.",
+      onOk: () => { intimar([f]); closeModal(); render(); showToast(`✓ ${f.nro} intimada — entra al acumulador del par`); } });
+  }));
+  const intimarTodas = document.querySelector('[data-intimar-todas]');
+  if (intimarTodas) intimarTodas.addEventListener('click', () => {
+    const pend = morosasSinIntimar();
+    const monto = pend.reduce((s,f)=>s+saldoPendiente(f),0);
+    confirmarAccion({ titulo: "Intimar todas las morosas", clase: "btn-danger", textoBoton: `Sí, intimar ${pend.length}`,
+      mensaje: `Vas a cursar la intimación fehaciente de ${pend.length} factura(s) morosa(s) por ${money(monto)}.`,
+      detalle: "Es la acción periódica de la auditoría sobre el conjunto de morosas. Las que no reciban pago pasan a acumular por par hospital–financiador.",
+      onOk: () => { intimar(pend); closeModal(); render(); showToast(`✓ ${pend.length} factura(s) intimada(s)`); } });
+  });
+  // El pago que entra tras la intimación cierra la factura y la saca del acumulador del par.
+  document.querySelectorAll('[data-pago-intimacion]').forEach(el => el.addEventListener('click', () => {
+    const f = state.facturas.find(x => x.nro === el.dataset.pagoIntimacion); if (!f) return;
+    confirmarAccion({ titulo: "Registrar el pago tras la intimación", clase: "btn-success", textoBoton: "Sí, entró el pago",
+      mensaje: `El financiador canceló el saldo de ${f.nro}: ${money(saldoPendiente(f))}.`,
+      detalle: "La factura se cierra y <strong>sale del acumulador del par</strong>, que baja en ese monto. Es la salida verde del sub-proceso de judicialización.",
+      onOk: () => {
+        f.montoPagado = (f.montoPagado||0) + saldoPendiente(f);
+        f.estado = "cerrada";
+        closeModal(); render(); showToast(`✓ ${f.nro} cerrada — sale del acumulador`);
+      } });
   }));
   document.querySelectorAll('[data-gdeba]').forEach(el => el.addEventListener('click', () => openModalGDEBA(el.dataset.gdeba)));
   document.querySelectorAll('[data-ver-paquete]').forEach(el => el.addEventListener('click', () => openModalVerPaquete(el.dataset.verPaquete)));
@@ -2225,126 +2970,307 @@ function closeModal() { $("#modal-backdrop").classList.remove("open"); }
 window.closeModal = closeModal;
 
 function openModalNotificar() {
-  const enCola = state.facturas.filter(f => f.estado === "en_cola");
+  const enCola = state.facturas.filter(f => f.estado === "en_cola" && finHabilitado(f.financiador));
+  const retenidas = state.facturas.filter(f => f.estado === "en_cola" && !finHabilitado(f.financiador));
   const fin = new Set(enCola.map(f => f.financiador));
   openModal(`<h3>Ejecutar notificación consolidada</h3>
-    <p>Vas a notificar <strong>${enCola.length}</strong> facturas a <strong>${fin.size}</strong> financiadores.</p>
-    <label>Fecha</label><input type="date" value="2026-08-03">
+    <p>Vas a notificar <strong>${enCola.length}</strong> facturas a <strong>${fin.size}</strong> financiadores, una comunicación por financiador.</p>
+    <div class="note">Desde esta fecha corre el plazo de <strong>60 días</strong> para cada una de estas facturas.</div>
+    ${retenidas.length ? `<div class="note note-blue"><strong>${retenidas.length} factura(s) quedan retenidas</strong> porque su financiador todavía no tiene usuario habilitado en el portal.</div>` : ''}
+    <div class="decision-abierta"><strong>A definir:</strong> la periodicidad de la notificación consolidada (mensual, quincenal o hasta semanal) y quién la fija.</div>
+    <label>Fecha</label><input type="date" value="${HOY}">
     <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" onclick="confirmarNotif()">Confirmar</button></div>`);
 }
 window.confirmarNotif = function() {
-  state.facturas.forEach(f => { if (f.estado === "en_cola") f.estado = "notificada"; });
-  closeModal(); render(); showToast("✓ Notificado");
+  // Solo se notifican las facturas de financiadores habilitados; el resto sigue retenido en la cola.
+  state.facturas.forEach(f => { if (f.estado === "en_cola" && finHabilitado(f.financiador)) { f.estado = "notificada"; f.fecha = HOY; } });
+  closeModal(); render(); showToast("✓ Notificación consolidada ejecutada — arranca el reloj de 60 días");
 };
 
 /* La discusión a nivel factura completa se eliminó: toda objeción se plantea sobre prestaciones
    concretas (openModalObjetarItems), que además permite que el resto quede cobrable. */
 
-/* MODAL DESCARGO DEL HOSPITAL — 6 categorías */
-function openModalDescargoHosp() {
-  openModal(`<h3>Enviar descargo estructurado</h3>
-    <p class="subtle">Elegí cómo respondés. Podés combinar acciones — por ejemplo ratificar la mayor parte y aceptar refacturar un ítem específico.</p>
+/* ================= RESPUESTAS POR PLANTEO =================
+   Antes había un único modal de descargo por factura y tres botones globales para el financiador.
+   Ahora cada planteo se resuelve por separado, con la evidencia de ese planteo a la vista. */
+
+// Encabezado común: qué se está respondiendo exactamente.
+const cabeceraPlanteo = (f, o) => {
+  const items = itemsDe(f.nro).filter(i => o.items.includes(i.id));
+  return `<p class="subtle">Factura ${f.nro} · planteo <strong>${o.id}</strong> — ${o.categoria} por ${money(o.monto)}</p>
+    <div class="note" style="margin-bottom:12px;">${o.detalle}</div>
+    ${items.length ? `<label>Prestaciones alcanzadas</label>
+    <div style="max-height:150px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;">
+      <table style="font-size:12px;"><tbody>${items.map(i => `<tr>
+        <td>${i.paciente}</td><td>${i.prestacion}</td><td><code>${i.codigo}</code></td><td class="money">${money(i.monto)}</td>
+      </tr>`).join('')}</tbody></table>
+    </div>` : ''}`;
+};
+
+// --- Auditoría: desestimar por improcedente (vuelve al financiador con documentación) ---
+function openModalAudDesestimar(f, o) {
+  openModal(`<h3>Desestimar el planteo — improcedente</h3>
+    ${cabeceraPlanteo(f, o)}
+    <div class="note note-blue">La objeción se devuelve al financiador con la documentación que la refuta, para que reconsidere. El hospital no interviene.</div>
+    <label>Fundamento de la auditoría</label>
+    <textarea id="aud-fund" placeholder="Ej: el padrón consultado el día de la atención acredita cobertura activa."></textarea>
+    <label>Documentación que se aporta</label>
+    <div class="checkline"><input type="checkbox" checked> Constancia de padrón con fecha y hora</div>
+    <div class="checkline"><input type="checkbox"> Convenio vigente con el financiador</div>
+    <div class="checkline"><input type="checkbox"> Historia clínica / epicrisis</div>
+    <div class="checkline"><input type="checkbox"> Autorización previa</div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-success" onclick="confirmarAudPlanteo('${f.nro}','${o.id}','desestimar')">Desestimar y devolver</button>
+    </div>`);
+}
+// --- Auditoría: derivar al hospital ---
+function openModalAudDerivar(f, o) {
+  openModal(`<h3>Derivar el planteo al hospital</h3>
+    ${cabeceraPlanteo(f, o)}
+    <div class="note">Reconocés que la objeción tiene sustento y el hospital debe responder: aportar lo que falta, refutar con evidencia, o emitir la nota de crédito.</div>
+    <label>Instrucción para el hospital</label>
+    <textarea id="aud-fund" placeholder="Ej: no consta la autorización previa en el expediente. Adjuntar o emitir NC."></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-warn" onclick="confirmarAudPlanteo('${f.nro}','${o.id}','derivar')">Derivar al hospital</button>
+    </div>`);
+}
+window.confirmarAudPlanteo = function(nro, objId, accion) {
+  const f = state.facturas.find(x => x.nro === nro); if (!f) return;
+  const o = objecionesDe(f).find(x => x.id === objId); if (!o) return;
+  const fund = ($("#aud-fund")?.value || "").trim() || "(sin fundamento)";
+  o.fundamentoAuditoria = fund; o.fechaAuditoria = HOY;
+  if (accion === "desestimar") {
+    o.estado = "respondido"; o.resolucion = "improcedente";
+    o.adjuntos.push({ nombre: "respaldo_auditoria_" + o.id.toLowerCase() + ".pdf", tipo: "pdf" });
+    state.auditoria.resueltas++;
+    anotarPlanteo(f, o, { who: "ministerio", nombre: "Auditoría central — SAMO", tipo: "Objeción improcedente",
+      texto: `Desestimamos el planteo y lo devolvemos al financiador. ${fund}`,
+      detalles: ["Se aporta documentación que refuta la objeción.", "El hospital no interviene en este planteo."],
+      adjuntos: [{ nombre: "respaldo_auditoria_" + o.id.toLowerCase() + ".pdf", tipo: "pdf" }] });
+  } else {
+    o.estado = "derivado_hospital"; o.resolucion = "derivada";
+    state.auditoria.derivadas++;
+    anotarPlanteo(f, o, { who: "ministerio", nombre: "Auditoría central — SAMO", tipo: "Objeción procedente — derivada",
+      texto: `Derivamos el planteo al hospital. ${fund}`,
+      detalles: ["El hospital debe presentar descargo o emitir nota de crédito."] });
+  }
+  recalcularEstadoFactura(f);
+  closeModal(); render();
+  showToast(accion === "desestimar" ? `✓ ${o.id} desestimado — vuelve al financiador` : `→ ${o.id} derivado al hospital`);
+};
+
+// --- Hospital: descargo de UN planteo, con las 6 categorías acotadas a ese planteo ---
+const CATEGORIAS_DESCARGO = [
+  { id: "ratificar", label: "Ratificar con documentación de respaldo", hint: "Sostengo lo facturado y adjunto evidencia." },
+  { id: "dato", label: "Aportar el dato faltante", hint: "Faltaba algo puntual y acá va." },
+  { id: "refutar", label: "Refutar el planteo", hint: "El criterio del financiador no corresponde según convenio." },
+  { id: "parcial", label: "Aceptar parcialmente y refacturar", hint: "Se retira parte y se corrige." },
+  { id: "prorroga", label: "Solicitar prórroga para reunir documentación", hint: "Necesito más tiempo." },
+  { id: "escalar", label: "Pedir intervención del ministerio", hint: "Que la auditoría medie en este punto." },
+];
+function openModalDescargoPlanteo(f, o) {
+  openModal(`<h3>Responder el planteo ${o.id}</h3>
+    ${cabeceraPlanteo(f, o)}
+    <div class="note note-blue">Estás respondiendo <strong>solo este planteo</strong>. Los demás de la factura siguen su curso por separado.</div>
+    <label>Tipo de respuesta</label>
     <div class="cat-list">
-
-      <div class="cat-item"><label class="cat-header"><input type="checkbox"><span>Ratificar factura con documentación de respaldo</span></label>
-        <div class="cat-body">
-          <label>Argumento / fundamento</label>
-          <textarea placeholder="Ej: La cobertura estaba activa al momento de la prestación, adjuntamos padrón."></textarea>
-          <label>Documentación que se adjunta</label>
-          <div class="checkline"><input type="checkbox"> Padrón consultado con timestamp</div>
-          <div class="checkline"><input type="checkbox"> Historia clínica completa</div>
-          <div class="checkline"><input type="checkbox"> Epicrisis firmada</div>
-          <div class="checkline"><input type="checkbox"> Constancia de urgencia</div>
-          <div class="checkline"><input type="checkbox"> Captura del sistema al momento de la atención</div>
-          <div class="checkline"><input type="checkbox"> Otro (aclarar)</div>
-        </div></div>
-
-      <div class="cat-item"><label class="cat-header"><input type="checkbox"><span>Aportar dato faltante</span></label>
-        <div class="cat-body">
-          <label>Tipo de dato</label>
-          <select><option>N° de autorización previa</option><option>N° de afiliado corregido</option><option>Plan del afiliado</option><option>Constancia de derivación</option><option>Otro</option></select>
-          <label>Valor / número</label><input placeholder="Ej: AUT-2026-88129">
-          <label>Fecha (si aplica)</label><input type="date">
-          <label>Aclaraciones</label><textarea></textarea>
-        </div></div>
-
-      <div class="cat-item"><label class="cat-header"><input type="checkbox"><span>Refutar el planteo</span></label>
-        <div class="cat-body">
-          <label>Motivo de la refutación</label>
-          <select>
-            <option>El código facturado es correcto según convenio</option>
-            <option>La prestación sí está cubierta por el plan</option>
-            <option>La autorización previa no era necesaria (emergencia)</option>
-            <option>Ya se aportó la documentación pedida</option>
-            <option>Otro</option>
-          </select>
-          <label>Fundamentación</label><textarea placeholder="Explicá el desacuerdo con evidencia."></textarea>
-          <label>Documento de referencia</label><input placeholder="Ej: Convenio IOMA vigente desde 05/2026">
-        </div></div>
-
-      <div class="cat-item"><label class="cat-header"><input type="checkbox"><span>Aceptar rechazo parcial y refacturar</span></label>
-        <div class="cat-body">
-          <label>Ítem(s) que se retiran</label>
-          <div class="checkline"><input type="checkbox"> Cirugía menor + insumos ($ 620.800)</div>
-          <div class="checkline"><input type="checkbox"> Estudios de laboratorio ($ 98.400)</div>
-          <div class="checkline"><input type="checkbox"> Otro ítem</div>
-          <label>Acción sobre lo retirado</label>
-          <select><option>Emitir nota de crédito por diferencia</option><option>Refacturar con corrección</option><option>Anular sin refacturar</option></select>
-          <label>Comentario</label><textarea></textarea>
-        </div></div>
-
-      <div class="cat-item"><label class="cat-header"><input type="checkbox"><span>Aceptar rechazo total de la factura</span></label>
-        <div class="cat-body">
-          <label>Motivo</label>
-          <select><option>Se emitirá nueva factura con datos corregidos</option><option>Corresponde a otro financiador</option><option>Factura duplicada — se anula</option><option>Otro</option></select>
-          <label>Aclaración</label><textarea></textarea>
-        </div></div>
-
-      <div class="cat-item"><label class="cat-header"><input type="checkbox"><span>Escalar al ministerio como mediador</span></label>
-        <div class="cat-body">
-          <label>Motivo del pedido de mediación</label>
-          <textarea placeholder="Ej: El financiador rechazó documentación válida. Solicitamos revisión del Ministerio."></textarea>
-          <div class="note note-blue" style="margin-top:8px;">Al escalar, el Ministerio interviene en el hilo. La discusión sigue abierta pero con visibilidad del auditor.</div>
-        </div></div>
-
+      ${CATEGORIAS_DESCARGO.map((c, n) => `<div class="cat-item"><label class="cat-header">
+        <input type="radio" name="descargo-tipo" value="${c.id}" ${n === 0 ? 'checked' : ''}>
+        <span style="flex:1;">${c.label}<div style="font-weight:400;font-size:11.5px;color:var(--muted);">${c.hint}</div></span>
+      </label></div>`).join('')}
     </div>
-    <label>Comentario general (opcional)</label><textarea></textarea>
+    <label>Fundamento</label>
+    <textarea id="desc-texto" placeholder="Explicá tu respuesta con la evidencia que la respalda."></textarea>
+    <label>Documentación que se adjunta</label>
+    <div class="checkline"><input type="checkbox" checked> Historia clínica</div>
+    <div class="checkline"><input type="checkbox"> Padrón consultado con timestamp</div>
+    <div class="checkline"><input type="checkbox"> Autorización previa</div>
+    <div class="checkline"><input type="checkbox"> Formularios F5 / F8 / F9</div>
     <label>Adjuntar archivos</label><input type="file" multiple>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="confirmarDescargoHosp()">Enviar descargo</button>
+      <button class="btn btn-primary" onclick="confirmarDescargoPlanteo('${f.nro}','${o.id}')">Enviar respuesta</button>
     </div>`);
 }
-window.openModalDescargoHosp = openModalDescargoHosp;
-window.confirmarDescargoHosp = function() {
-  const f = state.facturas.find(x => x.nro === state.context.factura); if (f) f.estado = "esperando_financiador";
-  if (!state.threads[state.context.factura]) state.threads[state.context.factura] = [];
-  state.threads[state.context.factura].push({
-    who: "hospital", nombre: "Hosp. San Martín", when: "hoy",
-    text: "Enviamos descargo estructurado con documentación adjunta.",
-    accion: { tipo: "Descargo del hospital", categorias: ["(categorías del modal)"], detalles: ["Se argumenta según los campos completados", "Se adjunta documentación de respaldo"] },
-    adjuntos: [{ nombre: "descargo_respuesta.pdf", tipo: "pdf" }, { nombre: "documentacion_respaldo.zip", tipo: "pdf" }]
-  });
-  closeModal(); render(); showToast("Descargo enviado — el financiador debe revisar");
+window.confirmarDescargoPlanteo = function(nro, objId) {
+  const f = state.facturas.find(x => x.nro === nro); if (!f) return;
+  const o = objecionesDe(f).find(x => x.id === objId); if (!o) return;
+  const tipoId = document.querySelector('input[name="descargo-tipo"]:checked')?.value || "ratificar";
+  const cat = CATEGORIAS_DESCARGO.find(c => c.id === tipoId);
+  const texto = ($("#desc-texto")?.value || "").trim() || "(sin fundamento)";
+  const adj = [{ nombre: `descargo_${o.id.toLowerCase()}_${nro}.pdf`, tipo: "pdf" }];
+  o.estado = "respondido";
+  o.adjuntos.push(...adj);
+  anotarPlanteo(f, o, { who: "hospital", nombre: "Hosp. San Martín", tipo: cat.label, categoria: cat.label,
+    texto, detalles: ["Respuesta acotada a este planteo.", "Se adjunta documentación de respaldo."], adjuntos: adj });
+  recalcularEstadoFactura(f);
+  closeModal(); render(); showToast(`✓ Respuesta enviada sobre ${o.id} — vuelve al financiador`);
+};
+// El hospital reconoce el planteo: se cierra con nota de crédito por ese monto.
+function emitirNCDePlanteo(f, o) {
+  const monto = Math.min(saldoPendiente(f), o.monto);
+  const id = "NC-2026-" + String(state.notasCredito.length + 40).padStart(4, "0");
+  state.notasCredito.push({ id, factura: f.nro, hospital: f.hospital, financiador: f.financiador,
+    monto, tipo: "parcial", motivo: o.categoria, fecha: HOY, estado: "notificada" });
+  f.notasCredito = (f.notasCredito || 0) + monto;
+  o.estado = "cerrado_nc"; o.notaCredito = id;
+  anotarPlanteo(f, o, { who: "hospital", nombre: "Hosp. San Martín", tipo: "Nota de crédito por el planteo",
+    texto: `Reconocemos el planteo y emitimos la nota de crédito ${id} por ${money(monto)}.`,
+    detalles: [`Saldo de la factura tras la NC: ${money(saldoPendiente(f))}.`, "Se notifica al financiador para que la reconcilie."],
+    adjuntos: [{ nombre: `${id.toLowerCase()}.pdf`, tipo: "pdf" }] });
+  if (saldoPendiente(f) <= 0) f.estado = "cerrada_nc"; else recalcularEstadoFactura(f);
+  render(); showToast(`✓ ${id} emitida por ${money(monto)} — ${o.id} cerrado`);
+}
+
+// --- Financiador: pedir más info o mantener la objeción ---
+function openModalFinRespuesta(f, o, modo) {
+  const sostener = modo === "sostener";
+  openModal(`<h3>${sostener ? "Mantener la objeción" : "Pedir más información"}</h3>
+    ${cabeceraPlanteo(f, o)}
+    <div class="note ${sostener ? '' : 'note-blue'}">${sostener
+      ? "No te convence la respuesta: el planteo vuelve a la auditoría central, que puede insistir con documentación o derivarlo otra vez al hospital."
+      : "Pedís documentación adicional. El planteo vuelve a la auditoría central para que la gestione."}</div>
+    <label>${sostener ? "Por qué mantenés la objeción" : "Qué documentación necesitás"}</label>
+    <textarea id="fin-texto" placeholder="${sostener ? 'Ej: la constancia aportada es posterior a la fecha de la prestación.' : 'Ej: falta la epicrisis firmada y el parte quirúrgico.'}"></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn ${sostener ? 'btn-danger' : 'btn-warn'}" onclick="confirmarFinRespuesta('${f.nro}','${o.id}','${modo}')">${sostener ? "Mantener la objeción" : "Pedir información"}</button>
+    </div>`);
+}
+window.confirmarFinRespuesta = function(nro, objId, modo) {
+  const f = state.facturas.find(x => x.nro === nro); if (!f) return;
+  const o = objecionesDe(f).find(x => x.id === objId); if (!o) return;
+  const texto = ($("#fin-texto")?.value || "").trim() || "(sin detalle)";
+  const sostener = modo === "sostener";
+  // Toda vuelta atrás pasa otra vez por la auditoría: el financiador no le escribe directo al hospital.
+  o.estado = "en_auditoria";
+  anotarPlanteo(f, o, { who: "financiador", nombre: "IOMA",
+    tipo: sostener ? "Objeción sostenida" : "Pedido de información",
+    texto, detalles: ["Vuelve a la auditoría central para su resolución."] });
+  recalcularEstadoFactura(f);
+  closeModal(); render();
+  showToast(sostener ? `${o.id} sostenido — vuelve a la auditoría` : `${o.id} — pedido enviado a la auditoría`);
 };
 
-/* MODAL INFORMAR PAGO — imputación a facturas concretas de UN SOLO hospital (brief 3.1) */
-function openModalNuevoPago() {
+/* MODAL EMITIR NOTA DE CRÉDITO (hospital) — cierra el circuito de rechazo total o parcial.
+   La NC no es unilateral: al emitirla se notifica al financiador por el mismo canal fehaciente
+   para que la reconcilie contra la factura original (Fase 6 del documento de proceso). */
+function openModalNotaCredito(nro) {
+  const f = state.facturas.find(x => x.nro === nro); if (!f) return;
+  const saldo = saldoPendiente(f);
+  const debate = montoEnDebate(f);
+  openModal(`<h3>Emitir nota de crédito — factura ${nro}</h3>
+    <p class="subtle">${finNombre(f.financiador)} — facturado ${money(f.monto)} · saldo actual ${money(saldo)}${debate > 0 ? ` · ${money(debate)} en debate` : ''}</p>
+    <div class="note">La NC <strong>baja el saldo reclamado</strong> y se notifica al financiador para que la reconcilie contra la factura original. Si el saldo queda en cero, la factura cierra.</div>
+    <label>Alcance</label>
+    <select id="nc-tipo" onchange="ajustarMontoNC('${nro}')">
+      <option value="parcial">Parcial — se retiran algunas prestaciones</option>
+      <option value="total">Total — se desconoce la factura completa</option>
+    </select>
+    <label>Motivo</label>
+    <select id="nc-motivo">
+      ${CATEGORIAS_OBJECION.map(c => `<option value="${c}">${c}</option>`).join('')}
+      <option value="Refacturación con datos corregidos">Refacturación con datos corregidos</option>
+      <option value="Corresponde a otro financiador">Corresponde a otro financiador</option>
+      <option value="Factura duplicada">Factura duplicada</option>
+    </select>
+    <label>Monto a acreditar</label>
+    <input type="number" id="nc-monto" value="${debate > 0 ? debate : saldo}" max="${saldo}">
+    <div style="font-size:11px;color:var(--muted);margin-top:4px;">Por defecto se propone ${debate > 0 ? "el monto en debate" : "el saldo completo"}. No puede superar el saldo de ${money(saldo)}.</div>
+    <label>Aclaración</label><textarea id="nc-detalle" placeholder="Ej: se retira la cirugía 710422 por falta de autorización previa."></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-warn" onclick="confirmarNotaCredito('${nro}')">Emitir y notificar</button>
+    </div>`);
+}
+window.ajustarMontoNC = function(nro) {
+  const f = state.facturas.find(x => x.nro === nro); if (!f) return;
+  if ($("#nc-tipo").value === "total") $("#nc-monto").value = saldoPendiente(f);
+};
+window.confirmarNotaCredito = function(nro) {
+  const f = state.facturas.find(x => x.nro === nro); if (!f) return;
+  const saldo = saldoPendiente(f);
+  const tipo = $("#nc-tipo").value;
+  const monto = Math.min(saldo, Math.max(0, Number($("#nc-monto").value) || 0));
+  if (monto <= 0) { showToast("⚠ Indicá el monto a acreditar"); return; }
+  const motivo = $("#nc-motivo").value;
+  const detalle = $("#nc-detalle").value.trim();
+  const id = "NC-2026-" + String(state.notasCredito.length + 40).padStart(4, "0");
+  state.notasCredito.push({ id, factura: nro, hospital: f.hospital, financiador: f.financiador,
+    monto, tipo, motivo, fecha: HOY, estado: "notificada" });
+  f.notasCredito = (f.notasCredito || 0) + monto;
+  if (tipo === "total") f.rechazoTotal = true;
+  // Si la NC cancela el saldo, la factura cierra por nota de crédito (no por pago) — ver D5.
+  if (saldoPendiente(f) <= 0) f.estado = "cerrada_nc";
+  else if (tipo === "parcial") { f.estado = "esperando_financiador"; f.montoDebate = Math.max(0, (f.montoDebate || 0) - monto); }
+  if (!state.threads[nro]) state.threads[nro] = [];
+  state.threads[nro].push({ who: "hospital", nombre: "Hosp. San Martín", when: "hoy",
+    text: `Emitimos la nota de crédito ${id} por ${money(monto)}.`,
+    accion: { tipo: `Nota de crédito ${tipo}`, categorias: [motivo],
+      detalles: [detalle || "(sin aclaración)", `Saldo de la factura tras la NC: ${money(saldoPendiente(f))}.`, "Se notifica al financiador para que la reconcilie contra la factura original."] },
+    adjuntos: [{ nombre: `${id.toLowerCase()}.pdf`, tipo: "pdf" }] });
+  closeModal(); render();
+  showToast(`✓ ${id} emitida por ${money(monto)} — notificada a ${finNombre(f.financiador)}`);
+};
+
+/* MODAL DECLARAR PAGO EFECTUADO — la transferencia ya salió, todavía sin repartir entre facturas.
+   Es el estado que el hospital ve como "plata sin imputar" y que lo habilita a intimar (definición 11/8). */
+function openModalPagoEfectuado() {
   const hospitales = [...new Set(state.facturas
     .filter(f => f.financiador === "F001" && isImpaga(f) && f.estado !== "en_cola")
     .map(f => f.hospital))];
-  openModal(`<h3>Informar nuevo pago</h3>
-    <p class="subtle">El pago se imputa a una o varias facturas concretas. Un mismo pago <strong>no puede cruzar hospitales</strong>: elegí primero el hospital y después las facturas.</p>
+  openModal(`<h3>Declarar pago efectuado</h3>
+    <p class="subtle">Registrá una transferencia ya realizada <strong>fuera del portal</strong>. Todavía no hace falta decir cuánto va a cada factura.</p>
+    <div class="note"><strong>Esto no cierra ninguna factura.</strong> Mientras el pago no esté imputado, el hospital no sabe qué cancelaste y puede <strong>intimarte fehacientemente</strong> a que lo declares. El reloj de 60 días sigue corriendo.</div>
     <label>Hospital destinatario</label>
-    <select id="pago-hospital" onchange="renderFacturasPago()">
-      ${hospitales.map(h => `<option value="${h}">${hospNombre(h)}</option>`).join('')}
+    <select id="pef-hospital">${hospitales.map(h => `<option value="${h}">${hospNombre(h)}</option>`).join('')}</select>
+    <label>Monto transferido</label><input type="number" id="pef-monto" placeholder="0">
+    <label>Fecha de la transferencia</label><input type="date" id="pef-fecha" value="${HOY}">
+    <label>Referencia / comprobante</label><input id="pef-ref" placeholder="TRF-…">
+    <label>Adjuntar comprobante</label><input type="file">
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarPagoEfectuado()">Declarar pago efectuado</button>
+    </div>`);
+}
+window.confirmarPagoEfectuado = function() {
+  const hospId = $("#pef-hospital").value;
+  const monto = Math.max(0, Number($("#pef-monto").value) || 0);
+  if (monto <= 0) { showToast("⚠ Indicá el monto transferido"); return; }
+  const pef = {
+    id: "PEF-" + String(state.pagosEfectuados.length + 1).padStart(3, "0"),
+    financiador: "F001", hospital: hospId, facturas: [], monto,
+    comprobante: $("#pef-ref").value || "TRF-" + Math.floor(100000 + Math.random() * 899999),
+    fecha: $("#pef-fecha").value || HOY, imputado: false, intimaciones: []
+  };
+  state.pagosEfectuados.push(pef);
+  closeModal(); render();
+  showToast(`💵 Pago efectuado declarado — ${money(monto)} a ${hospCorto(hospId)}, pendiente de imputar`);
+};
+
+/* MODAL INFORMAR PAGO — imputación a facturas concretas de UN SOLO hospital (brief 3.1).
+   Si viene de un pago efectuado (pefId), arranca con ese hospital y monto ya cargados. */
+function openModalNuevoPago(pefId) {
+  const pef = pefId ? state.pagosEfectuados.find(p => p.id === pefId) : null;
+  const hospitales = [...new Set(state.facturas
+    .filter(f => f.financiador === "F001" && isImpaga(f) && f.estado !== "en_cola")
+    .map(f => f.hospital))];
+  openModal(`<h3>${pef ? "Imputar pago efectuado" : "Informar nuevo pago"}</h3>
+    <p class="subtle">El pago se imputa a una o varias facturas concretas. Un mismo pago <strong>no puede cruzar hospitales</strong>: elegí primero el hospital y después las facturas.</p>
+    ${pef ? `<div class="note"><strong>Transferencia ${pef.comprobante}</strong> del ${pef.fecha} por ${money(pef.monto)}${pef.intimaciones.length ? ` — <strong style="color:var(--danger);">el hospital te intimó ${pef.intimaciones.length} vez(ces)</strong>` : ''}. Al imputarla, el hospital podrá confirmar la recepción y cerrar las facturas.</div>
+    <input type="hidden" id="pago-pef" value="${pef.id}">` : ''}
+    <label>Hospital destinatario</label>
+    <select id="pago-hospital" onchange="renderFacturasPago()" ${pef ? 'disabled' : ''}>
+      ${hospitales.map(h => `<option value="${h}" ${pef && pef.hospital === h ? 'selected' : ''}>${hospNombre(h)}</option>`).join('')}
     </select>
     <div class="note note-blue" style="margin-top:10px;">Solo se listan facturas impagas de este hospital. Para pagar facturas de otro hospital, informá un pago separado.</div>
     <label>Facturas a imputar</label>
     <div class="cat-list" id="pago-facturas"></div>
     <div id="pago-resumen" style="background:#fafbfc;border-radius:6px;padding:10px 12px;margin-top:10px;font-size:13px;"></div>
-    <label>Monto total transferido</label><input type="number" id="pago-monto" placeholder="0" oninput="recalcPago()">
-    <label>Fecha</label><input type="date" id="pago-fecha" value="2026-08-03">
+    <label>Monto total transferido</label><input type="number" id="pago-monto" placeholder="0" value="${pef ? pef.monto : ''}" oninput="recalcPago()">
+    <label>Fecha</label><input type="date" id="pago-fecha" value="${HOY}">
     <label>Referencia / comprobante</label><input id="pago-ref" placeholder="TRF-...">
     <label>Adjuntar comprobante</label><input type="file">
     <div class="modal-actions">
@@ -2364,7 +3290,7 @@ window.renderFacturasPago = function() {
         return `<div class="cat-item">
           <label class="cat-header">
             <input type="checkbox" class="pago-check" data-nro="${f.nro}" data-saldo="${s}">
-            <span style="flex:1;"><code>${f.nro}</code> ${chip(f.estado)}${f.estado === "morosa" ? '' : ` <span style="font-size:11px;color:var(--muted);">${diasRestantes(f.fecha)} días</span>`}</span>
+            <span style="flex:1;"><code>${f.nro}</code> ${chip(f.estado)}${esMorosa(f) ? '' : ` <span style="font-size:11px;color:var(--muted);">${diasRestantes(f.fecha)} días</span>`}</span>
             <span style="font-family:monospace;font-size:12px;">${debate > 0 ? `Cobrable ${money(cobrable)}` : `Saldo ${money(s)}`}</span>
           </label>
           <div class="cat-body">
@@ -2418,11 +3344,17 @@ window.confirmarNuevoPago = function() {
     imputaciones: imp.map(i => ({ nro: i.nro, monto: i.monto })),
     monto: total,
     tipo: imp.every(i => i.monto >= i.saldo) ? "total" : "parcial",
-    comprobante: ref, fecha: $("#pago-fecha").value || "2026-08-03",
+    comprobante: ref, fecha: $("#pago-fecha").value || HOY,
     estado: "pendiente_confirmacion"
   };
   state.pagosInformados.push(pago);
   imp.forEach(i => { const f = state.facturas.find(x => x.nro === i.nro); if (f) f.estado = "pago_informado"; });
+  // Si la imputación viene de una transferencia ya declarada, esa deja de estar pendiente.
+  const pefId = $("#pago-pef")?.value;
+  if (pefId) {
+    const pef = state.pagosEfectuados.find(p => p.id === pefId);
+    if (pef) { pef.imputado = true; pef.facturas = imp.map(i => i.nro); }
+  }
   closeModal(); render();
   showToast(`✓ Pago informado — ${money(total)} imputado a ${imp.length} factura(s) de ${hospCorto(hospId)}`);
 };
@@ -2449,9 +3381,9 @@ function notaModelo({ hospital, financiador, facturas, monto, fecha, id }) {
 }
 
 function openModalPaqueteJudicial(hospId, finId) {
-  const facts = morosasDelPar(hospId, finId);
+  const facts = intimadasDelPar(hospId, finId);
   const monto = facts.reduce((s, f) => s + saldoPendiente(f), 0);
-  if (monto <= UMBRAL_MONTO) { showToast(`⚠ El par no supera ${UMBRAL_JUS} JUS`); return; }
+  if (monto < UMBRAL_MONTO) { showToast(`⚠ El par no alcanza ${UMBRAL_JUS} JUS`); return; }
   const previos = expedientesDelPar(hospId, finId).length;
   const idTentativo = "EXP-2026-" + String(state.expedientes.length + 1).padStart(4, "0");
   openModal(`<h3>Generar expediente judicial</h3>
@@ -2472,14 +3404,14 @@ function openModalPaqueteJudicial(hospId, finId) {
       <span class="attachment-chip">📎 notas_credito.pdf</span>
     </div>
     <label>Nota modelo autocompletada</label>
-    ${notaModelo({ hospital: hospId, financiador: finId, facturas: facts, monto, fecha: "2026-08-03", id: idTentativo })}
+    ${notaModelo({ hospital: hospId, financiador: finId, facturas: facts, monto, fecha: HOY, id: idTentativo })}
     <label>Carga en GDEBA</label>
     <select id="exp-carga">
       <option value="manual">Manual — Legales carga el expediente en GDEBA (modalidad actual)</option>
       <option value="api">Interoperable por API — alta automática en GDEBA (a futuro)</option>
     </select>
     <div class="decision-abierta" style="margin-top:8px;">
-      <strong>D6 — a definir:</strong> la carga en GDEBA puede ser manual (como hoy) o interoperable por API. La decisión está abierta; el prototipo muestra ambas opciones.
+      <strong>D4 — a definir:</strong> la carga en GDEBA puede ser manual (como hoy) o interoperable por API. La decisión está abierta; el prototipo muestra ambas opciones.
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
@@ -2488,17 +3420,17 @@ function openModalPaqueteJudicial(hospId, finId) {
     </div>`);
 }
 window.confirmarExpediente = function(hospId, finId) {
-  const facts = morosasDelPar(hospId, finId);
+  const facts = intimadasDelPar(hospId, finId);
   const monto = facts.reduce((s, f) => s + saldoPendiente(f), 0);
-  if (monto <= UMBRAL_MONTO) { showToast(`⚠ El par no supera ${UMBRAL_JUS} JUS`); return; }
+  if (monto < UMBRAL_MONTO) { showToast(`⚠ El par no alcanza ${UMBRAL_JUS} JUS`); return; }
   const id = "EXP-2026-" + String(state.expedientes.length + 1).padStart(4, "0");
   state.expedientes.push({
     id, hospital: hospId, financiador: finId,
-    facturas: facts.map(f => f.nro), monto, fecha: "2026-08-03",
+    facturas: facts.map(f => f.nro), monto, fecha: HOY,
     nroGDEBA: null, cargaGDEBA: $("#exp-carga")?.value || "manual", estado: "pendiente_gdeba"
   });
-  // Las facturas de la tanda salen del acumulador: el par vuelve a cero.
-  facts.forEach(f => f.expediente = id);
+  // Las facturas de la tanda salen del acumulador (el par vuelve a cero) y pasan a judicializadas.
+  facts.forEach(f => { f.expediente = id; f.estado = "judicializada"; });
   closeModal();
   state.view = "expedientes"; render();
   showToast(`✓ ${id} abierto — ${facts.length} factura(s), ${money(monto)}. El acumulador del par vuelve a cero.`);
@@ -2559,6 +3491,41 @@ document.querySelectorAll('.role-switcher button').forEach(b => {
     state.view = NAV[state.role][0].view;
     state.context = {};
     render();
+  });
+});
+
+/* ===================== INICIALIZACIÓN ===================== */
+/* Corre una sola vez, después de que están definidos todos los helpers. */
+
+// 1. Prestaciones de las facturas que no vienen cargadas a mano.
+FACTURAS.forEach(f => { if (!ITEMS_FACTURA[f.nro]) ITEMS_FACTURA[f.nro] = generarItems(f); });
+
+/* 2. Migración del modelo viejo: las facturas del mock que traían `montoDebate` suelto no tenían
+   planteos desagregados, así que en la nueva UI no habría nada que mostrar ni sobre qué responder.
+   Se convierten en UN planteo sintético, eligiendo las prestaciones cuyo monto se acerca al debatido.
+   A partir de acá `montoDebate` es solo un cache: la fuente de verdad son las objeciones. */
+const CATEGORIA_POR_DEFECTO = "Documentación incompleta";
+state.facturas.forEach(f => {
+  if (!f.montoDebate || objecionesDe(f).length) return;
+  const items = itemsDe(f.nro);
+  const elegidos = []; let acum = 0;
+  for (const i of items) { if (acum >= f.montoDebate) break; elegidos.push(i.id); acum += i.monto; }
+  f.objeciones = [{ id: "OBJ-1", items: elegidos.length ? elegidos : items.slice(0,1).map(i=>i.id),
+    categoria: CATEGORIA_POR_DEFECTO, detalle: "Planteo cargado en el mock inicial.",
+    monto: f.montoDebate, fecha: f.fecha, adjuntos: [], respuestas: [] }];
+});
+
+/* 3. Estado y campos propios de cada planteo. El planteo es la unidad de trabajo: camina solo por el
+   circuito y el estado de la factura se deriva de él (ver recalcularEstadoFactura). */
+state.facturas.forEach(f => {
+  objecionesDe(f).forEach(o => {
+    o.adjuntos = o.adjuntos || [];
+    o.respuestas = o.respuestas || [];
+    if (o.estado) return;
+    // Se deduce del estado en que quedó la factura en el mock.
+    o.estado = f.estado === "esperando_hospital" ? "derivado_hospital"
+      : f.estado === "esperando_financiador" ? "respondido"
+      : "en_auditoria";
   });
 });
 
