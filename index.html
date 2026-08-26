@@ -275,28 +275,31 @@ const HOSPITALES = [
      - "en_pausa": usuario creado pero facturación temporalmente pausada. Las facturas aparecen como
        RETENIDAS (visibles pero no notificables) hasta que se reactive.
    El ABM del ministerio es el único punto donde estos estados se cambian. */
+/* El `cuit` es el del financiador como persona jurídica: el primer usuario (admin) se crea atado a
+   ese CUIT más el DNI de la persona responsable / apoderado. Los sin_usuario todavía no lo tienen
+   cargado — se ingresa recién en el alta desde el ABM del ministerio. */
 const FINANCIADORES = [
-  { id: "F001", nombre: "IOMA", tipo: "Obra Social Provincial", estado: "activo", alta: "2026-03-02" },
-  { id: "F002", nombre: "PAMI", tipo: "Obra Social Nacional", estado: "activo", alta: "2026-04-15" },
-  { id: "F003", nombre: "OSDE", tipo: "Prepaga", estado: "activo", alta: "2026-05-04" },
-  { id: "F004", nombre: "Swiss Medical", tipo: "Prepaga", estado: "activo", alta: "2026-06-01" },
-  { id: "F005", nombre: "OSECAC", tipo: "Obra Social Sindical", estado: "activo", alta: "2026-06-20" },
+  { id: "F001", nombre: "IOMA", tipo: "Obra Social Provincial", estado: "activo", alta: "2026-03-02", cuit: "30-62345678-9" },
+  { id: "F002", nombre: "PAMI", tipo: "Obra Social Nacional", estado: "activo", alta: "2026-04-15", cuit: "30-64567890-1" },
+  { id: "F003", nombre: "OSDE", tipo: "Prepaga", estado: "activo", alta: "2026-05-04", cuit: "30-54876543-2" },
+  { id: "F004", nombre: "Swiss Medical", tipo: "Prepaga", estado: "activo", alta: "2026-06-01", cuit: "30-59123456-7" },
+  { id: "F005", nombre: "OSECAC", tipo: "Obra Social Sindical", estado: "activo", alta: "2026-06-20", cuit: "30-52987654-3" },
   // Facturación en pausa: usuario creado, pero por algún motivo se pausó. Las facturas quedan retenidas.
-  { id: "F006", nombre: "Medifé", tipo: "Prepaga", estado: "en_pausa", alta: "2026-05-10", pausadoDesde: "2026-07-25", motivoPausa: "Revisión de conciliación pendiente con el financiador" },
-  { id: "F011", nombre: "Hospital Italiano Plan Salud", tipo: "Prepaga", estado: "en_pausa", alta: "2026-06-05", pausadoDesde: "2026-07-18", motivoPausa: "Cambio de responsable administrativo — pendiente designación" },
-  { id: "F012", nombre: "OSPRERA", tipo: "Obra Social Nacional", estado: "en_pausa", alta: "2026-05-22", pausadoDesde: "2026-07-30", motivoPausa: "Auditoría interna del financiador en curso" },
-  { id: "F017", nombre: "Prevención Salud", tipo: "Prepaga", estado: "en_pausa", alta: "2026-06-12", pausadoDesde: "2026-08-02", motivoPausa: "Revisión de contrato marco con el ministerio" },
+  { id: "F006", nombre: "Medifé", tipo: "Prepaga", estado: "en_pausa", alta: "2026-05-10", pausadoDesde: "2026-07-25", motivoPausa: "Revisión de conciliación pendiente con el financiador", cuit: "30-58765432-1" },
+  { id: "F011", nombre: "Hospital Italiano Plan Salud", tipo: "Prepaga", estado: "en_pausa", alta: "2026-06-05", pausadoDesde: "2026-07-18", motivoPausa: "Cambio de responsable administrativo — pendiente designación", cuit: "30-51234567-8" },
+  { id: "F012", nombre: "OSPRERA", tipo: "Obra Social Nacional", estado: "en_pausa", alta: "2026-05-22", pausadoDesde: "2026-07-30", motivoPausa: "Auditoría interna del financiador en curso", cuit: "30-65432109-8" },
+  { id: "F017", nombre: "Prevención Salud", tipo: "Prepaga", estado: "en_pausa", alta: "2026-06-12", pausadoDesde: "2026-08-02", motivoPausa: "Revisión de contrato marco con el ministerio", cuit: "30-70123456-4" },
   // Activos adicionales — se incorporaron después del arranque inicial de F001–F005.
-  { id: "F007", nombre: "Galeno", tipo: "Prepaga", estado: "activo", alta: "2026-06-25" },
-  { id: "F008", nombre: "Sancor Salud", tipo: "Prepaga", estado: "activo", alta: "2026-07-01" },
-  { id: "F009", nombre: "OMINT", tipo: "Prepaga", estado: "activo", alta: "2026-07-05" },
-  { id: "F010", nombre: "Medicus", tipo: "Prepaga", estado: "activo", alta: "2026-07-10" },
-  { id: "F013", nombre: "OSPLAD", tipo: "Obra Social Nacional", estado: "activo", alta: "2026-07-15" },
-  { id: "F015", nombre: "ObSBA", tipo: "Obra Social Provincial", estado: "activo", alta: "2026-07-20" },
+  { id: "F007", nombre: "Galeno", tipo: "Prepaga", estado: "activo", alta: "2026-06-25", cuit: "30-56789012-5" },
+  { id: "F008", nombre: "Sancor Salud", tipo: "Prepaga", estado: "activo", alta: "2026-07-01", cuit: "30-57890123-6" },
+  { id: "F009", nombre: "OMINT", tipo: "Prepaga", estado: "activo", alta: "2026-07-05", cuit: "30-58901234-7" },
+  { id: "F010", nombre: "Medicus", tipo: "Prepaga", estado: "activo", alta: "2026-07-10", cuit: "30-53012345-8" },
+  { id: "F013", nombre: "OSPLAD", tipo: "Obra Social Nacional", estado: "activo", alta: "2026-07-15", cuit: "30-66123456-9" },
+  { id: "F015", nombre: "ObSBA", tipo: "Obra Social Provincial", estado: "activo", alta: "2026-07-20", cuit: "30-99876543-0" },
   // Sin usuario en el portal: universo de financiadores a incorporar. Sus facturas ni siquiera entran.
-  { id: "F014", nombre: "OSDOP", tipo: "Obra Social Nacional", estado: "sin_usuario", alta: null },
-  { id: "F016", nombre: "Federada Salud", tipo: "Prepaga", estado: "sin_usuario", alta: null },
-  { id: "F018", nombre: "Accord Salud", tipo: "Prepaga", estado: "sin_usuario", alta: null },
+  { id: "F014", nombre: "OSDOP", tipo: "Obra Social Nacional", estado: "sin_usuario", alta: null, cuit: null },
+  { id: "F016", nombre: "Federada Salud", tipo: "Prepaga", estado: "sin_usuario", alta: null, cuit: null },
+  { id: "F018", nombre: "Accord Salud", tipo: "Prepaga", estado: "sin_usuario", alta: null, cuit: null },
 ];
 const finEstado = (id) => FINANCIADORES.find(f => f.id === id)?.estado || "sin_usuario";
 // `finHabilitado` = apto para notificar. Solo los activos lo son. En pausa y sin usuario NO.
@@ -304,6 +307,35 @@ const finHabilitado = (id) => finEstado(id) === "activo";
 const finEnPausa = (id) => finEstado(id) === "en_pausa";
 const finSinUsuario = (id) => finEstado(id) === "sin_usuario";
 const ESTADOS_FIN_LABEL = { sin_usuario: "Sin usuario", activo: "Facturación activa", en_pausa: "Facturación en pausa" };
+
+/* ---- USUARIOS DEL FINANCIADOR (definición: gestión de usuarios) ----
+   Cada financiador tiene usuarios propios. El PRIMER usuario es el `admin` (apoderado / responsable):
+   se crea junto con el alta del financiador, atado al CUIT de la persona jurídica + su DNI, y es el
+   ÚNICO que puede solicitar la creación de más usuarios. Los usuarios `operador` no crean usuarios.
+   Toda alta de usuario nuevo la pide el admin y la APRUEBA el ministerio (queda `pendiente` hasta
+   entonces). El admin puede, sobre los operadores ya aprobados, restringirles qué hospitales ven
+   (por defecto ven todo) y darlos de baja. El ministerio aprueba/rechaza solicitudes y puede
+   inhabilitar cualquier usuario.
+   Estados del usuario: pendiente · activo · rechazado · inhabilitado.
+   `hospitales`: null = ve todos; array de ids = restringido (solo aplica a Facturas a revisar y a
+   las dos vistas de Conciliación; el resto de las pantallas siempre muestra todo). */
+const ESTADO_USR_LABEL = { pendiente: "Pendiente de aprobación", activo: "Activo", rechazado: "Rechazado", inhabilitado: "Inhabilitado" };
+const ROL_USR_LABEL = { admin: "Administrador", operador: "Operador" };
+const usuariosDeFin = (id) => state.usuariosFin.filter(u => u.financiador === id);
+const usuariosActivosDeFin = (id) => usuariosDeFin(id).filter(u => u.estado === "activo");
+const adminDeFin = (id) => usuariosDeFin(id).find(u => u.rol === "admin");
+// Usuario "logueado" del rol Financiador (siempre F001 en la demo). Se conmuta con "Ver como".
+const usuarioFinActual = () => state.usuariosFin.find(u => u.id === state.usuarioActivoFin)
+  || usuariosActivosDeFin("F001")[0] || adminDeFin("F001");
+const esAdminFinActual = () => { const u = usuarioFinActual(); return !!u && u.rol === "admin" && u.estado === "activo"; };
+// null = ve todos los hospitales; array = restringido. Solo lo miran las 3 vistas alcanzadas.
+const hospitalesVisiblesFin = () => { const u = usuarioFinActual(); return (u && Array.isArray(u.hospitales)) ? u.hospitales : null; };
+const puedeVerHospitalFin = (hospId) => { const hs = hospitalesVisiblesFin(); return !hs || hs.includes(hospId); };
+const solicitudesUsuarioPendientes = () => state.usuariosFin.filter(u => u.estado === "pendiente");
+const nuevoIdUsuario = (finId) => {
+  const n = state.usuariosFin.filter(u => u.financiador === finId).length + 1;
+  return `USR-${finId}-${n}`;
+};
 // Fecha del escenario. Todo el prototipo calcula contra esta fecha: cambiarla acá mueve el escenario entero.
 const HOY = "2026-08-03";
 // Unidad de medida judicial (mock, configurable) y umbral para habilitar expediente — ver 3.3/3.4 del brief.
@@ -344,6 +376,22 @@ const FACTURAS = [
   // Financiador todavía no habilitado en el portal: quedan retenidas, no son aptas para notificar
   { nro: "0001-00042251", hospital: "H001", financiador: "F006", fecha: "2026-08-01", monto: 1180000, montoPagado: 0, estado: "en_cola", pacientes: 6 },
   { nro: "0004-00028310", hospital: "H002", financiador: "F006", fecha: "2026-08-01", monto: 740000, montoPagado: 0, estado: "en_cola", pacientes: 3 },
+
+  /* --- Conciliaciones de IOMA en H002 (Rossi) y H004 (Gutiérrez) ---
+     La operadora restringida de IOMA solo ve H001/H003/H005, así que estos casos NO le aparecen en
+     "Esperan mi respuesta" ni en "Esperando resolución": son los que hacen visible la diferencia entre
+     el admin (ve todo) y la operadora restringida. Se cargan con montoDebate para que el init sintetice
+     un planteo real sobre prestaciones generadas. */
+  // H002 — Rossi
+  { nro: "0004-00028120", hospital: "H002", financiador: "F001", fecha: "2026-07-18", monto: 1980400, montoPagado: 0, estado: "esperando_auditoria", pacientes: 9, montoDebate: 312500 },
+  { nro: "0004-00028121", hospital: "H002", financiador: "F001", fecha: "2026-07-12", monto: 1340900, montoPagado: 0, estado: "esperando_hospital", pacientes: 7, montoDebate: 198700 },
+  { nro: "0004-00028122", hospital: "H002", financiador: "F001", fecha: "2026-07-22", monto: 2260000, montoPagado: 0, estado: "esperando_financiador", pacientes: 12, montoDebate: 415000 },
+  { nro: "0004-00028123", hospital: "H002", financiador: "F001", fecha: "2026-07-16", monto: 870300, montoPagado: 0, estado: "esperando_financiador", pacientes: 4, montoDebate: 132400 },
+  // H004 — Gutiérrez
+  { nro: "0012-00010220", hospital: "H004", financiador: "F001", fecha: "2026-07-19", monto: 2540600, montoPagado: 0, estado: "esperando_auditoria", pacientes: 13, montoDebate: 488900 },
+  { nro: "0012-00010221", hospital: "H004", financiador: "F001", fecha: "2026-07-14", monto: 1105200, montoPagado: 0, estado: "esperando_hospital", pacientes: 6, montoDebate: 224100 },
+  { nro: "0012-00010222", hospital: "H004", financiador: "F001", fecha: "2026-07-21", monto: 1760000, montoPagado: 0, estado: "esperando_financiador", pacientes: 8, montoDebate: 305600 },
+  { nro: "0012-00010223", hospital: "H004", financiador: "F001", fecha: "2026-07-17", monto: 940500, montoPagado: 0, estado: "esperando_financiador", pacientes: 5, montoDebate: 141800 },
 
   // --- Notificación consolidada del 2026-08-01 a IOMA: recién recibida, ninguna revisada todavía ---
   // Es el lote al que apunta la alerta del panel: todas en "notificada", coherente con que acaba de llegar.
@@ -665,7 +713,24 @@ let state = {
   // `vistaItems` conmuta entre leer la factura por prestación o agrupada por paciente.
   selItems: [], filtroItems: { codigo: "TODOS", q: "" }, vistaItems: "prestacion", focusSel: null,
   // Prestaciones alcanzadas por la acción de planteo que se está por confirmar (ver planteoDeLaAccion).
-  accionPlanteo: null
+  accionPlanteo: null,
+  /* Usuarios de cada financiador (ver helpers arriba). El admin se crea con el alta del financiador.
+     Para poblar la demo, cada financiador con usuario tiene su admin, e IOMA (el actor fijo del rol
+     Financiador) tiene además operadores — uno con acceso total, otro restringido a 3 hospitales — y
+     una solicitud pendiente. Hay otra solicitud pendiente de OSDE para que la bandeja del ministerio
+     no arranque vacía. */
+  usuariosFin: [
+    { id: "USR-F001-1", financiador: "F001", rol: "admin", nombre: "María", apellido: "González", dni: "24.876.109", mail: "mgonzalez@ioma.gba.gob.ar", telefono: "221-4567890", cargo: "Apoderada / Responsable administrativa", cuit: "30-62345678-9", estado: "activo", fechaSolicitud: "2026-03-02", fechaAlta: "2026-03-02", hospitales: null },
+    { id: "USR-F001-2", financiador: "F001", rol: "operador", nombre: "Jorge", apellido: "Pérez", dni: "28.334.221", mail: "jperez@ioma.gba.gob.ar", telefono: "221-4567891", cargo: "Liquidaciones", estado: "activo", fechaSolicitud: "2026-03-20", fechaAlta: "2026-03-22", hospitales: null },
+    { id: "USR-F001-3", financiador: "F001", rol: "operador", nombre: "Lucía", apellido: "Fernández", dni: "31.902.556", mail: "lfernandez@ioma.gba.gob.ar", telefono: "221-4567892", cargo: "Auditoría médica — zona sur", estado: "activo", fechaSolicitud: "2026-05-11", fechaAlta: "2026-05-13", hospitales: ["H001", "H003", "H005"] },
+    { id: "USR-F001-4", financiador: "F001", rol: "operador", nombre: "Diego", apellido: "Ramírez", dni: "33.120.887", mail: "dramirez@ioma.gba.gob.ar", telefono: "221-4567893", cargo: "Liquidaciones", estado: "pendiente", fechaSolicitud: "2026-08-01", fechaAlta: null, hospitales: null },
+    { id: "USR-F002-1", financiador: "F002", rol: "admin", nombre: "Roberto", apellido: "Suárez", dni: "20.445.318", mail: "rsuarez@pami.org.ar", telefono: "11-43210000", cargo: "Apoderado", cuit: "30-64567890-1", estado: "activo", fechaSolicitud: "2026-04-15", fechaAlta: "2026-04-15", hospitales: null },
+    { id: "USR-F003-1", financiador: "F003", rol: "admin", nombre: "Carolina", apellido: "Vega", dni: "27.109.664", mail: "cvega@osde.com.ar", telefono: "11-53200000", cargo: "Apoderada", cuit: "30-54876543-2", estado: "activo", fechaSolicitud: "2026-05-04", fechaAlta: "2026-05-04", hospitales: null },
+    { id: "USR-F003-2", financiador: "F003", rol: "operador", nombre: "Martín", apellido: "Ibáñez", dni: "30.778.213", mail: "mibanez@osde.com.ar", telefono: "11-53200001", cargo: "Convenios hospitalarios", estado: "pendiente", fechaSolicitud: "2026-08-02", fechaAlta: null, hospitales: null },
+    { id: "USR-F004-1", financiador: "F004", rol: "admin", nombre: "Silvina", apellido: "Rossi", dni: "26.554.902", mail: "srossi@swissmedical.com.ar", telefono: "11-51520000", cargo: "Apoderada", cuit: "30-59123456-7", estado: "activo", fechaSolicitud: "2026-06-01", fechaAlta: "2026-06-01", hospitales: null },
+    { id: "USR-F006-1", financiador: "F006", rol: "admin", nombre: "Pablo", apellido: "Domínguez", dni: "25.881.470", mail: "pdominguez@medife.com.ar", telefono: "11-40900000", cargo: "Apoderado", cuit: "30-58765432-1", estado: "activo", fechaSolicitud: "2026-05-10", fechaAlta: "2026-05-10", hospitales: null }
+  ],
+  usuarioActivoFin: "USR-F001-1"
 };
 // Objeciones cargadas sobre prestaciones concretas de una factura.
 const objecionesDe = (f) => f.objeciones || [];
@@ -702,6 +767,8 @@ const NAV = {
     ]},
     { label: "Informar pagos", view: "informar_pagos" },
     { label: "Historial", view: "historial_financiador" },
+    // Solo la ve el usuario admin: se filtra en renderSidebar según esAdminFinActual().
+    { label: "Gestión de usuarios", view: "usuarios_financiador", soloAdmin: true },
   ]
 };
 
@@ -1046,15 +1113,35 @@ function renderSidebar() {
   const kFin = state.role === "financiador" ? kpisFinanciador() : null;
   const kHosp = state.role === "hospital" ? kpisHospital() : null;
   const html = [`<div class="section-label">${roleLabel}</div>`];
+  /* Rol Financiador: selector "Ver como usuario". Permite conmutar entre los usuarios activos de IOMA
+     para demostrar la restricción por hospital y qué ve un operador vs. el admin. Va siempre visible
+     (incluso impersonando a un operador que no ve Gestión de usuarios) para poder volver al admin. */
+  if (state.role === "financiador") {
+    const us = usuariosActivosDeFin("F001");
+    const uAct = usuarioFinActual();
+    html.push(`<div style="padding:2px 20px 10px;">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);font-weight:600;margin-bottom:4px;">Ver como usuario</div>
+      <select id="ver-como-usr" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;background:#fff;">
+        ${us.map(u => `<option value="${u.id}" ${uAct && uAct.id === u.id ? 'selected' : ''}>${u.nombre} ${u.apellido} · ${ROL_USR_LABEL[u.rol]}${Array.isArray(u.hospitales) ? ` (${u.hospitales.length} hosp.)` : ''}</option>`).join('')}
+      </select>
+    </div>`);
+  }
   items.forEach(item => {
+    if (item.soloAdmin && !esAdminFinActual()) return;
     const activeCls = state.view === item.view || (item.sub && item.sub.some(s => s.view === state.view)) ? "active" : "";
     html.push(`<a data-view="${item.view}" class="${activeCls}">${item.label}</a>`);
     if (item.sub) {
       item.sub.forEach(sub => {
         let badge = "";
         if (state.role === "financiador") {
-          if (sub.view === "conc_esperan_yo" && kFin.espYo > 0) badge = `<span class="badge">${kFin.espYo}</span>`;
-          if (sub.view === "conc_esperan_hosp" && kFin.espHosp > 0) badge = `<span class="badge warn">${kFin.espHosp}</span>`;
+          /* Los badges de Conciliación reflejan lo que el usuario ACTUAL puede ver: si es un operador
+             con hospitales restringidos, cuenta solo los suyos (las dos vistas de conciliación están
+             acotadas — §5.10). No se usa kpisFinanciador() acá porque ese contador alimenta el panel,
+             que sí muestra todo. */
+          const restrEspYo = state.facturas.filter(f => f.financiador === "F001" && puedeVerHospitalFin(f.hospital) && esConcYo_fin(f)).length;
+          const restrEspHosp = state.facturas.filter(f => f.financiador === "F001" && puedeVerHospitalFin(f.hospital) && esConcHosp_fin(f)).length;
+          if (sub.view === "conc_esperan_yo" && restrEspYo > 0) badge = `<span class="badge">${restrEspYo}</span>`;
+          if (sub.view === "conc_esperan_hosp" && restrEspHosp > 0) badge = `<span class="badge warn">${restrEspHosp}</span>`;
         } else if (state.role === "hospital") {
           if (sub.view === "conc_h_esperan_yo" && kHosp.espYo > 0) badge = `<span class="badge">${kHosp.espYo}</span>`;
           if (sub.view === "conc_h_esperan_fin" && kHosp.espFin > 0) badge = `<span class="badge warn">${kHosp.espFin}</span>`;
@@ -1065,6 +1152,14 @@ function renderSidebar() {
   });
   sidebar.innerHTML = html.join("");
   sidebar.querySelectorAll('a').forEach(a => a.addEventListener('click', () => { state.view = a.dataset.view; state.context = {}; render(); }));
+  const verComo = sidebar.querySelector('#ver-como-usr');
+  if (verComo) verComo.addEventListener('change', () => {
+    state.usuarioActivoFin = verComo.value;
+    // Si pasamos a un operador estando en Gestión de usuarios, esa vista deja de existir para él.
+    if (state.view === "usuarios_financiador" && !esAdminFinActual()) state.view = "panel_financiador";
+    state.context = {};
+    render();
+  });
 }
 
 /* ========================================================= COMPONENTES ========================================================= */
@@ -1076,6 +1171,17 @@ const notaEmbebido = () => `<div class="decision-abierta" style="margin-bottom:1
   <strong>Vista embebida —</strong> estas pantallas <strong>no son un portal aparte para el hospital</strong>. El hospital no recibe un usuario ni un link nuevo:
   ve esta sección desde el <strong>sistema de facturación que ya usa</strong>. <em>A definir:</em> si se integra embebida (iframe), como módulo nuevo, o habilitando una función para un perfil determinado.
 </div>`;
+
+/* Aviso de que el usuario actual tiene la vista acotada a ciertos hospitales. Solo se muestra en las
+   3 pantallas alcanzadas por la restricción (Facturas a revisar + las dos de Conciliación). */
+const notaRestriccionHospitales = () => {
+  const hs = hospitalesVisiblesFin();
+  if (!hs) return '';
+  const u = usuarioFinActual();
+  return `<div class="note note-blue" style="margin-bottom:16px;"><strong>Vista acotada por el administrador.</strong>
+    ${u.nombre} ${u.apellido} tiene acceso restringido a <strong>${hs.length} hospital(es)</strong>:
+    ${hs.map(h => hospCorto(h)).join(' · ')}. El resto de las secciones (panel, notificaciones, pagos, etc.) sigue mostrando toda la información del financiador.</div>`;
+};
 
 /* ---- Tabla de prestaciones, compartida por los tres roles ----
    Dos modos de lectura sobre los mismos datos: por prestación (una fila por ítem) o por paciente
@@ -2070,6 +2176,8 @@ function facturasFinFiltradas() {
   const fl = state.filtrosFactFin;
   const q = fl.q.trim().toLowerCase();
   return state.facturas.filter(f => f.financiador === "F001" && f.estado !== "en_cola")
+    // Restricción por usuario: un operador restringido solo ve los hospitales habilitados (esta vista).
+    .filter(f => puedeVerHospitalFin(f.hospital))
     .filter(f => fl.hospital === "TODOS" || f.hospital === fl.hospital)
     .filter(f => fl.estado === "TODOS" || grupoDe(f.estado) === fl.estado)
     .filter(f => fl.situacion === "TODOS" || situacionFactura(f) === fl.situacion)
@@ -2089,9 +2197,10 @@ function viewFinanciador_Facturas() {
       <div><h1>Facturas a revisar</h1><div class="sub">${facts.length} factura(s) en vista${fl.situacion !== "TODOS" ? ` — ${LABEL_SITUACION[fl.situacion]}` : ''} — ordenadas por urgencia</div></div>
       <button class="btn btn-excel" onclick="exportFacturasFin()">⬇ Excel</button>
     </div>
+    ${notaRestriccionHospitales()}
     <div class="card" style="padding:14px 16px;">
       <div class="filter-bar" style="margin-bottom:0;">
-        ${selectHospitales(fl.hospital, 'data-filtro-fact="hospital"', hospitalesFin())}
+        ${selectHospitales(fl.hospital, 'data-filtro-fact="hospital"', hospitalesFin().filter(puedeVerHospitalFin))}
         ${selectGrupos(fl.estado, 'data-filtro-fact="estado"')}
         <select data-filtro-fact="situacion">
           ${Object.entries(LABEL_SITUACION).map(([k, v]) => `<option value="${k}" ${fl.situacion === k ? 'selected' : ''}>${k === "TODOS" ? "Todas las situaciones temporales" : v}</option>`).join('')}
@@ -2383,13 +2492,15 @@ window.confirmarObjecionItems = function(nro) {
    planteo se acepta, se cuestiona o se sostiene por separado (data-fin-*). */
 
 function viewFinanciador_Conciliacion(subestado) {
-  const facts = state.facturas.filter(f => f.financiador === "F001" && (subestado === "yo" ? esConcYo_fin(f) : esConcHosp_fin(f)));
+  // Restricción por usuario: esta vista también respeta los hospitales habilitados del operador.
+  const facts = state.facturas.filter(f => f.financiador === "F001" && puedeVerHospitalFin(f.hospital) && (subestado === "yo" ? esConcYo_fin(f) : esConcHosp_fin(f)));
   const titulo = subestado === "yo" ? "Esperan mi respuesta" : "Esperando resolución";
   const sub = subestado === "yo"
     ? "La auditoría o el hospital ya respondieron: te toca re-evaluar."
     : "Ya planteaste tu objeción. La resuelve la auditoría central del ministerio, que puede desestimarla o derivarla al hospital.";
   return `
     <div class="page-header"><div><h1>Conciliación — ${titulo}</h1><div class="sub">${sub}</div></div></div>
+    ${notaRestriccionHospitales()}
     ${subestado !== "yo" ? `<div class="note note-blue"><strong>Toda objeción pasa primero por la auditoría central del ministerio.</strong> No se plantea directamente al hospital: el ministerio unifica criterios y filtra los planteos antes de derivarlos.</div>` : ''}
     ${facts.length === 0 ? `<div class="card" style="text-align:center;color:var(--muted);padding:40px;">Sin conciliaciones.</div>` : `
     <div class="card" style="padding:0;"><table>
@@ -2404,6 +2515,131 @@ function viewFinanciador_Conciliacion(subestado) {
     </table></div>`}
   `;
 }
+
+/* ================= GESTIÓN DE USUARIOS DEL FINANCIADOR =================
+   Solo la ve el admin (el router y el sidebar ya lo filtran). Desde acá el admin:
+   - solicita la creación de usuarios nuevos (quedan `pendiente` hasta que el ministerio los apruebe);
+   - a los operadores ya aprobados les restringe hospitales o los da de baja.
+   Los usuarios nuevos NO pueden crear usuarios: esa potestad es exclusiva del admin. */
+const chipUsr = (e) => {
+  const cls = { activo: "chip-aceptada", pendiente: "chip-por-vencer", rechazado: "chip-rechazada", inhabilitado: "chip-en-cola" };
+  return `<span class="chip ${cls[e] || 'chip-en-cola'}">${ESTADO_USR_LABEL[e] || e}</span>`;
+};
+function viewFinanciador_Usuarios() {
+  const fin = FINANCIADORES.find(f => f.id === "F001");
+  const us = usuariosDeFin("F001");
+  const activos = us.filter(u => u.estado === "activo").length;
+  const pend = us.filter(u => u.estado === "pendiente").length;
+  const admin = adminDeFin("F001");
+  const hospTxt = (u) => Array.isArray(u.hospitales)
+    ? `<span title="${u.hospitales.map(hospCorto).join(', ')}">${u.hospitales.length} hospital(es)</span>`
+    : '<span style="color:var(--muted);">Todos</span>';
+  const acciones = (u) => {
+    if (u.rol === "admin") return '<span style="color:var(--muted);font-size:12px;">Administrador — vos</span>';
+    if (u.estado === "pendiente") return `<button class="btn btn-secondary btn-sm" data-cancelar-usr="${u.id}">Cancelar solicitud</button>`;
+    if (u.estado === "rechazado") return `<span style="color:var(--danger);font-size:12px;" title="${u.motivoRechazo || ''}">Rechazado por el ministerio</span>`;
+    if (u.estado === "inhabilitado") return '<span style="color:var(--muted);font-size:12px;">Inhabilitado por el ministerio</span>';
+    // activo (operador)
+    return `<button class="btn btn-secondary btn-sm" data-restringir-usr="${u.id}">Restringir hospitales</button>
+      <button class="btn btn-danger btn-sm" data-baja-usr="${u.id}">Dar de baja</button>`;
+  };
+  return `<div class="page-header">
+      <div><h1>Gestión de usuarios</h1><div class="sub">Usuarios de ${fin.nombre} con acceso al portal — administrados por ${admin ? admin.nombre + ' ' + admin.apellido : 'el administrador'}</div></div>
+      <button class="btn btn-primary" data-solicitar-usuario="1">+ Solicitar nuevo usuario</button>
+    </div>
+    <div class="note note-blue"><strong>Solo el administrador crea usuarios.</strong> Los usuarios que solicites entran como <em>pendientes</em> y recién quedan habilitados cuando <strong>el ministerio los aprueba</strong>. Un usuario operador puede operar el portal pero <strong>no puede crear otros usuarios</strong>. Por defecto cada usuario ve todos los hospitales; podés restringirle la vista a un subconjunto (aplica solo a <em>Facturas a revisar</em> y <em>Conciliación</em>).</div>
+    <div class="card" style="padding:14px 16px;margin-bottom:16px;">
+      <div style="font-size:12px;color:var(--muted);">Datos institucionales</div>
+      <div style="margin-top:4px;"><strong>CUIT:</strong> <code>${fin.cuit || '—'}</code> · <strong>Apoderado / responsable:</strong> ${admin ? admin.nombre + ' ' + admin.apellido + ' (DNI ' + admin.dni + ')' : '—'}</div>
+    </div>
+    <div class="kpi-grid">
+      <div class="kpi ${activos?'good':''}"><div class="label">Usuarios activos</div><div class="value ${activos?'ok':''}">${activos}</div></div>
+      <div class="kpi ${pend?'warning':''}"><div class="label">Solicitudes pendientes</div><div class="value ${pend?'warn':''}">${pend}</div><div class="hint">esperan aprobación del ministerio</div></div>
+      <div class="kpi"><div class="label">Total</div><div class="value">${us.length}</div></div>
+    </div>
+    <div class="card" style="padding:0;">
+      <table>
+        <thead><tr><th>Usuario</th><th>DNI</th><th>Mail</th><th>Rol</th><th>Estado</th><th>Hospitales que ve</th><th style="text-align:right;">Acciones</th></tr></thead>
+        <tbody>${us.map(u => `<tr>
+          <td><strong>${u.nombre} ${u.apellido}</strong><div style="font-size:11px;color:var(--muted);">${u.cargo || ''}</div></td>
+          <td style="color:var(--muted);">${u.dni}</td>
+          <td style="color:var(--muted);font-size:12px;">${u.mail}</td>
+          <td>${ROL_USR_LABEL[u.rol]}</td>
+          <td>${chipUsr(u.estado)}${u.estado === "rechazado" && u.motivoRechazo ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${u.motivoRechazo}</div>` : ''}</td>
+          <td>${u.rol === "admin" ? '<span style="color:var(--muted);">Todos</span>' : hospTxt(u)}</td>
+          <td style="text-align:right;">${acciones(u)}</td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>`;
+}
+
+// Solicitar un usuario nuevo (lo pide el admin, lo aprueba el ministerio → queda pendiente).
+window.__solicitarUsuarioFin = function() {
+  openModal(`<h3>Solicitar nuevo usuario</h3>
+    <p class="subtle">El usuario queda <strong>pendiente</strong> hasta que el ministerio lo apruebe. Será un usuario <strong>operador</strong>: podrá operar el portal pero no crear otros usuarios.</p>
+    <label>Nombre</label><input id="usr-nombre" placeholder="Ej: Ana">
+    <label>Apellido</label><input id="usr-apellido" placeholder="Ej: Martínez">
+    <label>DNI</label><input id="usr-dni" placeholder="Ej: 30.111.222">
+    <label>Correo electrónico</label><input id="usr-mail" type="email" placeholder="Ej: amartinez@financiador.com">
+    <label>Teléfono (opcional)</label><input id="usr-tel" placeholder="Ej: 221-4567890">
+    <label>Cargo / área (opcional)</label><input id="usr-cargo" placeholder="Ej: Liquidaciones">
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="window.__confirmarSolicitudUsuario()">Enviar solicitud al ministerio</button>
+    </div>`);
+};
+window.__confirmarSolicitudUsuario = function() {
+  const nombre = $("#usr-nombre").value.trim(), apellido = $("#usr-apellido").value.trim();
+  const dni = $("#usr-dni").value.trim(), mail = $("#usr-mail").value.trim();
+  if (!nombre || !apellido || !dni || !mail) { showToast("⚠ Completá nombre, apellido, DNI y correo"); return; }
+  const u = { id: nuevoIdUsuario("F001"), financiador: "F001", rol: "operador",
+    nombre, apellido, dni, mail, telefono: $("#usr-tel").value.trim(), cargo: $("#usr-cargo").value.trim(),
+    estado: "pendiente", fechaSolicitud: HOY, fechaAlta: null, hospitales: null };
+  state.usuariosFin.push(u);
+  closeModal(); render();
+  showToast(`✓ Solicitud enviada — ${nombre} ${apellido} queda pendiente de aprobación del ministerio`);
+};
+window.__cancelarSolicitudUsuario = function(userId) {
+  const u = state.usuariosFin.find(x => x.id === userId); if (!u) return;
+  confirmarAccion({ titulo: "Cancelar solicitud", clase: "btn-danger", textoBoton: "Sí, cancelar",
+    mensaje: `Vas a cancelar la solicitud de ${u.nombre} ${u.apellido}.`,
+    detalle: "La solicitud se retira antes de que el ministerio la resuelva.",
+    onOk: () => { state.usuariosFin = state.usuariosFin.filter(x => x.id !== userId); closeModal(); render(); showToast("Solicitud cancelada"); } });
+};
+// Restringir los hospitales que ve un operador (checkboxes; sin ninguno = ve todos).
+window.__restringirHospitalesFin = function(userId) {
+  const u = state.usuariosFin.find(x => x.id === userId); if (!u) return;
+  const actuales = Array.isArray(u.hospitales) ? u.hospitales : null;
+  openModal(`<h3>Restringir hospitales — ${u.nombre} ${u.apellido}</h3>
+    <p class="subtle">Elegí qué hospitales puede ver este usuario en <strong>Facturas a revisar</strong> y <strong>Conciliación</strong>. Si no marcás ninguno, verá <strong>todos</strong>. El resto de las secciones no se ve afectado.</p>
+    <div style="border:1px solid var(--border);border-radius:6px;padding:10px 12px;margin-top:8px;">
+      ${HOSPITALES.map(h => `<label style="display:flex;align-items:center;gap:8px;font-weight:400;text-transform:none;letter-spacing:0;margin:6px 0;color:var(--text);">
+        <input type="checkbox" class="usr-hosp" value="${h.id}" ${actuales && actuales.includes(h.id) ? 'checked' : ''}> ${h.nombre}</label>`).join('')}
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="window.__confirmarRestringir('${userId}')">Guardar</button>
+    </div>`);
+};
+window.__confirmarRestringir = function(userId) {
+  const u = state.usuariosFin.find(x => x.id === userId); if (!u) return;
+  const sel = [...document.querySelectorAll('.usr-hosp:checked')].map(c => c.value);
+  u.hospitales = sel.length ? sel : null;  // sin marcas = ve todos
+  closeModal();
+  // Si nos estamos restringiendo a nosotros mismos no aplica (admin no se restringe), así que solo re-render.
+  render();
+  showToast(sel.length ? `✓ ${u.nombre} ahora ve ${sel.length} hospital(es)` : `✓ ${u.nombre} vuelve a ver todos los hospitales`);
+};
+window.__bajaUsuarioFin = function(userId) {
+  const u = state.usuariosFin.find(x => x.id === userId); if (!u) return;
+  confirmarAccion({ titulo: `Dar de baja a ${u.nombre} ${u.apellido}`, clase: "btn-danger", textoBoton: "Sí, dar de baja",
+    mensaje: `Vas a dar de baja el acceso de ${u.nombre} ${u.apellido}.`,
+    detalle: "El usuario pierde el acceso al portal. Podés volver a solicitarlo más adelante si hiciera falta.",
+    onOk: () => { u.estado = "inhabilitado"; u.hospitales = u.hospitales; closeModal();
+      // Si estábamos impersonando a ese usuario, volvemos al admin.
+      if (state.usuarioActivoFin === userId) state.usuarioActivoFin = (adminDeFin("F001") || {}).id;
+      render(); showToast(`${u.nombre} ${u.apellido} dado de baja`); } });
+};
 
 function viewFinanciador_InformarPagos() {
   const pagos = state.pagosInformados.filter(p => p.financiador === "F001");
@@ -2832,31 +3068,57 @@ function viewMinisterio_ABMFinanciadores() {
     return `<span class="chip ${cls[e]}">${ESTADOS_FIN_LABEL[e]}</span>`;
   };
   const facsDelFin = (id) => state.facturas.filter(f => f.financiador === id).length;
+  const solicitudes = solicitudesUsuarioPendientes();
 
   const accionesRow = (f) => {
     if (f.estado === "sin_usuario")
-      return `<button class="btn btn-primary btn-sm" data-abm-alta="${f.id}">Dar de alta</button>`;
+      return `<button class="btn btn-primary btn-sm" data-alta-fin="${f.id}">Dar de alta + crear usuario</button>`;
     if (f.estado === "activo")
       return `<button class="btn btn-secondary btn-sm" data-abm-pausar="${f.id}">Pausar facturación</button>`;
     return `<button class="btn btn-primary btn-sm" data-abm-reactivar="${f.id}">Reactivar facturación</button>`;
   };
+  // Celda de usuarios: contador clickeable que abre el detalle de usuarios del financiador.
+  const celdaUsuarios = (f) => {
+    if (f.estado === "sin_usuario") return '<span style="color:var(--muted);">—</span>';
+    const act = usuariosActivosDeFin(f.id).length;
+    const pend = usuariosDeFin(f.id).filter(u => u.estado === "pendiente").length;
+    return `<button class="btn btn-secondary btn-sm" data-ver-usuarios="${f.id}">${act} activo(s)${pend ? ` · <strong style="color:var(--warn);">${pend} pend.</strong>` : ''}</button>`;
+  };
 
   return `<div class="page-header">
-      <div><h1>Financiadores</h1><div class="sub">Alta y estado de los financiadores del portal</div></div>
+      <div><h1>Financiadores</h1><div class="sub">Alta, estado y usuarios de los financiadores del portal</div></div>
       <button class="btn btn-secondary" disabled title="Alta manual de nuevos financiadores — no implementado en la demo">+ Nuevo financiador</button>
     </div>
     <div class="note note-blue"><strong>Tres estados posibles.</strong>
       <ul style="margin:6px 0 0 18px;padding:0;">
-        <li><strong>Sin usuario</strong> — sin acceso al portal. Sus facturas no entran ni al proceso.</li>
+        <li><strong>Sin usuario</strong> — sin acceso al portal. Sus facturas no entran ni al proceso. El alta crea el <strong>usuario administrador</strong> (apoderado / responsable) atado al CUIT del financiador y a su DNI.</li>
         <li><strong>Facturación activa</strong> — sus facturas se listan en la cola y se notifican.</li>
         <li><strong>Facturación en pausa</strong> — sus facturas aparecen retenidas y no se notifican hasta reactivar.</li>
       </ul>
     </div>
+    ${solicitudes.length ? `<div class="card" style="padding:0;border:1px solid var(--warn);">
+      <h3 class="card-title" style="padding:16px 20px 0;color:var(--warn);">⚠ Solicitudes de usuario pendientes <span style="font-size:12px;font-weight:400;color:var(--muted);">${solicitudes.length}</span></h3>
+      <div style="padding:0 20px 8px;font-size:13px;color:var(--muted);">Usuarios que los administradores de los financiadores pidieron crear. Al aprobar, el usuario queda habilitado a operar y ver la información de su financiador; al rechazar, se registra el motivo.</div>
+      <table>
+        <thead><tr><th>Financiador</th><th>Usuario solicitado</th><th>DNI</th><th>Mail</th><th>Solicitado</th><th style="text-align:right;">Acciones</th></tr></thead>
+        <tbody>${solicitudes.map(u => `<tr>
+          <td><strong>${finNombre(u.financiador)}</strong></td>
+          <td>${u.nombre} ${u.apellido}<div style="font-size:11px;color:var(--muted);">${u.cargo || ''} · ${ROL_USR_LABEL[u.rol]}</div></td>
+          <td style="color:var(--muted);">${u.dni}</td>
+          <td style="color:var(--muted);font-size:12px;">${u.mail}</td>
+          <td style="color:var(--muted);">${u.fechaSolicitud}</td>
+          <td style="text-align:right;white-space:nowrap;">
+            <button class="btn btn-primary btn-sm" data-aprobar-usr="${u.id}">Aprobar</button>
+            <button class="btn btn-danger btn-sm" data-rechazar-usr="${u.id}">Rechazar</button>
+          </td>
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>` : ''}
     <div class="kpi-grid">
       <div class="kpi"><div class="label">Total</div><div class="value">${FINANCIADORES.length}</div></div>
       <div class="kpi ${cnt.activo?'good':''}"><div class="label">Facturación activa</div><div class="value ${cnt.activo?'ok':''}">${cnt.activo}</div></div>
       <div class="kpi ${cnt.en_pausa?'warning':''}"><div class="label">En pausa</div><div class="value ${cnt.en_pausa?'warn':''}">${cnt.en_pausa}</div></div>
-      <div class="kpi"><div class="label">Sin usuario</div><div class="value">${cnt.sin_usuario}</div><div class="hint">a incorporar</div></div>
+      <div class="kpi ${solicitudes.length?'action-required':''}"><div class="label">Solicitudes de usuario</div><div class="value ${solicitudes.length?'danger':''}">${solicitudes.length}</div><div class="hint">pendientes de aprobación</div></div>
     </div>
     <div class="card" style="padding:0;">
       <div class="filter-bar" style="padding:16px 20px 0;">
@@ -2870,14 +3132,15 @@ function viewMinisterio_ABMFinanciadores() {
         ${(fl.estado!=="TODOS"||fl.q) ? `<button class="btn btn-secondary btn-sm" data-filtro-abm-reset="1">Limpiar</button>` : ''}
       </div>
       <table>
-        <thead><tr><th>Financiador</th><th>Tipo</th><th>Estado</th><th>Alta</th><th style="text-align:center;">Facturas en el portal</th><th style="text-align:right;">Acciones</th></tr></thead>
+        <thead><tr><th>Financiador</th><th>Tipo</th><th>Estado</th><th>Alta</th><th style="text-align:center;">Usuarios</th><th style="text-align:center;">Facturas en el portal</th><th style="text-align:right;">Acciones</th></tr></thead>
         <tbody>${lista.length === 0
-          ? '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Sin financiadores para estos filtros.</td></tr>'
+          ? '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">Sin financiadores para estos filtros.</td></tr>'
           : lista.map(f => `<tr>
-              <td><strong>${f.nombre}</strong></td>
+              <td><strong>${f.nombre}</strong>${f.cuit ? `<div style="font-size:11px;color:var(--muted);">CUIT ${f.cuit}</div>` : ''}</td>
               <td style="color:var(--muted);">${f.tipo}</td>
               <td>${chipEst(f.estado)}${f.estado==="en_pausa" && f.motivoPausa ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${f.motivoPausa}</div>` : ''}</td>
               <td style="color:var(--muted);">${f.alta || '—'}</td>
+              <td style="text-align:center;">${celdaUsuarios(f)}</td>
               <td style="text-align:center;">${facsDelFin(f.id) || '—'}</td>
               <td style="text-align:right;">${accionesRow(f)}</td>
             </tr>`).join('')}
@@ -3245,6 +3508,7 @@ function render() {
     else if (view === "conc_esperan_hosp") html = viewFinanciador_Conciliacion("hosp");
     else if (view === "informar_pagos") html = viewFinanciador_InformarPagos();
     else if (view === "historial_financiador") html = viewFinanciador_Historial();
+    else if (view === "usuarios_financiador") html = esAdminFinActual() ? viewFinanciador_Usuarios() : viewFinanciador_Panel();
   }
   html += `<div class="legend"><h4>Ciclo de vida — estados</h4><div class="legend-items">
     ${chip("en_cola")} ${chip("notificada")} ${chip("aceptada")}
@@ -3307,12 +3571,21 @@ function wireEvents() {
   document.querySelectorAll('[data-open-fact-hosp]').forEach(el => el.addEventListener('click', () => { state.view = "detalle_factura_hosp"; state.context.factura = el.dataset.openFactHosp; render(); }));
   const bN = $("#btn-notificar"); if (bN) bN.addEventListener('click', () => openModalNotificar());
 
-  document.querySelectorAll('[data-abm-alta]').forEach(el => el.addEventListener('click', () => window.__cambiarEstadoFin(el.dataset.abmAlta, "alta")));
+  document.querySelectorAll('[data-alta-fin]').forEach(el => el.addEventListener('click', () => window.__altaFinanciador(el.dataset.altaFin)));
   document.querySelectorAll('[data-abm-pausar]').forEach(el => el.addEventListener('click', () => window.__cambiarEstadoFin(el.dataset.abmPausar, "pausar")));
   document.querySelectorAll('[data-abm-reactivar]').forEach(el => el.addEventListener('click', () => window.__cambiarEstadoFin(el.dataset.abmReactivar, "reactivar")));
   document.querySelectorAll('[data-reactivar-fin]').forEach(el => el.addEventListener('click', () => window.__cambiarEstadoFin(el.dataset.reactivarFin, "reactivar")));
   // "Ver financiadores a reactivar": abre el modal-lista con acción por fila.
   document.querySelectorAll('[data-ver-reactivar]').forEach(el => el.addEventListener('click', () => openModalReactivar()));
+
+  /* ---- Gestión de usuarios: financiador (admin) y ministerio ---- */
+  document.querySelectorAll('[data-ver-usuarios]').forEach(el => el.addEventListener('click', () => window.openModalUsuariosFin(el.dataset.verUsuarios)));
+  document.querySelectorAll('[data-aprobar-usr]').forEach(el => el.addEventListener('click', () => window.__resolverSolicitud(el.dataset.aprobarUsr, "aprobar")));
+  document.querySelectorAll('[data-rechazar-usr]').forEach(el => el.addEventListener('click', () => window.__resolverSolicitud(el.dataset.rechazarUsr, "rechazar")));
+  document.querySelectorAll('[data-solicitar-usuario]').forEach(el => el.addEventListener('click', () => window.__solicitarUsuarioFin()));
+  document.querySelectorAll('[data-cancelar-usr]').forEach(el => el.addEventListener('click', () => window.__cancelarSolicitudUsuario(el.dataset.cancelarUsr)));
+  document.querySelectorAll('[data-restringir-usr]').forEach(el => el.addEventListener('click', () => window.__restringirHospitalesFin(el.dataset.restringirUsr)));
+  document.querySelectorAll('[data-baja-usr]').forEach(el => el.addEventListener('click', () => window.__bajaUsuarioFin(el.dataset.bajaUsr)));
   document.querySelectorAll('[data-filtro-abm]').forEach(el => el.addEventListener(el.tagName === "INPUT" ? 'input' : 'change', () => {
     state.filtroABMFin[el.dataset.filtroAbm] = el.value;
     if (el.tagName === "INPUT") state.focusSel = `[data-filtro-abm="${el.dataset.filtroAbm}"]`;
@@ -3724,6 +3997,132 @@ window.__cambiarEstadoFin = function(finId, accion) {
   });
 };
 
+/* ---- ALTA DE FINANCIADOR + CREACIÓN DEL USUARIO ADMIN ----
+   El alta ya no es solo cambiar el estado: crea el PRIMER usuario (admin / apoderado), atado al CUIT
+   del financiador y al DNI de la persona responsable. Ese usuario es el único que después podrá
+   solicitar más usuarios. Se mantiene la doble confirmación del ABM. */
+window.__altaFinanciador = function(finId) {
+  const fin = FINANCIADORES.find(x => x.id === finId); if (!fin) return;
+  openModal(`<h3>Dar de alta a ${fin.nombre}</h3>
+    <p class="subtle">${fin.nombre} (${fin.tipo}) pasa a <strong>facturación activa</strong>. Se crea el <strong>usuario administrador</strong> (apoderado / responsable), atado al CUIT del financiador y al DNI de la persona.</p>
+    <div class="note note-blue">El usuario administrador es el único que podrá <strong>solicitar la creación de más usuarios</strong> de este financiador.</div>
+    <label>CUIT del financiador</label><input id="alta-cuit" value="${fin.cuit || ''}" placeholder="30-12345678-9">
+    <label>Nombre del responsable / apoderado</label><input id="alta-nombre" placeholder="Ej: Ana">
+    <label>Apellido</label><input id="alta-apellido" placeholder="Ej: Martínez">
+    <label>DNI</label><input id="alta-dni" placeholder="Ej: 28.111.222">
+    <label>Correo electrónico</label><input id="alta-mail" type="email" placeholder="Ej: amartinez@financiador.com">
+    <label>Teléfono (opcional)</label><input id="alta-tel" placeholder="Ej: 11-40000000">
+    <label>Cargo (opcional)</label><input id="alta-cargo" placeholder="Ej: Apoderado">
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="window.__confirmarAltaFinanciador('${finId}')">Continuar</button>
+    </div>`);
+};
+window.__confirmarAltaFinanciador = function(finId) {
+  const fin = FINANCIADORES.find(x => x.id === finId); if (!fin) return;
+  const cuit = $("#alta-cuit").value.trim(), nombre = $("#alta-nombre").value.trim(), apellido = $("#alta-apellido").value.trim();
+  const dni = $("#alta-dni").value.trim(), mail = $("#alta-mail").value.trim();
+  const telefono = $("#alta-tel").value.trim(), cargo = $("#alta-cargo").value.trim() || "Apoderado / Responsable administrativo";
+  if (!cuit || !nombre || !apellido || !dni || !mail) { showToast("⚠ Completá CUIT, nombre, apellido, DNI y correo"); return; }
+  closeModal();
+  confirmarAccion({ titulo: "Confirmar alta", textoBoton: "Sí, dar de alta", clase: "btn-primary",
+    mensaje: `¿Confirmás dar de alta a ${fin.nombre} y crear el usuario administrador ${nombre} ${apellido}?`,
+    detalle: "El financiador pasa a facturación activa (sus facturas empiezan a aparecer en la cola) y el usuario administrador queda habilitado. Esta operación queda registrada.",
+    onOk: () => {
+      fin.estado = "activo"; fin.alta = HOY; fin.cuit = cuit;
+      state.usuariosFin.push({ id: nuevoIdUsuario(finId), financiador: finId, rol: "admin",
+        nombre, apellido, dni, mail, telefono, cargo, cuit, estado: "activo",
+        fechaSolicitud: HOY, fechaAlta: HOY, hospitales: null });
+      closeModal(); render();
+      showToast(`✓ ${fin.nombre} dado de alta — usuario admin ${nombre} ${apellido} creado`);
+    }
+  });
+};
+
+/* ---- APROBAR / RECHAZAR SOLICITUDES DE USUARIO (ministerio) ---- */
+window.__resolverSolicitud = function(userId, decision) {
+  const u = state.usuariosFin.find(x => x.id === userId); if (!u) return;
+  if (decision === "aprobar") {
+    confirmarAccion({ titulo: "Aprobar usuario", textoBoton: "Sí, aprobar", clase: "btn-primary",
+      mensaje: `Vas a habilitar a ${u.nombre} ${u.apellido} (${finNombre(u.financiador)}).`,
+      detalle: "El usuario queda habilitado a operar el portal y a ver la información de su financiador.",
+      onOk: () => { u.estado = "activo"; u.fechaAlta = HOY; delete u.motivoRechazo; closeModal(); render();
+        showToast(`✓ ${u.nombre} ${u.apellido} habilitado`); } });
+  } else {
+    openModal(`<h3>Rechazar solicitud</h3>
+      <p class="subtle">Vas a rechazar la solicitud de ${u.nombre} ${u.apellido} (${finNombre(u.financiador)}).</p>
+      <label>Motivo del rechazo</label>
+      <textarea id="rech-motivo" placeholder="Ej: el DNI informado no coincide con el apoderado registrado."></textarea>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+        <button class="btn btn-danger" onclick="window.__confirmarRechazo('${userId}')">Rechazar solicitud</button>
+      </div>`);
+  }
+};
+window.__confirmarRechazo = function(userId) {
+  const u = state.usuariosFin.find(x => x.id === userId); if (!u) return;
+  const motivo = $("#rech-motivo").value.trim();
+  if (!motivo) { showToast("⚠ Registrá el motivo del rechazo"); return; }
+  u.estado = "rechazado"; u.motivoRechazo = motivo;
+  closeModal(); render();
+  showToast(`Solicitud de ${u.nombre} ${u.apellido} rechazada`);
+};
+
+/* ---- DETALLE DE USUARIOS DE UN FINANCIADOR (ministerio) ----
+   Modal abierto desde la columna "Usuarios" del ABM. El ministerio puede inhabilitar / rehabilitar
+   cualquier usuario (incluido el admin), y resolver desde acá las solicitudes pendientes. */
+window.openModalUsuariosFin = function(finId) {
+  const fin = FINANCIADORES.find(x => x.id === finId); if (!fin) return;
+  const us = usuariosDeFin(finId);
+  const accion = (u) => {
+    if (u.estado === "pendiente")
+      return `<button class="btn btn-primary btn-sm" data-aprobar-usr="${u.id}">Aprobar</button>
+        <button class="btn btn-danger btn-sm" data-rechazar-usr="${u.id}">Rechazar</button>`;
+    if (u.estado === "activo")
+      return `<button class="btn btn-danger btn-sm" data-inhabilitar-usr="${u.id}">Inhabilitar</button>`;
+    if (u.estado === "inhabilitado")
+      return `<button class="btn btn-primary btn-sm" data-rehabilitar-usr="${u.id}">Rehabilitar</button>`;
+    return `<span style="color:var(--muted);font-size:12px;">—</span>`;
+  };
+  openModal(`<h3>Usuarios de ${fin.nombre}</h3>
+    <p class="subtle">CUIT ${fin.cuit || '—'} · ${us.length} usuario(s). El administrador es el apoderado / responsable; los operadores no crean usuarios.</p>
+    ${us.length === 0 ? '<div class="note">Este financiador todavía no tiene usuarios.</div>' : `
+    <div style="max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;">
+      <table style="font-size:12px;"><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Hospitales</th><th></th></tr></thead>
+      <tbody>${us.map(u => `<tr>
+        <td><strong>${u.nombre} ${u.apellido}</strong><div style="color:var(--muted);">DNI ${u.dni} · ${u.mail}</div></td>
+        <td>${ROL_USR_LABEL[u.rol]}</td>
+        <td>${chipUsr(u.estado)}${u.estado==="rechazado" && u.motivoRechazo ? `<div style="color:var(--muted);">${u.motivoRechazo}</div>` : ''}</td>
+        <td>${Array.isArray(u.hospitales) ? u.hospitales.map(hospCorto).join(', ') : 'Todos'}</td>
+        <td style="text-align:right;white-space:nowrap;">${accion(u)}</td>
+      </tr>`).join('')}</tbody></table>
+    </div>`}
+    <div class="modal-actions" style="margin-top:16px;"><button class="btn btn-secondary" onclick="closeModal()">Cerrar</button></div>`);
+  // Cablear acciones dentro del modal. Tras resolver, se re-renderiza (que cierra este modal) — para
+  // seguir gestionando, se reabre el detalle si el financiador aún tiene usuarios que atender.
+  const rewire = () => {
+    document.querySelectorAll('#modal-content [data-aprobar-usr]').forEach(el => el.addEventListener('click', () => window.__resolverSolicitud(el.dataset.aprobarUsr, "aprobar")));
+    document.querySelectorAll('#modal-content [data-rechazar-usr]').forEach(el => el.addEventListener('click', () => window.__resolverSolicitud(el.dataset.rechazarUsr, "rechazar")));
+    document.querySelectorAll('#modal-content [data-inhabilitar-usr]').forEach(el => el.addEventListener('click', () => window.__inhabilitarUsuarioMin(el.dataset.inhabilitarUsr)));
+    document.querySelectorAll('#modal-content [data-rehabilitar-usr]').forEach(el => el.addEventListener('click', () => window.__rehabilitarUsuarioMin(el.dataset.rehabilitarUsr)));
+  };
+  rewire();
+};
+window.__inhabilitarUsuarioMin = function(userId) {
+  const u = state.usuariosFin.find(x => x.id === userId); if (!u) return;
+  confirmarAccion({ titulo: `Inhabilitar a ${u.nombre} ${u.apellido}`, textoBoton: "Sí, inhabilitar", clase: "btn-danger",
+    mensaje: `Vas a inhabilitar el acceso de ${u.nombre} ${u.apellido} (${finNombre(u.financiador)}).`,
+    detalle: u.rol === "admin" ? "Es el usuario administrador del financiador: al inhabilitarlo, el financiador queda sin quien gestione usuarios hasta designar otro." : "El usuario pierde el acceso al portal.",
+    onOk: () => { u.estado = "inhabilitado";
+      if (state.usuarioActivoFin === userId) state.usuarioActivoFin = (adminDeFin(u.financiador) || {}).id;
+      closeModal(); render(); showToast(`${u.nombre} ${u.apellido} inhabilitado`); } });
+};
+window.__rehabilitarUsuarioMin = function(userId) {
+  const u = state.usuariosFin.find(x => x.id === userId); if (!u) return;
+  u.estado = "activo"; if (!u.fechaAlta) u.fechaAlta = HOY;
+  closeModal(); render(); showToast(`✓ ${u.nombre} ${u.apellido} rehabilitado`);
+};
+
 /* La conciliación a nivel factura completa se eliminó: toda objeción se plantea sobre prestaciones
    concretas (openModalObjetarItems), que además permite que el resto quede cobrable. */
 
@@ -3827,528 +4226,4 @@ window.confirmarAudPlanteo = function(nro, objId, accion) {
     o.estado = "derivado_hospital"; o.resolucion = "derivada";
     state.auditoria.derivadas++;
     anotarPlanteo(f, o, { who: "ministerio", nombre: "Auditoría central — SAMO", tipo: "Derivado al hospital",
-      texto: `Derivamos el planteo al hospital para su intervención. ${fund}`,
-      detalles: ["El hospital debe aportar documentación, refutar o reconocer el planteo."], adjuntos: docs });
-    toast = `→ ${o.id} derivado al hospital`;
-  } else {
-    // Procedente: no se discute más, queda a la espera de la NC consolidada de la factura.
-    o.estado = "a_acreditar"; o.resolucion = "procedente";
-    state.auditoria.resueltas++;
-    anotarPlanteo(f, o, { who: "ministerio", nombre: "Auditoría central — SAMO", tipo: "Objeción procedente — reconocida",
-      texto: `Le damos la razón al financiador. ${fund}`,
-      detalles: [`El planteo queda reconocido por ${money(o.monto)}, pendiente de nota de crédito.`,
-        "La NC se emite consolidada por factura, cuando no queden planteos en conciliación."], adjuntos: docs });
-    toast = `${o.id} reconocido — pendiente de nota de crédito`;
-  }
-  recalcularEstadoFactura(f);
-  closeModal(); render(); showToast(toast);
-};
-
-// --- Hospital: descargo de UN planteo, con las 6 categorías acotadas a ese planteo ---
-const CATEGORIAS_DESCARGO = [
-  { id: "ratificar", label: "Ratificar con documentación de respaldo", hint: "Sostengo lo facturado y adjunto evidencia." },
-  { id: "dato", label: "Aportar el dato faltante", hint: "Faltaba algo puntual y acá va." },
-  { id: "refutar", label: "Refutar el planteo", hint: "El criterio del financiador no corresponde según convenio." },
-  { id: "parcial", label: "Aceptar parcialmente y refacturar", hint: "Se retira parte y se corrige." },
-  { id: "prorroga", label: "Solicitar prórroga para reunir documentación", hint: "Necesito más tiempo." },
-  { id: "escalar", label: "Pedir intervención del ministerio", hint: "Que la auditoría medie en este punto." },
-];
-function openModalDescargoPlanteo(f, o) {
-  openModal(`<h3>Responder el planteo ${o.id}</h3>
-    ${cabeceraPlanteo(f, o)}
-    <div class="note note-blue">Estás respondiendo <strong>solo este planteo</strong>. Los demás de la factura siguen su curso por separado.</div>
-    <label>Tipo de respuesta</label>
-    <div class="cat-list">
-      ${CATEGORIAS_DESCARGO.map((c, n) => `<div class="cat-item"><label class="cat-header">
-        <input type="radio" name="descargo-tipo" value="${c.id}" ${n === 0 ? 'checked' : ''}>
-        <span style="flex:1;">${c.label}<div style="font-weight:400;font-size:11.5px;color:var(--muted);">${c.hint}</div></span>
-      </label></div>`).join('')}
-    </div>
-    <label>Fundamento</label>
-    <textarea id="desc-texto" placeholder="Explicá tu respuesta con la evidencia que la respalda."></textarea>
-    <label>Documentación que se adjunta</label>
-    <div class="checkline"><input type="checkbox" checked> Historia clínica</div>
-    <div class="checkline"><input type="checkbox"> Padrón consultado con timestamp</div>
-    <div class="checkline"><input type="checkbox"> Autorización previa</div>
-    <div class="checkline"><input type="checkbox"> Formularios F5 / F8 / F9</div>
-    <label>Adjuntar archivos</label><input type="file" multiple>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="confirmarDescargoPlanteo('${f.nro}','${o.id}')">Enviar respuesta</button>
-    </div>`);
-}
-window.confirmarDescargoPlanteo = function(nro, objId) {
-  const f = state.facturas.find(x => x.nro === nro); if (!f) return;
-  const o0 = objecionesDe(f).find(x => x.id === objId); if (!o0) return;
-  const o = planteoDeLaAccion(f, o0);
-  const tipoId = document.querySelector('input[name="descargo-tipo"]:checked')?.value || "ratificar";
-  const cat = CATEGORIAS_DESCARGO.find(c => c.id === tipoId);
-  const texto = ($("#desc-texto")?.value || "").trim() || "(sin fundamento)";
-  const adj = [{ nombre: `descargo_${o.id.toLowerCase()}_${nro}.pdf`, tipo: "pdf" }];
-  o.estado = "respondido";
-  o.adjuntos.push(...adj);
-  anotarPlanteo(f, o, { who: "hospital", nombre: "Hosp. San Martín", tipo: cat.label, categoria: cat.label,
-    texto, detalles: ["Respuesta acotada a este planteo.", "Se adjunta documentación de respaldo."], adjuntos: adj });
-  recalcularEstadoFactura(f);
-  closeModal(); render(); showToast(`✓ Respuesta enviada sobre ${o.id} — vuelve al financiador`);
-};
-// El hospital reconoce el planteo: no se emite la NC todavía, queda a la espera de la consolidada.
-function reconocerPlanteo(f, o) {
-  o.estado = "a_acreditar"; o.resolucion = "reconocida_hospital";
-  anotarPlanteo(f, o, { who: "hospital", nombre: "Hosp. San Martín", tipo: "Planteo reconocido",
-    texto: `Reconocemos el planteo por ${money(o.monto)}. Queda pendiente de nota de crédito.`,
-    detalles: ["La NC se emite consolidada por factura, cuando no queden planteos en conciliación."] });
-  recalcularEstadoFactura(f);
-  render(); showToast(`${o.id} reconocido — pendiente de la NC consolidada`);
-}
-
-/* Una sola nota de crédito por factura, que cubre todos los planteos reconocidos.
-   Evita emitir una NC por planteo, que del lado contable sería un lío. */
-function emitirNCConsolidada(f) {
-  const acreditables = planteosAcreditables(f);
-  if (!acreditables.length) return;
-  const monto = Math.min(saldoPendiente(f), acreditables.reduce((s, o) => s + o.monto, 0));
-  const id = "NC-2026-" + String(state.notasCredito.length + 40).padStart(4, "0");
-  const total = monto >= saldoPendiente(f);
-  state.notasCredito.push({ id, factura: f.nro, hospital: f.hospital, financiador: f.financiador,
-    monto, tipo: total ? "total" : "parcial",
-    motivo: acreditables.map(o => o.categoria).join(" · "), fecha: HOY, estado: "notificada" });
-  f.notasCredito = (f.notasCredito || 0) + monto;
-  acreditables.forEach(o => {
-    o.estado = "cerrado_nc"; o.notaCredito = id;
-    anotarPlanteo(f, o, { who: "hospital", nombre: "Hosp. San Martín", tipo: "Cerrado por nota de crédito",
-      texto: `Acreditado en la nota de crédito ${id}.`,
-      detalles: [`NC consolidada de la factura por ${money(monto)}, que cubre ${acreditables.length} planteo(s).`],
-      adjuntos: [{ nombre: `${id.toLowerCase()}.pdf`, tipo: "pdf" }] });
-  });
-  if (saldoPendiente(f) <= 0) f.estado = "cerrada_nc"; else recalcularEstadoFactura(f);
-  render();
-  showToast(`✓ ${id} emitida por ${money(monto)} — ${acreditables.length} planteo(s) cerrado(s)`);
-}
-
-// --- Financiador: pedir más info o mantener la objeción ---
-function openModalFinRespuesta(f, o, modo) {
-  const sostener = modo === "sostener";
-  openModal(`<h3>${sostener ? "Mantener la objeción" : "Pedir más información"}</h3>
-    ${cabeceraPlanteo(f, o)}
-    <div class="note ${sostener ? '' : 'note-blue'}">${sostener
-      ? "No te convence la respuesta: el planteo vuelve a la auditoría central, que puede insistir con documentación o derivarlo otra vez al hospital."
-      : "Pedís documentación adicional. El planteo vuelve a la auditoría central para que la gestione."}</div>
-    <label>${sostener ? "Por qué mantenés la objeción" : "Qué documentación necesitás"}</label>
-    <textarea id="fin-texto" placeholder="${sostener ? 'Ej: la constancia aportada es posterior a la fecha de la prestación.' : 'Ej: falta la epicrisis firmada y el parte quirúrgico.'}"></textarea>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn ${sostener ? 'btn-danger' : 'btn-warn'}" onclick="confirmarFinRespuesta('${f.nro}','${o.id}','${modo}')">${sostener ? "Mantener la objeción" : "Pedir información"}</button>
-    </div>`);
-}
-window.confirmarFinRespuesta = function(nro, objId, modo) {
-  const f = state.facturas.find(x => x.nro === nro); if (!f) return;
-  const o0 = objecionesDe(f).find(x => x.id === objId); if (!o0) return;
-  const o = planteoDeLaAccion(f, o0);
-  const texto = ($("#fin-texto")?.value || "").trim() || "(sin detalle)";
-  const sostener = modo === "sostener";
-  // Toda vuelta atrás pasa otra vez por la auditoría: el financiador no le escribe directo al hospital.
-  o.estado = "en_auditoria";
-  anotarPlanteo(f, o, { who: "financiador", nombre: "IOMA",
-    tipo: sostener ? "Objeción sostenida" : "Pedido de información",
-    texto, detalles: ["Vuelve a la auditoría central para su resolución."] });
-  recalcularEstadoFactura(f);
-  closeModal(); render();
-  showToast(sostener ? `${o.id} sostenido — vuelve a la auditoría` : `${o.id} — pedido enviado a la auditoría`);
-};
-
-/* MODAL EMITIR NOTA DE CRÉDITO (hospital) — cierra el circuito de rechazo total o parcial.
-   La NC no es unilateral: al emitirla se notifica al financiador por el mismo canal fehaciente
-   para que la reconcilie contra la factura original (Fase 6 del documento de proceso). */
-function openModalNotaCredito(nro) {
-  const f = state.facturas.find(x => x.nro === nro); if (!f) return;
-  const saldo = saldoPendiente(f);
-  const debate = montoEnDebate(f);
-  openModal(`<h3>Emitir nota de crédito — factura ${nro}</h3>
-    <p class="subtle">${finNombre(f.financiador)} — facturado ${money(f.monto)} · saldo actual ${money(saldo)}${debate > 0 ? ` · ${money(debate)} en debate` : ''}</p>
-    <div class="note">La NC <strong>baja el saldo reclamado</strong> y se notifica al financiador para que la reconcilie contra la factura original. Si el saldo queda en cero, la factura cierra.</div>
-    <label>Alcance</label>
-    <select id="nc-tipo" onchange="ajustarMontoNC('${nro}')">
-      <option value="parcial">Parcial — se retiran algunas prestaciones</option>
-      <option value="total">Total — se desconoce la factura completa</option>
-    </select>
-    <label>Motivo</label>
-    <select id="nc-motivo">
-      ${CATEGORIAS_OBJECION.map(c => `<option value="${c}">${c}</option>`).join('')}
-      <option value="Refacturación con datos corregidos">Refacturación con datos corregidos</option>
-      <option value="Corresponde a otro financiador">Corresponde a otro financiador</option>
-      <option value="Factura duplicada">Factura duplicada</option>
-    </select>
-    <label>Monto a acreditar</label>
-    <input type="number" id="nc-monto" value="${debate > 0 ? debate : saldo}" max="${saldo}">
-    <div style="font-size:11px;color:var(--muted);margin-top:4px;">Por defecto se propone ${debate > 0 ? "el monto en debate" : "el saldo completo"}. No puede superar el saldo de ${money(saldo)}.</div>
-    <label>Aclaración</label><textarea id="nc-detalle" placeholder="Ej: se retira la cirugía 710422 por falta de autorización previa."></textarea>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-warn" onclick="confirmarNotaCredito('${nro}')">Emitir y notificar</button>
-    </div>`);
-}
-window.ajustarMontoNC = function(nro) {
-  const f = state.facturas.find(x => x.nro === nro); if (!f) return;
-  if ($("#nc-tipo").value === "total") $("#nc-monto").value = saldoPendiente(f);
-};
-window.confirmarNotaCredito = function(nro) {
-  const f = state.facturas.find(x => x.nro === nro); if (!f) return;
-  const saldo = saldoPendiente(f);
-  const tipo = $("#nc-tipo").value;
-  const monto = Math.min(saldo, Math.max(0, Number($("#nc-monto").value) || 0));
-  if (monto <= 0) { showToast("⚠ Indicá el monto a acreditar"); return; }
-  const motivo = $("#nc-motivo").value;
-  const detalle = $("#nc-detalle").value.trim();
-  const id = "NC-2026-" + String(state.notasCredito.length + 40).padStart(4, "0");
-  state.notasCredito.push({ id, factura: nro, hospital: f.hospital, financiador: f.financiador,
-    monto, tipo, motivo, fecha: HOY, estado: "notificada" });
-  f.notasCredito = (f.notasCredito || 0) + monto;
-  if (tipo === "total") f.rechazoTotal = true;
-  // Si la NC cancela el saldo, la factura cierra por nota de crédito (no por pago) — ver D5.
-  if (saldoPendiente(f) <= 0) f.estado = "cerrada_nc";
-  else if (tipo === "parcial") { f.estado = "esperando_financiador"; f.montoDebate = Math.max(0, (f.montoDebate || 0) - monto); }
-  if (!state.threads[nro]) state.threads[nro] = [];
-  state.threads[nro].push({ who: "hospital", nombre: "Hosp. San Martín", when: "hoy",
-    text: `Emitimos la nota de crédito ${id} por ${money(monto)}.`,
-    accion: { tipo: `Nota de crédito ${tipo}`, categorias: [motivo],
-      detalles: [detalle || "(sin aclaración)", `Saldo de la factura tras la NC: ${money(saldoPendiente(f))}.`, "Se notifica al financiador para que la reconcilie contra la factura original."] },
-    adjuntos: [{ nombre: `${id.toLowerCase()}.pdf`, tipo: "pdf" }] });
-  closeModal(); render();
-  showToast(`✓ ${id} emitida por ${money(monto)} — notificada a ${finNombre(f.financiador)}`);
-};
-
-/* MODAL DECLARAR PAGO EFECTUADO — la transferencia ya salió, todavía sin repartir entre facturas.
-   Es el estado que el hospital ve como "plata sin imputar" y que lo habilita a intimar (definición 11/8). */
-function openModalPagoEfectuado() {
-  const hospitales = [...new Set(state.facturas
-    .filter(f => f.financiador === "F001" && isImpaga(f) && f.estado !== "en_cola")
-    .map(f => f.hospital))];
-  openModal(`<h3>Declarar pago efectuado</h3>
-    <p class="subtle">Registrá una transferencia ya realizada <strong>fuera del portal</strong>. Todavía no hace falta decir cuánto va a cada factura.</p>
-    <div class="note"><strong>Esto no cierra ninguna factura.</strong> Mientras el pago no esté imputado, el hospital no sabe qué cancelaste y puede <strong>intimarte fehacientemente</strong> a que lo declares. El reloj de 60 días sigue corriendo.</div>
-    <label>Hospital destinatario</label>
-    <select id="pef-hospital">${hospitales.map(h => `<option value="${h}">${hospNombre(h)}</option>`).join('')}</select>
-    <label>Monto transferido</label><input type="number" id="pef-monto" placeholder="0">
-    <label>Fecha de la transferencia</label><input type="date" id="pef-fecha" value="${HOY}">
-    <label>Referencia / comprobante</label><input id="pef-ref" placeholder="TRF-…">
-    <label>Adjuntar comprobante</label><input type="file">
-    <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="confirmarPagoEfectuado()">Declarar pago efectuado</button>
-    </div>`);
-}
-window.confirmarPagoEfectuado = function() {
-  const hospId = $("#pef-hospital").value;
-  const monto = Math.max(0, Number($("#pef-monto").value) || 0);
-  if (monto <= 0) { showToast("⚠ Indicá el monto transferido"); return; }
-  const pef = {
-    id: "PEF-" + String(state.pagosEfectuados.length + 1).padStart(3, "0"),
-    financiador: "F001", hospital: hospId, facturas: [], monto,
-    comprobante: $("#pef-ref").value || "TRF-" + Math.floor(100000 + Math.random() * 899999),
-    fecha: $("#pef-fecha").value || HOY, imputado: false, intimaciones: []
-  };
-  state.pagosEfectuados.push(pef);
-  closeModal(); render();
-  showToast(`💵 Pago efectuado declarado — ${money(monto)} a ${hospCorto(hospId)}, pendiente de imputar`);
-};
-
-/* MODAL INFORMAR PAGO — imputación a facturas concretas de UN SOLO hospital (brief 3.1).
-   Si viene de un pago efectuado (pefId), arranca con ese hospital y monto ya cargados. */
-function openModalNuevoPago(pefId) {
-  const pef = pefId ? state.pagosEfectuados.find(p => p.id === pefId) : null;
-  const hospitales = [...new Set(state.facturas
-    .filter(f => f.financiador === "F001" && isImpaga(f) && f.estado !== "en_cola")
-    .map(f => f.hospital))];
-  openModal(`<h3>${pef ? "Imputar pago efectuado" : "Informar nuevo pago"}</h3>
-    <p class="subtle">El pago se imputa a una o varias facturas concretas. Un mismo pago <strong>no puede cruzar hospitales</strong>: elegí primero el hospital y después las facturas.</p>
-    ${pef ? `<div class="note"><strong>Transferencia ${pef.comprobante}</strong> del ${pef.fecha} por ${money(pef.monto)}${pef.intimaciones.length ? ` — <strong style="color:var(--danger);">el hospital te intimó ${pef.intimaciones.length} vez(ces)</strong>` : ''}. Al imputarla, el hospital podrá confirmar la recepción y cerrar las facturas.</div>
-    <input type="hidden" id="pago-pef" value="${pef.id}">` : ''}
-    <label>Hospital destinatario</label>
-    <select id="pago-hospital" onchange="renderFacturasPago()" ${pef ? 'disabled' : ''}>
-      ${hospitales.map(h => `<option value="${h}" ${pef && pef.hospital === h ? 'selected' : ''}>${hospNombre(h)}</option>`).join('')}
-    </select>
-    <div class="note note-blue" style="margin-top:10px;">Solo se listan facturas impagas de este hospital. Para pagar facturas de otro hospital, informá un pago separado.</div>
-    <label>Facturas a imputar</label>
-    <div class="cat-list" id="pago-facturas"></div>
-    <div id="pago-resumen" style="background:#fafbfc;border-radius:6px;padding:10px 12px;margin-top:10px;font-size:13px;"></div>
-    <label>Monto total transferido</label><input type="number" id="pago-monto" placeholder="0" value="${pef ? pef.monto : ''}" oninput="recalcPago()">
-    <label>Fecha</label><input type="date" id="pago-fecha" value="${HOY}">
-    <label>Referencia / comprobante</label><input id="pago-ref" placeholder="TRF-...">
-    <label>Adjuntar comprobante</label><input type="file">
-    <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="confirmarNuevoPago()">Informar pago</button>
-    </div>`);
-  renderFacturasPago();
-}
-window.renderFacturasPago = function() {
-  const hospId = $("#pago-hospital").value;
-  const facts = state.facturas.filter(f => f.financiador === "F001" && f.hospital === hospId && isImpaga(f) && f.estado !== "en_cola");
-  $("#pago-facturas").innerHTML = facts.length === 0
-    ? `<div style="color:var(--muted);padding:14px;text-align:center;font-size:13px;">Sin facturas impagas con este hospital.</div>`
-    : facts.map(f => {
-        const s = saldoPendiente(f);
-        const cobrable = montoCobrable(f), debate = montoEnDebate(f);
-        return `<div class="cat-item">
-          <label class="cat-header">
-            <input type="checkbox" class="pago-check" data-nro="${f.nro}" data-saldo="${s}">
-            <span style="flex:1;"><code>${f.nro}</code> ${chip(f.estado)}${esMorosa(f) ? '' : ` <span style="font-size:11px;color:var(--muted);">${diasRestantes(f.fecha)} días</span>`}</span>
-            <span style="font-family:monospace;font-size:12px;">${debate > 0 ? `Cobrable ${money(cobrable)}` : `Saldo ${money(s)}`}</span>
-          </label>
-          <div class="cat-body">
-            <label>Importe a imputar a esta factura</label>
-            <input type="number" class="pago-imputa" data-nro="${f.nro}" value="${cobrable}" max="${s}" oninput="recalcPago()">
-            <div style="font-size:11px;color:var(--muted);margin-top:4px;">
-              ${debate > 0
-                ? `Saldo ${money(s)}, de los cuales <strong>${money(debate)} están en debate</strong>. Se propone imputar los ${money(cobrable)} reconocidos, que se pueden pagar sin esperar a que cierre la conciliación.`
-                : `Saldo pendiente: ${money(s)}. Imputar menos deja la factura en pago parcial — el reloj de 60 días no se renueva.`}
-            </div>
-          </div>
-        </div>`;
-      }).join('');
-  document.querySelectorAll('.pago-check').forEach(cb => cb.addEventListener('change', () => {
-    cb.closest('.cat-item').classList.toggle('checked', cb.checked);
-    recalcPago();
-  }));
-  recalcPago();
-};
-function imputacionesSeleccionadas() {
-  return [...document.querySelectorAll('.pago-check')].filter(cb => cb.checked).map(cb => {
-    const nro = cb.dataset.nro;
-    const input = document.querySelector(`.pago-imputa[data-nro="${nro}"]`);
-    return { nro, monto: Math.max(0, Number(input?.value) || 0), saldo: Number(cb.dataset.saldo) };
-  });
-}
-window.recalcPago = function() {
-  const box = $("#pago-resumen"); if (!box) return;
-  const imp = imputacionesSeleccionadas();
-  const totalImputado = imp.reduce((s, i) => s + i.monto, 0);
-  const declarado = Number($("#pago-monto")?.value) || 0;
-  const excedido = imp.filter(i => i.monto > i.saldo);
-  const descuadre = declarado > 0 && Math.abs(declarado - totalImputado) > 0.5;
-  box.innerHTML = `
-    <div style="display:flex;justify-content:space-between;"><span>Facturas seleccionadas</span><strong>${imp.length}</strong></div>
-    <div style="display:flex;justify-content:space-between;"><span>Total imputado</span><strong style="font-family:monospace;">${money(totalImputado)}</strong></div>
-    ${excedido.length ? `<div style="color:var(--danger);margin-top:6px;">⚠ ${excedido.length} imputación(es) superan el saldo de la factura.</div>` : ''}
-    ${descuadre ? `<div style="color:var(--warn);margin-top:6px;">⚠ El total imputado no coincide con el monto transferido (${money(declarado)}).</div>` : ''}`;
-};
-window.confirmarNuevoPago = function() {
-  const hospId = $("#pago-hospital").value;
-  const imp = imputacionesSeleccionadas().filter(i => i.monto > 0);
-  if (imp.length === 0) { showToast("⚠ Seleccioná al menos una factura e indicá el importe"); return; }
-  if (imp.some(i => i.monto > i.saldo)) { showToast("⚠ Una imputación supera el saldo de la factura"); return; }
-  const total = imp.reduce((s, i) => s + i.monto, 0);
-  const ref = $("#pago-ref").value || "TRF-" + Math.floor(100000 + Math.random() * 899999);
-  const pago = {
-    id: "PAG-" + String(state.pagosInformados.length + 1).padStart(3, "0"),
-    financiador: "F001", hospital: hospId,
-    facturas: imp.map(i => i.nro),
-    imputaciones: imp.map(i => ({ nro: i.nro, monto: i.monto })),
-    monto: total,
-    tipo: imp.every(i => i.monto >= i.saldo) ? "total" : "parcial",
-    comprobante: ref, fecha: $("#pago-fecha").value || HOY,
-    estado: "pendiente_confirmacion"
-  };
-  state.pagosInformados.push(pago);
-  imp.forEach(i => { const f = state.facturas.find(x => x.nro === i.nro); if (f) f.estado = "pago_informado"; });
-  // Si la imputación viene de una transferencia ya declarada, esa deja de estar pendiente.
-  const pefId = $("#pago-pef")?.value;
-  if (pefId) {
-    const pef = state.pagosEfectuados.find(p => p.id === pefId);
-    if (pef) { pef.imputado = true; pef.facturas = imp.map(i => i.nro); }
-  }
-  closeModal(); render();
-  showToast(`✓ Pago informado — ${money(total)} imputado a ${imp.length} factura(s) de ${hospCorto(hospId)}`);
-};
-
-/* ---- MODALES DE JUDICIALIZACIÓN (brief 3.3) ---- */
-function notaModelo({ hospital, financiador, facturas, monto, fecha, id }) {
-  const desde = facturas.map(f => f.fecha).sort()[0];
-  return `<div class="nota-modelo">
-    <h5>Nota de reclamo judicial — Recuperación de Costos</h5>
-    <p>La Plata, <span class="campo">${fecha}</span>.</p>
-    <p>Por la presente, la Dirección de SAMO del Ministerio de Salud de la Provincia de Buenos Aires promueve reclamo
-    contra <span class="campo">${finNombre(financiador)}</span> (${finTipo(financiador)}) por la deuda impaga que mantiene
-    con <span class="campo">${hospNombre(hospital)}</span>.</p>
-    <p>La deuda asciende a <span class="campo">${money(monto)}</span>, equivalente a
-    <span class="campo">${jus(monto).toFixed(2)} JUS</span>, superando el umbral de ${UMBRAL_JUS} JUS requerido para la promoción de la acción.</p>
-    <p>El reclamo comprende <span class="campo">${facturas.length}</span> factura(s) notificadas fehacientemente a partir del
-    <span class="campo">${desde}</span>, cuyo plazo de 60 días corridos venció sin que se cancelara el saldo:</p>
-    <ul style="margin:6px 0 6px 18px;padding:0;">
-      ${facturas.map(f => `<li>Factura <span class="campo">${f.nro}</span> — notificada ${f.fecha}, vencida hace ${Math.abs(diasRestantes(f.fecha))} días — saldo reclamado <span class="campo">${money(saldoPendiente(f))}</span>${(f.montoPagado||0)>0 ? ` (pago parcial imputado: ${money(f.montoPagado)})` : ''}${(f.notasCredito||0)>0 ? ` (NC: ${money(f.notasCredito)})` : ''}</li>`).join('')}
-    </ul>
-    <p>Se acompaña la documentación respaldatoria de cada factura y las constancias de notificación fehaciente.</p>
-    <p style="margin-top:14px;">Expediente interno: <span class="campo">${id}</span></p>
-  </div>`;
-}
-
-function openModalPaqueteJudicial(hospId, finId) {
-  const facts = intimadasDelPar(hospId, finId);
-  const monto = facts.reduce((s, f) => s + saldoPendiente(f), 0);
-  if (monto < UMBRAL_MONTO) { showToast(`⚠ El par no alcanza ${UMBRAL_JUS} JUS`); return; }
-  const previos = expedientesDelPar(hospId, finId).length;
-  const idTentativo = "EXP-2026-" + String(state.expedientes.length + 1).padStart(4, "0");
-  openModal(`<h3>Generar expediente judicial</h3>
-    <p class="subtle">${hospCorto(hospId)} · ${finNombre(finId)} — tanda de ${facts.length} factura(s) morosa(s) por ${money(monto)} (${jus(monto).toFixed(2)} JUS).</p>
-    ${previos > 0 ? `<div class="note"><strong>Este par ya tiene ${previos} expediente(s) previo(s).</strong> Este sería el N° ${previos + 1}: agrupa únicamente las morosas acumuladas desde la última tanda. Al confirmarlo, estas facturas salen del acumulador y el contador del par vuelve a cero.</div>` : `<div class="note"><strong>Primera tanda de este par.</strong> Al confirmar, estas facturas salen del acumulador y el contador vuelve a cero para la próxima.</div>`}
-    <label>Facturas incluidas en la tanda</label>
-    <table style="font-size:12.5px;">
-      <thead><tr><th>Factura</th><th>Notificada</th><th class="money-header">Saldo</th></tr></thead>
-      <tbody>${facts.map(f => `<tr><td><code>${f.nro}</code></td><td>${f.fecha}</td><td class="money">${money(saldoPendiente(f))}</td></tr>`).join('')}
-        <tr><td colspan="2" style="text-align:right;font-weight:600;">Total reclamado</td><td class="money" style="font-weight:700;color:var(--danger);">${money(monto)}</td></tr></tbody>
-    </table>
-    <label>Paquete judicial — documentación</label>
-    <div class="attachments">
-      <span class="attachment-chip">📎 facturas_${facts.length}_originales.pdf</span>
-      <span class="attachment-chip">📎 constancias_notificacion.pdf</span>
-      <span class="attachment-chip">📎 detalle_prestaciones.xlsx</span>
-      <span class="attachment-chip">📎 comprobantes_pagos_parciales.pdf</span>
-      <span class="attachment-chip">📎 notas_credito.pdf</span>
-    </div>
-    <label>Nota modelo autocompletada</label>
-    ${notaModelo({ hospital: hospId, financiador: finId, facturas: facts, monto, fecha: HOY, id: idTentativo })}
-    <label>Carga en GDEBA</label>
-    <select id="exp-carga">
-      <option value="manual">Manual — Legales carga el expediente en GDEBA (modalidad actual)</option>
-      <option value="api">Interoperable por API — alta automática en GDEBA (a futuro)</option>
-    </select>
-    <div class="decision-abierta" style="margin-top:8px;">
-      <strong>D4 — a definir:</strong> la carga en GDEBA puede ser manual (como hoy) o interoperable por API. La decisión está abierta; el prototipo muestra ambas opciones.
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-secondary" onclick="showToast('📄 Paquete judicial generado (simulado)')">Descargar paquete PDF</button>
-      <button class="btn btn-danger" onclick="confirmarExpediente('${hospId}','${finId}')">Confirmar y abrir expediente</button>
-    </div>`);
-}
-window.confirmarExpediente = function(hospId, finId) {
-  const facts = intimadasDelPar(hospId, finId);
-  const monto = facts.reduce((s, f) => s + saldoPendiente(f), 0);
-  if (monto < UMBRAL_MONTO) { showToast(`⚠ El par no alcanza ${UMBRAL_JUS} JUS`); return; }
-  const id = "EXP-2026-" + String(state.expedientes.length + 1).padStart(4, "0");
-  state.expedientes.push({
-    id, hospital: hospId, financiador: finId,
-    facturas: facts.map(f => f.nro), monto, fecha: HOY,
-    nroGDEBA: null, cargaGDEBA: $("#exp-carga")?.value || "manual", estado: "pendiente_gdeba"
-  });
-  // Las facturas de la tanda salen del acumulador (el par vuelve a cero) y pasan a judicializadas.
-  facts.forEach(f => { f.expediente = id; f.estado = "judicializada"; });
-  closeModal();
-  state.view = "expedientes"; render();
-  showToast(`✓ ${id} abierto — ${facts.length} factura(s), ${money(monto)}. El acumulador del par vuelve a cero.`);
-};
-
-function openModalGDEBA(expId) {
-  const e = state.expedientes.find(x => x.id === expId); if (!e) return;
-  openModal(`<h3>Registrar N° de expediente GDEBA</h3>
-    <p class="subtle">${e.id} — ${hospCorto(e.hospital)} · ${finNombre(e.financiador)} — ${money(e.monto)}</p>
-    <div class="note note-blue">El número se asocia a <strong>todas las facturas de la tanda</strong> (${e.facturas.length}), de modo que desde cualquier factura morosa se puede ver en qué expediente está.</div>
-    <label>N° de expediente GDEBA</label>
-    <input id="gdeba-nro" placeholder="EX-2026-00000000-GDEBA-DPSAMOMSALGP" value="${e.nroGDEBA || ''}">
-    <label>Modalidad de carga</label>
-    <select id="gdeba-carga">
-      <option value="manual" ${e.cargaGDEBA === 'manual' ? 'selected' : ''}>Manual</option>
-      <option value="api" ${e.cargaGDEBA === 'api' ? 'selected' : ''}>Interoperable por API</option>
-    </select>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="confirmarGDEBA('${expId}')">Guardar</button>
-    </div>`);
-}
-window.confirmarGDEBA = function(expId) {
-  const e = state.expedientes.find(x => x.id === expId); if (!e) return;
-  const nro = $("#gdeba-nro").value.trim();
-  if (!nro) { showToast("⚠ Ingresá el N° de expediente GDEBA"); return; }
-  e.nroGDEBA = nro; e.cargaGDEBA = $("#gdeba-carga").value; e.estado = "presentado";
-  closeModal(); render();
-  showToast(`✓ GDEBA ${nro} asociado a ${e.facturas.length} factura(s)`);
-};
-
-function openModalVerPaquete(expId) {
-  const e = state.expedientes.find(x => x.id === expId); if (!e) return;
-  const facts = e.facturas.map(nro => state.facturas.find(x => x.nro === nro)).filter(Boolean);
-  openModal(`<h3>Paquete judicial — ${e.id}</h3>
-    <p class="subtle">${hospCorto(e.hospital)} · ${finNombre(e.financiador)} — generado el ${e.fecha}</p>
-    ${e.nroGDEBA ? `<div class="note note-blue"><strong>GDEBA:</strong> <span class="exp-gdeba">${e.nroGDEBA}</span> — carga ${e.cargaGDEBA}.</div>` : `<div class="note"><strong>Sin N° GDEBA todavía.</strong> Legales debe registrarlo.</div>`}
-    <label>Documentación del paquete</label>
-    <div class="attachments">
-      <span class="attachment-chip">📎 facturas_${facts.length}_originales.pdf</span>
-      <span class="attachment-chip">📎 constancias_notificacion.pdf</span>
-      <span class="attachment-chip">📎 detalle_prestaciones.xlsx</span>
-      <span class="attachment-chip">📎 nota_reclamo_${e.id}.pdf</span>
-    </div>
-    <label>Nota modelo</label>
-    ${notaModelo({ hospital: e.hospital, financiador: e.financiador, facturas: facts, monto: e.monto, fecha: e.fecha, id: e.id })}
-    <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeModal()">Cerrar</button>
-      <button class="btn btn-primary" onclick="showToast('📄 Paquete descargado (simulado)')">Descargar PDF</button>
-    </div>`);
-}
-
-document.querySelectorAll('.role-switcher button').forEach(b => {
-  b.addEventListener('click', () => {
-    document.querySelectorAll('.role-switcher button').forEach(x => x.classList.remove('active'));
-    b.classList.add('active');
-    state.role = b.dataset.role;
-    state.view = NAV[state.role][0].view;
-    state.context = {};
-    render();
-  });
-});
-
-/* ===================== INICIALIZACIÓN ===================== */
-/* Corre una sola vez, después de que están definidos todos los helpers. */
-
-// 1. Prestaciones de las facturas que no vienen cargadas a mano.
-FACTURAS.forEach(f => { if (!ITEMS_FACTURA[f.nro]) ITEMS_FACTURA[f.nro] = generarItems(f); });
-
-/* 2. Migración del modelo viejo: las facturas del mock que traían `montoDebate` suelto no tenían
-   planteos desagregados, así que en la nueva UI no habría nada que mostrar ni sobre qué responder.
-   Se convierten en UN planteo sintético, eligiendo las prestaciones cuyo monto se acerca al debatido.
-   A partir de acá `montoDebate` es solo un cache: la fuente de verdad son las objeciones. */
-const CATEGORIA_POR_DEFECTO = "Documentación incompleta";
-state.facturas.forEach(f => {
-  if (!f.montoDebate || objecionesDe(f).length) return;
-  const items = itemsDe(f.nro);
-  const elegidos = []; let acum = 0;
-  for (const i of items) { if (acum >= f.montoDebate) break; elegidos.push(i.id); acum += i.monto; }
-  f.objeciones = [{ id: "OBJ-1", items: elegidos.length ? elegidos : items.slice(0,1).map(i=>i.id),
-    categoria: CATEGORIA_POR_DEFECTO, detalle: "Planteo cargado en el mock inicial.",
-    monto: f.montoDebate, fecha: f.fecha, adjuntos: [], respuestas: [] }];
-});
-
-/* 3. Estado y campos propios de cada planteo. El planteo es la unidad de trabajo: camina solo por el
-   circuito y el estado de la factura se deriva de él (ver recalcularEstadoFactura). */
-state.facturas.forEach(f => {
-  objecionesDe(f).forEach(o => {
-    /* El planteo tiene que llegarle a la auditoría tal como lo mandó el financiador: con su
-       documentación de respaldo y su movimiento inicial. Sin esto, el auditor abre un planteo del
-       mock y ve la categoría pero no la evidencia, que es justo lo que necesita para resolver. */
-    if (!o.adjuntos || !o.adjuntos.length) {
-      o.adjuntos = [{ nombre: `respaldo_${o.id.toLowerCase()}_${f.nro}.pdf`, tipo: "pdf" },
-        { nombre: `detalle_prestaciones_objetadas.xlsx`, tipo: "pdf" }];
-    }
-    o.respuestas = o.respuestas || [];
-    if (!o.respuestas.some(r => r.inicial)) {
-      const its = itemsDe(f.nro).filter(i => o.items.includes(i.id));
-      const pacs = [...new Set(its.map(i => i.paciente))];
-      o.respuestas.unshift({ who: "financiador", nombre: finNombre(f.financiador), when: o.fecha, inicial: true,
-        tipo: "Objeción planteada", texto: o.detalle, adjuntos: o.adjuntos });
-      if (!state.threads[f.nro]) state.threads[f.nro] = [];
-      state.threads[f.nro].unshift({ who: "financiador", nombre: finNombre(f.financiador), when: o.fecha,
-        text: `[${o.id}] Objetamos ${its.length} prestación(es) de ${pacs.length} paciente(s) por ${money(o.monto)}.`,
-        accion: { tipo: "Objeción por prestación", categorias: [o.categoria], detalles: [o.detalle] }, adjuntos: o.adjuntos });
-    }
-    if (o.estado) return;
-    // Se deduce del estado en que quedó la factura en el mock.
-    o.estado = f.estado === "esperando_hospital" ? "derivado_hospital"
-      : f.estado === "esperando_financiador" ? "respondido"
-      : "en_auditoria";
-  });
-});
-
-render();
-</script>
-</body>
-</html>
+      texto: `Derivamos el planteo al hospit
