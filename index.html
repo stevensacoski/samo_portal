@@ -229,6 +229,50 @@
   .planteo-mov.from-ministerio { border-left-color: var(--purple); }
   .planteo-mov.from-sistema, .thread-msg.from-sistema { border-left-color: var(--neutral); }
   .planteo-escindido { font-size: 11px; color: var(--muted); font-style: italic; }
+  /* Identificador único de la objeción (rastreable). Monoespaciado, junto al número legible. */
+  .obj-uid { font-family: "SF Mono", Monaco, monospace; font-size: 10.5px; background: var(--neutral-soft); color: var(--neutral); padding: 1px 6px; border-radius: 4px; letter-spacing: 0.3px; }
+  /* Cargador de documentación repetible (varios archivos). */
+  .doc-uploader .doc-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+  .doc-uploader .doc-row input[type="text"] { flex: 2; }
+  .doc-uploader .doc-row input[type="file"] { flex: 3; }
+  .doc-uploader .doc-del { padding: 6px 9px; flex: none; }
+  /* Ámbito de la prestación (guardia / internación / ambulatorio). */
+  .amb { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 10.5px; font-weight: 600; }
+  .amb-guardia { background: var(--danger-soft); color: var(--danger); }
+  .amb-internacion { background: var(--purple-soft); color: var(--purple); }
+  .amb-ambulatorio { background: var(--info-soft); color: var(--info); }
+  /* Ficha de diagnóstico visible sin descargar documentación. */
+  .diag-box { background: var(--mds-turquesa-soft); border: 1px solid #9fdbe3; border-radius: 6px; padding: 10px 12px; margin: 8px 0; font-size: 12.5px; }
+  .diag-box .diag-tit { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; color: #0a6b78; margin-bottom: 3px; }
+  /* Fila de prestación que requiere acción del financiador (vista B): resaltada. */
+  tr.row-objetada-accion td { background: #fff7ec; box-shadow: inset 3px 0 0 var(--danger); }
+  /* Árbol del historial por caso. */
+  .caso-arbol { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; }
+  .caso-arbol .caso-tit { font-weight: 600; font-size: 13px; margin-bottom: 8px; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .caso-pacientes { font-size: 11.5px; margin-bottom: 8px; background: #fafbfc; border-radius: 6px; padding: 8px 10px; line-height: 1.7; }
+  .caso-rama { border-left: 2px solid var(--border); margin-left: 8px; padding-left: 12px; }
+  .caso-nodo { position: relative; padding: 6px 10px; margin: 6px 0; background: #fafbfc; border-radius: 0 6px 6px 0; border-left: 3px solid var(--primary); font-size: 12.5px; }
+  .caso-nodo.from-hospital { border-left-color: var(--success); }
+  .caso-nodo.from-financiador { border-left-color: var(--warn); }
+  .caso-nodo.from-ministerio { border-left-color: var(--purple); }
+  .caso-nodo.from-sistema { border-left-color: var(--neutral); }
+  .caso-nodo .caso-meta { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; margin-bottom: 2px; }
+  .caso-nodo.nivel-1 { margin-left: 22px; }
+  .switch-log { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: white; }
+  .switch-log button { border: none; background: white; padding: 5px 11px; font-size: 12px; cursor: pointer; color: var(--muted); font-family: inherit; }
+  .switch-log button + button { border-left: 1px solid var(--border); }
+  .switch-log button.active { background: var(--primary); color: white; font-weight: 600; }
+  /* Solicitud de rechazo total y auditoría en terreno: recuadros de acción destacados. */
+  .req-box { border: 1px solid var(--border); border-left: 4px solid var(--danger); border-radius: 8px; padding: 14px 16px; margin-bottom: 12px; background: #fffbfa; }
+  .req-box.terreno { border-left-color: var(--mds-turquesa); background: #f5fdfe; }
+  .req-box .req-tit { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+  /* Encabezados de tabla ordenables. */
+  th.th-sort { cursor: pointer; user-select: none; white-space: nowrap; }
+  th.th-sort:hover { background: var(--primary-soft); color: var(--primary-dark); }
+  th.th-sort.active { color: var(--primary-dark); }
+  th.th-sort .sort-arrow { font-size: 9px; opacity: 0.5; margin-left: 2px; }
+  th.th-sort.active .sort-arrow { opacity: 1; }
+  th.th-sort.money-header { text-align: right; }
 </style>
 </head>
 <body>
@@ -352,6 +396,10 @@ const FACTURAS = [
       { id: "OBJ-2", items: ["I-97-3"], categoria: "Falta autorización previa", detalle: "No consta autorización previa para la cirugía programada.", monto: 620800, fecha: "2026-07-28" }
     ] },
   { nro: "0001-00042194", hospital: "H001", financiador: "F005", fecha: "2026-07-15", monto: 780000, montoPagado: 0, estado: "aceptada", pacientes: 3 },
+  /* Caso testigo del flujo nuevo "solicitar rechazo de factura": IOMA pidió el rechazo total con un
+     motivo, y espera resolución de la auditoría central (aprobar / denegar / derivar al hospital). */
+  { nro: "0001-00042198", hospital: "H001", financiador: "F001", fecha: "2026-07-30", monto: 680000, montoPagado: 0, estado: "esperando_auditoria", pacientes: 4, montoDebate: 680000,
+    solicitudRechazo: { motivo: "La factura corresponde a un afiliado que no pertenece a IOMA: el padrón no lo registra en ninguna de las fechas de atención. Se solicita el desconocimiento íntegro.", fecha: "2026-07-31", estado: "en_auditoria", adjuntos: [{ nombre: "consulta_padron_ioma_julio.pdf", tipo: "pdf" }] } },
   // IOMA ya transfirió por esta factura pero no imputó: el hospital puede intimarlo (ver PEF-001)
   { nro: "0001-00042210", hospital: "H001", financiador: "F001", fecha: "2026-06-18", monto: 1750000, montoPagado: 0, estado: "pago_efectuado", pacientes: 8 },
   // Ya intimada y sin pago: es la que sostiene el par H001–PAMI en el acumulador judicial (18,7 JUS)
@@ -582,14 +630,30 @@ const ITEMS_FACTURA = {
 const APELLIDOS_POOL = ["Gómez","Ramírez","Torres","Silva","Molina","Acosta","Benítez","Cabrera","Vega","Ortiz","Ferreyra","Quiroga","Medina","Ríos","Núñez","Peralta","Herrera","Sosa","Castro","Villalba"];
 const NOMBRES_POOL = ["Alberto","Mariana","Jorge","Silvina","Raúl","Claudia","Néstor","Patricia","Osvaldo","Verónica","Daniel","Andrea","Rubén","Gabriela","Sergio","Mónica"];
 const PRESTACIONES_POOL = [
-  { prestacion: "Consulta guardia", codigo: "420101", peso: 1 },
-  { prestacion: "Estudios de laboratorio", codigo: "310105", peso: 1 },
-  { prestacion: "Diagnóstico por imágenes", codigo: "340210", peso: 2 },
-  { prestacion: "Internación clínica 3 días", codigo: "620301", peso: 4 },
-  { prestacion: "Cirugía menor + insumos", codigo: "710422", peso: 5 },
-  { prestacion: "Estudio de alta complejidad", codigo: "810301", peso: 5 },
-  { prestacion: "Práctica kinesiológica", codigo: "250110", peso: 1 },
+  { prestacion: "Consulta guardia", codigo: "420101", peso: 1, ambito: "guardia" },
+  { prestacion: "Estudios de laboratorio", codigo: "310105", peso: 1, ambito: "ambulatorio" },
+  { prestacion: "Diagnóstico por imágenes", codigo: "340210", peso: 2, ambito: "ambulatorio" },
+  { prestacion: "Internación clínica 3 días", codigo: "620301", peso: 4, ambito: "internacion" },
+  { prestacion: "Cirugía menor + insumos", codigo: "710422", peso: 5, ambito: "internacion" },
+  { prestacion: "Estudio de alta complejidad", codigo: "810301", peso: 5, ambito: "ambulatorio" },
+  { prestacion: "Práctica kinesiológica", codigo: "250110", peso: 1, ambito: "ambulatorio" },
 ];
+// Diagnóstico presuntivo, para poder leerlo sin descargar la documentación (pedido nuevo).
+const DIAGNOSTICOS_POOL = [
+  "J18.9 — Neumonía, organismo no especificado", "K35.8 — Apendicitis aguda",
+  "I50.9 — Insuficiencia cardíaca", "S72.0 — Fractura de cuello de fémur",
+  "N39.0 — Infección de vías urinarias", "E11.9 — Diabetes mellitus tipo 2",
+  "J44.9 — EPOC reagudizada", "R10.4 — Dolor abdominal", "A09 — Gastroenteritis",
+  "O80 — Parto único espontáneo", "I63.9 — ACV isquémico", "M54.5 — Lumbalgia",
+];
+const AMBITO_LABEL = { guardia: "Guardia", internacion: "Internación", ambulatorio: "Ambulatorio" };
+const chipAmbito = (a) => a ? `<span class="amb amb-${a}">${AMBITO_LABEL[a] || a}</span>` : '';
+// Ámbito de una prestación por si el mock no lo trae explícito (se deduce del texto de la prestación).
+const ambitoDe = (it) => it.ambito || (/guardia/i.test(it.prestacion) ? "guardia"
+  : /internaci|cirug[íi]a/i.test(it.prestacion) ? "internacion" : "ambulatorio");
+// Para internación mostramos ingreso/egreso; para el resto, la fecha de la prestación.
+const fechaEstadia = (it) => (ambitoDe(it) === "internacion" && it.fechaEgreso && it.fechaEgreso !== it.fechaIngreso)
+  ? `Ing. ${it.fechaIngreso}<br>Egr. ${it.fechaEgreso}` : (it.fecha || it.fechaIngreso || "");
 function generarItems(f) {
   // PRNG chico y determinístico: misma factura → mismas prestaciones, siempre.
   let seed = 0;
@@ -599,15 +663,22 @@ function generarItems(f) {
   const nPac = Math.max(1, f.pacientes || 1);
   for (let p = 0; p < nPac; p++) {
     const nombre = `${APELLIDOS_POOL[Math.floor(rnd()*APELLIDOS_POOL.length)]}, ${NOMBRES_POOL[Math.floor(rnd()*NOMBRES_POOL.length)]}`;
-    const dni = `${20 + Math.floor(rnd()*25)}.${String(Math.floor(rnd()*900)+100)}.***`;
-    const afiliado = `${finNombre(f.financiador)} ${4 + Math.floor(rnd()*3)}-${String(Math.floor(rnd()*900)+100)}-${String(Math.floor(rnd()*900)+100)}***`;
+    const dni = `${20 + Math.floor(rnd()*25)}.${String(Math.floor(rnd()*900)+100)}.${String(Math.floor(rnd()*900)+100)}`;
+    const afiliado = `${finNombre(f.financiador)} ${4 + Math.floor(rnd()*3)}-${String(Math.floor(rnd()*900)+100)}-${String(Math.floor(rnd()*900)+100)}-${Math.floor(rnd()*9)+1}`;
     // Entre 1 y 3 prestaciones por paciente: la realidad es que a una persona le facturan varias cosas.
     const nPrest = 1 + Math.floor(rnd() * 3);
+    // Un diagnóstico por paciente (todas sus prestaciones del episodio lo comparten).
+    const diagnostico = DIAGNOSTICOS_POOL[Math.floor(rnd()*DIAGNOSTICOS_POOL.length)];
     for (let k = 0; k < nPrest; k++) {
       const pr = PRESTACIONES_POOL[Math.floor(rnd()*PRESTACIONES_POOL.length)];
       const d = new Date(f.fechaEmision); d.setDate(d.getDate() - Math.floor(rnd()*20));
+      const fechaPrest = d.toISOString().split("T")[0];
+      // Fechas de ingreso/egreso: para internación, una estadía de 1–6 días; el resto, mismo día.
+      const estadia = pr.ambito === "internacion" ? 1 + Math.floor(rnd()*6) : 0;
+      const egreso = new Date(d); egreso.setDate(egreso.getDate() + estadia);
       items.push({ id: `I-${f.nro.slice(-5)}-${items.length+1}`, paciente: nombre, dni, afiliado,
-        prestacion: pr.prestacion, codigo: pr.codigo, fecha: d.toISOString().split("T")[0], peso: pr.peso });
+        prestacion: pr.prestacion, codigo: pr.codigo, fecha: fechaPrest, peso: pr.peso,
+        ambito: pr.ambito, fechaIngreso: fechaPrest, fechaEgreso: egreso.toISOString().split("T")[0], diagnostico });
     }
   }
   // Los montos se reparten por peso y se ajusta el último para que la suma cierre exacto con la factura.
@@ -628,7 +699,7 @@ const DOCS_PACIENTE = ["Formulario F5", "Formulario F8", "Formulario F9", "Histo
 const THREADS_INITIAL = {
   "0001-00042190": [
     { who: "financiador", nombre: "IOMA", when: "28/07/2026 14:32", text: "Iniciamos conciliación sobre 1 ítem por afiliado no vigente.",
-      accion: { tipo: "Objeción iniciada", categorias: ["Afiliado no vigente"], detalles: ["Ítem: Internación — Juan Pérez", "N° afiliado: IOMA 4-503-819***", "Fecha de baja: 30/06/2026"] },
+      accion: { tipo: "Objeción iniciada", categorias: ["Afiliado no vigente"], detalles: ["Ítem: Internación — Juan Pérez", "N° afiliado: IOMA 4-503-819-2", "Fecha de baja: 30/06/2026"] },
       adjuntos: [{ nombre: "padron_ioma_junio_2026.pdf", tipo: "pdf" }] },
     { who: "hospital", nombre: "Hosp. San Martín", when: "29/07/2026 09:15", text: "Discrepamos. Adjuntamos padrón consultado el día de la atención — cobertura activa.",
       accion: { tipo: "Descargo del hospital", categorias: ["Ratificar cobertura con documentación"], detalles: ["Padrón consultado: 12/07/2026 08:41", "Estado registrado: ACTIVO", "Prestación efectuada: 12/07/2026 10:20"] },
@@ -708,6 +779,21 @@ let state = {
   selItems: [], filtroItems: { codigo: "TODOS", q: "" }, vistaItems: "prestacion", focusSel: null,
   // Prestaciones alcanzadas por la acción de planteo que se está por confirmar (ver planteoDeLaAccion).
   accionPlanteo: null,
+  // Modo de lectura del detalle de factura del financiador: "A" (bloque de planteos arriba) o "B"
+  // (sin ese bloque; se responde desde la tabla de prestaciones + "Ver documentación"). Ver §Conciliación.
+  detalleModo: "A",
+  // Modo del registro de la conciliación: "crono" (cronológico) o "arbol" (por caso/objeción).
+  logModo: "crono",
+  // Orden de las tablas de facturas (columna + dirección), clickeable en los encabezados.
+  sortFactFin: { col: "dias", dir: "asc" },
+  sortFactHosp: { col: "dias", dir: "asc" },
+  /* Auditorías en terreno (presenciales) solicitadas por el financiador. El ministerio acepta y se
+     acuerda fecha en común. Un caso testigo ya solicitado, esperando que el ministerio proponga fecha. */
+  auditoriasTerreno: [
+    { id: "AT-001", factura: "0015-00007712", hospital: "H005", financiador: "F001",
+      motivo: "Verificar historias clínicas y registros de quirófano de 2 prestaciones de alta complejidad objetadas.",
+      fechaSolicitud: "2026-07-30", estado: "solicitada", fechaPropuesta: null, propuestaPor: null, participantes: "Auditoría médica IOMA (2 profesionales)" }
+  ],
   /* Usuarios de cada financiador (ver helpers arriba). El admin se crea con el alta del financiador.
      Para poblar la demo, cada financiador con usuario tiene su admin, e IOMA (el actor fijo del rol
      Financiador) tiene además operadores — uno con acceso total, otro restringido a 3 hospitales — y
@@ -728,6 +814,16 @@ let state = {
 };
 // Objeciones cargadas sobre prestaciones concretas de una factura.
 const objecionesDe = (f) => f.objeciones || [];
+/* Cada objeción tiene DOS identificadores: el número legible `id` (OBJ-n, correlativo dentro de la
+   factura, que se repite entre facturas) y un `uid` único e irrepetible en todo el portal. El uid es
+   el que permite rastrear un planteo aunque se escinda o aunque otra factura tenga un OBJ con el mismo
+   número. Se genera con un contador monotónico + azar para garantizar unicidad. */
+let __uidObjSeq = 0;
+function nuevoUidObjecion() {
+  __uidObjSeq++;
+  const rnd = Math.floor(Math.random() * 0xffff).toString(16).toUpperCase().padStart(4, "0");
+  return "OBJ-" + __uidObjSeq.toString(16).toUpperCase().padStart(3, "0") + rnd;
+}
 
 const NAV = {
   ministerio: [
@@ -784,6 +880,14 @@ const isImpaga = (f) => !["cerrada","cerrada_nc","pagada","rechazada_total"].inc
    Las tres siguen siendo deuda vencida: para KPIs y tableros se leen juntas con esMorosa(). */
 const ESTADOS_MORA = ["morosa", "intimada", "judicializada"];
 const esMorosa = (f) => ESTADOS_MORA.includes(f.estado);
+/* Ventana de objeción (definición nueva): cada prestación solo puede objetarse durante los primeros
+   15 días desde la NOTIFICACIÓN. Pasado ese plazo la ventana se cierra y no se abren objeciones
+   nuevas; entre el día 16 y el 60 solo se sigue discutiendo lo que ya había sido objetado. Es un
+   reloj distinto del de mora (60 días): una factura puede tener la ventana cerrada y seguir en plazo. */
+const DIAS_VENTANA_OBJECION = 15;
+const diasDesdeNotif = (fecha) => Math.floor((new Date(HOY) - new Date(fecha)) / 86400000);
+const diasVentanaObjecion = (f) => DIAS_VENTANA_OBJECION - diasDesdeNotif(f.fecha);
+const ventanaObjecionAbierta = (f) => isImpaga(f) && f.estado !== "en_cola" && diasVentanaObjecion(f) >= 0;
 // saldo = monto notificado − pagos imputados − notas de crédito (brief 3.2).
 const saldoPendiente = (f) => f.monto - (f.montoPagado||0) - (f.notasCredito||0);
 /* El saldo se parte en dos ejes independientes:
@@ -822,6 +926,32 @@ const chipPlanteo = (o) => {
   const l = PLANTEO_LABEL[o.estado] || PLANTEO_LABEL.en_auditoria;
   return `<span class="chip ${l.cls}">${l.txt}</span>`;
 };
+/* ---- Solicitud de rechazo total (flujo nuevo) ----
+   Reemplaza el viejo "rechazar factura completa" unilateral. Ahora el financiador SOLICITA el rechazo
+   con un motivo de texto libre; la resuelve la auditoría central del ministerio, que puede aprobarlo,
+   denegarlo o derivarlo al hospital para que responda. Vive en la propia factura (f.solicitudRechazo). */
+const solicitudRechazoDe = (f) => f.solicitudRechazo || null;
+const ESTADO_REQRECHAZO = {
+  en_auditoria: { txt: "En auditoría central", cls: "chip-esperando-auditoria" },
+  derivado_hospital: { txt: "Derivada al hospital", cls: "chip-esperando-hospital" },
+  respondido_hospital: { txt: "Respondida por el hospital — vuelve a auditoría", cls: "chip-esperando-auditoria" },
+  aprobado: { txt: "Rechazo aprobado", cls: "chip-rechazada" },
+  denegado: { txt: "Rechazo denegado", cls: "chip-aceptada" },
+};
+const reqRechazoAbierta = (f) => { const r = solicitudRechazoDe(f); return r && !["aprobado","denegado"].includes(r.estado); };
+/* ---- Auditoría en terreno (presencial) ----
+   La solicita el financiador para ir a verificar al hospital. El ministerio la acepta y se acuerda una
+   fecha en común: el financiador propone una, el ministerio la confirma o propone otra, y recién con la
+   confirmación mutua queda agendada. Vive en state.auditoriasTerreno. */
+const auditoriaTerrenoDe = (nro) => state.auditoriasTerreno.find(a => a.factura === nro && !["realizada","rechazada","cancelada"].includes(a.estado));
+const ESTADO_TERRENO = {
+  solicitada: { txt: "Solicitada — el ministerio debe aceptar y proponer fecha", cls: "chip-esperando-auditoria" },
+  fecha_ministerio: { txt: "Fecha propuesta por el ministerio — a confirmar por el financiador", cls: "chip-por-vencer" },
+  fecha_financiador: { txt: "Fecha propuesta por el financiador — a confirmar por el ministerio", cls: "chip-por-vencer" },
+  confirmada: { txt: "Fecha confirmada — auditoría agendada", cls: "chip-aceptada" },
+  realizada: { txt: "Realizada", cls: "chip-cerrada" },
+  rechazada: { txt: "Rechazada por el ministerio", cls: "chip-rechazada" },
+};
 // Quién tiene que actuar sobre este planteo, para que cada rol sepa si le toca.
 const planteoEsDe = (o, rol) =>
   rol === "ministerio" ? o.estado === "en_auditoria"
@@ -857,9 +987,11 @@ function escindirPlanteo(f, o, ids) {
   const nuevo = {
     ...o,
     id: "OBJ-" + (objecionesDe(f).length + 1),
+    uid: nuevoUidObjecion(),
     items: seleccion,
     monto: montoNuevo,
     escindidoDe: o.id,
+    escindidoDeUid: o.uid,
     adjuntos: [...(o.adjuntos || [])],
     respuestas: (o.respuestas || []).map(r => ({ ...r })),
   };
@@ -1183,7 +1315,7 @@ const notaRestriccionHospitales = () => {
    varias prestaciones en la factura, y según lo que estés revisando conviene una vista u otra.
    La selección vive siempre a nivel ítem (`state.selItems`), así que objetar funciona igual desde
    los dos modos: el checkbox del paciente es un atajo que marca todas sus prestaciones visibles. */
-function viewTablaItems(f, { seleccionable = false } = {}) {
+function viewTablaItems(f, { seleccionable = false, resaltarAccion = false } = {}) {
   const items = itemsDe(f.nro);
   const fi = state.filtroItems;
   const modo = state.vistaItems;
@@ -1199,37 +1331,47 @@ function viewTablaItems(f, { seleccionable = false } = {}) {
     const o = objetados.find(x => x.items.includes(it.id));
     return o ? `<div style="margin-top:3px;"><span class="chip ${PLANTEO_LABEL[o.estado]?.cls || 'chip-esperando-hospital'}" title="${o.detalle}">${o.id} · ${o.categoria}</span></div>` : '';
   };
-  const colSpan = seleccionable ? 7 : 6;
+  /* Vista B de la conciliación: en vez del bloque de "Planteos", la propia tabla marca fuerte las
+     prestaciones cuyo planteo espera la acción del rol actual, y desde "Ver documentación" se responde. */
+  const accionDeItem = (id) => resaltarAccion ? objetados.find(o => o.items.includes(id) && planteoEsDe(o, state.role)) : null;
+  const botonItem = (pacEnc, hayAccion) => hayAccion
+    ? `<button class="btn btn-primary btn-sm" data-ver-paciente="${pacEnc}">Responder →</button>`
+    : `<button class="btn btn-secondary btn-sm" data-ver-paciente="${pacEnc}">Ver documentación</button>`;
+  const colSpan = seleccionable ? 8 : 7;
 
   // Modo paciente: fila de grupo por persona + sus prestaciones debajo.
   const porPaciente = {};
   visibles.forEach(i => { (porPaciente[i.paciente] = porPaciente[i.paciente] || []).push(i); });
 
-  const filasPrestacion = visibles.map(it => `<tr class="${sel.includes(it.id) ? 'row-sel' : ''}">
+  const filasPrestacion = visibles.map(it => { const acc = accionDeItem(it.id); return `<tr class="${sel.includes(it.id) ? 'row-sel' : ''} ${acc ? 'row-objetada-accion' : ''}">
     ${seleccionable ? `<td><input type="checkbox" data-sel-item="${it.id}" ${sel.includes(it.id) ? 'checked' : ''}></td>` : ''}
     <td><div>${it.paciente} <span style="color:var(--muted);font-size:11px;">DNI ${it.dni}</span></div>
         <div style="color:var(--muted);font-size:11px;">${it.afiliado}</div>${marcaObjecion(it)}</td>
-    <td>${it.prestacion}</td><td><code>${it.codigo}</code></td><td style="color:var(--muted);">${it.fecha}</td>
+    <td>${it.prestacion}</td><td>${chipAmbito(ambitoDe(it))}</td><td><code>${it.codigo}</code></td>
+    <td style="color:var(--muted);white-space:nowrap;">${fechaEstadia(it)}</td>
     <td class="money">${money(it.monto)}</td>
-    <td><button class="btn btn-secondary btn-sm" data-ver-paciente="${encodeURIComponent(it.paciente)}">Ver paciente</button></td>
-  </tr>`).join('');
+    <td>${botonItem(encodeURIComponent(it.paciente), !!acc)}</td>
+  </tr>`; }).join('');
 
   const filasPaciente = Object.entries(porPaciente).map(([pac, its]) => {
     const p = its[0];
     const todasSel = its.every(i => sel.includes(i.id));
     const total = its.reduce((s,i)=>s+i.monto,0);
     const objs = [...new Set(its.map(i => objetados.find(o => o.items.includes(i.id))).filter(Boolean))];
-    return `<tr class="fila-paciente">
+    const grpAcc = its.some(i => accionDeItem(i.id));
+    return `<tr class="fila-paciente ${grpAcc ? 'row-objetada-accion' : ''}">
       ${seleccionable ? `<td><input type="checkbox" data-sel-paciente="${encodeURIComponent(pac)}" ${todasSel ? 'checked' : ''} title="Seleccionar todas las prestaciones de este paciente"></td>` : ''}
-      <td colspan="4"><strong>${pac}</strong> <span style="color:var(--muted);font-size:11px;">DNI ${p.dni} · ${p.afiliado} · ${its.length} prestación(es)</span>
+      <td colspan="5"><strong>${pac}</strong> <span style="color:var(--muted);font-size:11px;">DNI ${p.dni} · ${p.afiliado} · ${its.length} prestación(es)</span>
+        ${p.diagnostico ? `<div style="color:var(--muted);font-size:11px;margin-top:2px;">Dx: ${p.diagnostico}</div>` : ''}
         ${objs.length ? `<div style="margin-top:3px;">${objs.map(o => `<span class="chip ${PLANTEO_LABEL[o.estado]?.cls || 'chip-esperando-hospital'}" title="${o.detalle}">${o.id} · ${o.categoria}</span>`).join(' ')}</div>` : ''}</td>
       <td class="money"><strong>${money(total)}</strong></td>
-      <td><button class="btn btn-secondary btn-sm" data-ver-paciente="${encodeURIComponent(pac)}">Ver documentación</button></td>
+      <td>${botonItem(encodeURIComponent(pac), grpAcc)}</td>
     </tr>
     ${its.map(it => `<tr class="sub-prestacion ${sel.includes(it.id) ? 'row-sel' : ''}">
       ${seleccionable ? `<td><input type="checkbox" data-sel-item="${it.id}" ${sel.includes(it.id) ? 'checked' : ''}></td>` : ''}
       <td></td>
-      <td style="padding-left:18px;">${it.prestacion}</td><td><code>${it.codigo}</code></td><td style="color:var(--muted);">${it.fecha}</td>
+      <td style="padding-left:18px;">${it.prestacion}</td><td>${chipAmbito(ambitoDe(it))}</td><td><code>${it.codigo}</code></td>
+      <td style="color:var(--muted);white-space:nowrap;">${fechaEstadia(it)}</td>
       <td class="money">${money(it.monto)}</td><td></td>
     </tr>`).join('')}`;
   }).join('');
@@ -1261,7 +1403,7 @@ function viewTablaItems(f, { seleccionable = false } = {}) {
     <table class="items-table">
       <thead><tr>
         ${seleccionable ? `<th style="width:28px;"><input type="checkbox" data-sel-todos="1" ${visibles.length > 0 && selVisibles.length === visibles.length ? 'checked' : ''} title="Seleccionar todas las visibles"></th>` : ''}
-        <th>${modo === 'paciente' ? 'Paciente / prestación' : 'Paciente'}</th><th>Prestación</th><th>Código</th><th>Fecha</th><th class="money-header">Monto</th><th></th>
+        <th>${modo === 'paciente' ? 'Paciente / prestación' : 'Paciente'}</th><th>Prestación</th><th>Ámbito</th><th>Código</th><th>Fecha / estadía</th><th class="money-header">Monto</th><th></th>
       </tr></thead>
       <tbody>${visibles.length === 0
         ? `<tr><td colspan="${colSpan}" style="text-align:center;padding:24px;color:var(--muted);">Sin prestaciones para este filtro.</td></tr>`
@@ -1287,6 +1429,7 @@ function viewPlanteo(f, o, rol) {
       <div>
         <div style="font-size:14px;font-weight:600;">${o.categoria}
           <span style="font-weight:400;color:var(--muted);font-size:12px;">— ${o.id} · planteado el ${o.fecha}</span>
+          ${o.uid ? `<span class="obj-uid" title="Identificador único e irrepetible del planteo, para rastreo">${o.uid}</span>` : ''}
         </div>
         ${o.escindidoDe ? `<div class="planteo-escindido">Desagregado de ${o.escindidoDe} para resolverse por separado</div>` : ''}
         <div style="margin-top:5px;">${chipPlanteo(o)}
@@ -1303,12 +1446,12 @@ function viewPlanteo(f, o, rol) {
       ${o.adjuntos && o.adjuntos.length ? `<div class="attachments" style="margin-top:8px;">${o.adjuntos.map(a => `<span class="attachment-chip">📎 ${a.nombre || a}</span>`).join('')}</div>` : ''}
     </div>
     <table style="font-size:12.5px;">
-      <thead><tr>${acciones ? '<th style="width:26px;"></th>' : ''}<th>Paciente</th><th>Prestación</th><th>Código</th><th>Fecha</th><th class="money-header">Monto</th><th></th></tr></thead>
-      <tbody>${items.length === 0 ? `<tr><td colspan="${acciones ? 7 : 6}" style="color:var(--muted);text-align:center;padding:14px;">Planteo a nivel factura, sin prestaciones desagregadas.</td></tr>` :
+      <thead><tr>${acciones ? '<th style="width:26px;"></th>' : ''}<th>Paciente</th><th>Prestación</th><th>Ámbito</th><th>Código</th><th>Fecha / estadía</th><th class="money-header">Monto</th><th></th></tr></thead>
+      <tbody>${items.length === 0 ? `<tr><td colspan="${acciones ? 8 : 7}" style="color:var(--muted);text-align:center;padding:14px;">Planteo a nivel factura, sin prestaciones desagregadas.</td></tr>` :
         items.map(i => `<tr>
           ${acciones ? `<td><input type="checkbox" data-sel-prest="${o.id}|${i.id}" title="Resolver solo esta prestación"></td>` : ''}
           <td><div>${i.paciente}</div><div style="color:var(--muted);font-size:11px;">DNI ${i.dni} · ${i.afiliado}</div></td>
-          <td>${i.prestacion}</td><td><code>${i.codigo}</code></td><td style="color:var(--muted);">${i.fecha}</td>
+          <td>${i.prestacion}</td><td>${chipAmbito(ambitoDe(i))}</td><td><code>${i.codigo}</code></td><td style="color:var(--muted);white-space:nowrap;">${fechaEstadia(i)}</td>
           <td class="money">${money(i.monto)}</td>
           <td><button class="btn btn-secondary btn-sm" data-ver-paciente-fact="${f.nro}|${encodeURIComponent(i.paciente)}">Ver documentación</button></td>
         </tr>`).join('')}</tbody>
@@ -1385,6 +1528,65 @@ function viewPlanteosDeFactura(f, rol) {
   </div>`;
 }
 
+/* Recuadro de la solicitud de rechazo total. Compartido por los tres roles: el financiador ve el
+   estado, el ministerio resuelve (aprobar / denegar / derivar), el hospital responde si le derivan. */
+function viewSolicitudRechazo(f, rol) {
+  const r = solicitudRechazoDe(f); if (!r) return '';
+  const st = ESTADO_REQRECHAZO[r.estado] || ESTADO_REQRECHAZO.en_auditoria;
+  const k = f.nro;
+  let acciones = '';
+  if (rol === "ministerio" && (r.estado === "en_auditoria" || r.estado === "respondido_hospital")) acciones = `
+    <button class="btn btn-danger btn-sm" data-req-aprobar="${k}">Aprobar el rechazo</button>
+    <button class="btn btn-success btn-sm" data-req-denegar="${k}">Denegar el rechazo</button>
+    <button class="btn btn-warn btn-sm" data-req-derivar="${k}">Derivar al hospital</button>`;
+  if (rol === "hospital" && r.estado === "derivado_hospital") acciones = `
+    <button class="btn btn-primary btn-sm" data-req-hosp-responder="${k}">✎ Responder el pedido de rechazo</button>`;
+  return `<div class="req-box">
+    <div class="req-tit">Solicitud de rechazo total de la factura ${chipReq(r)}</div>
+    <div style="font-size:12.5px;margin-bottom:6px;"><span style="color:var(--muted);">Solicitada por ${finNombre(f.financiador)} el ${r.fecha}.</span></div>
+    <div class="planteo-origen"><div class="planteo-origen-tit">Motivo del rechazo</div><div style="font-size:13px;">${r.motivo}</div>
+      ${r.adjuntos && r.adjuntos.length ? `<div class="attachments" style="margin-top:8px;">${r.adjuntos.map(a => `<span class="attachment-chip">📎 ${a.nombre||a}</span>`).join('')}</div>` : ''}</div>
+    ${r.resolucion ? `<div class="note ${r.estado==='aprobado'?'':'note-blue'}" style="margin:8px 0 0;"><strong>${r.estado==='aprobado'?'Rechazo aprobado':r.estado==='denegado'?'Rechazo denegado':'Respuesta del hospital'}:</strong> ${r.resolucion}</div>` : ''}
+    ${acciones ? `<div class="actions-row">${acciones}</div>` : ''}
+  </div>`;
+}
+const chipReq = (r) => { const st = ESTADO_REQRECHAZO[r.estado] || ESTADO_REQRECHAZO.en_auditoria; return `<span class="chip ${st.cls}">${st.txt}</span>`; };
+
+/* Recuadro de la auditoría en terreno (presencial). El financiador la solicita; el ministerio acepta y
+   propone una fecha; se confirma en común acuerdo. Cada rol ve las acciones que le tocan. */
+function viewAuditoriaTerreno(f, rol) {
+  const a = auditoriaTerrenoDe(f.nro); if (!a) return '';
+  const st = ESTADO_TERRENO[a.estado] || ESTADO_TERRENO.solicitada;
+  const k = a.id;
+  let acciones = '';
+  if (rol === "ministerio") {
+    if (a.estado === "solicitada") acciones = `
+      <button class="btn btn-primary btn-sm" data-terreno-proponer="${k}">Aceptar y proponer fecha</button>
+      <button class="btn btn-danger btn-sm" data-terreno-rechazar="${k}">Rechazar</button>`;
+    else if (a.estado === "fecha_financiador") acciones = `
+      <button class="btn btn-success btn-sm" data-terreno-confirmar="${k}">Confirmar la fecha (${a.fechaPropuesta})</button>
+      <button class="btn btn-primary btn-sm" data-terreno-proponer="${k}">Proponer otra fecha</button>
+      <button class="btn btn-danger btn-sm" data-terreno-rechazar="${k}">Rechazar</button>`;
+    else if (a.estado === "confirmada") acciones = `<button class="btn btn-success btn-sm" data-terreno-realizada="${k}">Marcar como realizada</button>`;
+  }
+  if (rol === "financiador") {
+    if (a.estado === "fecha_ministerio") acciones = `
+      <button class="btn btn-success btn-sm" data-terreno-confirmar="${k}">Confirmar la fecha (${a.fechaPropuesta})</button>
+      <button class="btn btn-warn btn-sm" data-terreno-proponer-fin="${k}">Proponer otra fecha</button>`;
+  }
+  return `<div class="req-box terreno">
+    <div class="req-tit">🏥 Auditoría en terreno (presencial) <span class="chip ${st.cls}">${st.txt}</span></div>
+    <div style="font-size:12.5px;line-height:1.7;">
+      <div><span style="color:var(--muted);">Solicitada por:</span> ${finNombre(a.financiador)} · ${a.fechaSolicitud}</div>
+      <div><span style="color:var(--muted);">Sede:</span> ${hospNombre(a.hospital)}</div>
+      ${a.participantes ? `<div><span style="color:var(--muted);">Participantes:</span> ${a.participantes}</div>` : ''}
+      ${a.fechaPropuesta ? `<div><span style="color:var(--muted);">Fecha ${a.estado==='confirmada'?'confirmada':'propuesta'}:</span> <strong>${a.fechaPropuesta}</strong>${a.propuestaPor?` <span style="color:var(--muted);">(propuesta por ${a.propuestaPor==='ministerio'?'el ministerio':'el financiador'})</span>`:''}</div>` : ''}
+    </div>
+    <div class="planteo-origen" style="border-left-color:var(--mds-turquesa);background:var(--mds-turquesa-soft);"><div class="planteo-origen-tit" style="color:#0a6b78;">Motivo</div><div style="font-size:13px;">${a.motivo}</div></div>
+    ${acciones ? `<div class="actions-row">${acciones}</div>` : ''}
+  </div>`;
+}
+
 function renderMensaje(m) {
   const rol = m.who === "financiador" ? "Financiador" : m.who === "hospital" ? "Hospital"
     : m.who === "sistema" ? "Sistema" : "Ministerio";
@@ -1399,16 +1601,60 @@ function renderMensaje(m) {
 }
 function renderHilo(nro) { const t = state.threads[nro]; if (!t) return ''; return `<div class="thread">${t.map(renderMensaje).join('')}</div>`; }
 
+/* Registro "por caso" (árbol): cada objeción con sus respuestas anidadas debajo, para seguir el ida
+   y vuelta de cada planteo por separado en vez de un único hilo cronológico entremezclado. */
+function viewLogPorCaso(f) {
+  const objs = objecionesDe(f);
+  const r = solicitudRechazoDe(f);
+  if (!objs.length && !r) return '<div style="color:var(--muted);padding:16px;text-align:center;">Todavía no hay casos abiertos en esta factura.</div>';
+  const nodo = (m, nivel) => `<div class="caso-nodo from-${m.who} ${nivel ? 'nivel-1' : ''}">
+      <div class="caso-meta">${m.nombre} · ${m.tipo || (m.inicial ? 'Objeción planteada' : 'Movimiento')} · ${m.when}</div>
+      <div>${m.texto || ''}</div>
+      ${m.adjuntos && m.adjuntos.length ? `<div class="attachments" style="margin-top:4px;">${m.adjuntos.map(a => `<span class="attachment-chip">📎 ${a.nombre || a}</span>`).join('')}</div>` : ''}
+    </div>`;
+  const casoRechazo = r ? `<div class="caso-arbol">
+      <div class="caso-tit"><span>Solicitud de rechazo total</span> ${chipReq(r)}</div>
+      <div class="caso-rama">
+        <div class="caso-nodo from-financiador"><div class="caso-meta">${finNombre(f.financiador)} · Solicitud de rechazo · ${r.fecha}</div><div>${r.motivo}</div></div>
+        ${r.resolucion ? `<div class="caso-nodo from-ministerio nivel-1"><div class="caso-meta">Resolución de la auditoría</div><div>${r.resolucion}</div></div>` : ''}
+      </div>
+    </div>` : '';
+  const casos = objs.map(o => {
+    const movs = o.respuestas || [];
+    const inicial = movs.find(m => m.inicial) || movs[0];
+    const resto = movs.filter(m => m !== inicial);
+    const its = itemsDe(f.nro).filter(i => o.items.includes(i.id));
+    return `<div class="caso-arbol">
+      <div class="caso-tit"><span>${o.id} <span class="obj-uid">${o.uid || ''}</span> · ${o.categoria}</span> <span>${chipPlanteo(o)} <strong style="font-family:monospace;">${money(o.monto)}</strong></span></div>
+      <div class="caso-pacientes">${its.length ? its.map(i => `<div>• <strong>${i.paciente}</strong> <span style="color:var(--muted);">— DNI ${i.dni} · Afiliado ${i.afiliado}</span> — ${i.prestacion} <code>${i.codigo}</code> ${chipAmbito(ambitoDe(i))} <span style="color:var(--muted);">${money(i.monto)}</span></div>`).join('') : '<div style="color:var(--muted);">Planteo a nivel factura.</div>'}</div>
+      <div class="caso-rama">${inicial ? nodo(inicial, 0) : ''}${resto.map(m => nodo(m, 1)).join('')}</div>
+    </div>`;
+  }).join('');
+  return casoRechazo + casos;
+}
 /* El hilo dejó de ser el lugar donde se trabaja (eso ahora son los planteos) y pasó a ser lo que
-   corresponde: el registro completo de todo lo actuado, consultable y descargable. */
+   corresponde: el registro completo de todo lo actuado, consultable y descargable. Se puede leer
+   de dos formas: cronológica (todo el hilo) o por caso (árbol por objeción). */
 function viewLogConciliacion(nro) {
+  const f = state.facturas.find(x => x.nro === nro);
   const t = state.threads[nro] || [];
+  const modo = state.logModo === "arbol" ? "arbol" : "crono";
   return `<div class="card">
     <h3 class="card-title">Registro de la conciliación
-      <button class="btn btn-excel btn-sm" onclick="exportLogConciliacion('${nro}')">⬇ Descargar log</button>
+      <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <span class="switch-log">
+          <button data-log-modo="crono" class="${modo === 'crono' ? 'active' : ''}">Cronológico</button>
+          <button data-log-modo="arbol" class="${modo === 'arbol' ? 'active' : ''}">Por caso</button>
+        </span>
+        <button class="btn btn-excel btn-sm" onclick="exportLogConciliacion('${nro}')">⬇ Descargar log</button>
+      </span>
     </h3>
-    <div class="note note-blue" style="margin-bottom:0;">Log completo de la factura, en orden cronológico. Las acciones sobre cada planteo se responden en las tarjetas de arriba; acá quedan asentadas con su referencia (<code>OBJ-n</code>).</div>
-    ${t.length ? renderHilo(nro) : '<div style="color:var(--muted);padding:16px;text-align:center;">Sin movimientos registrados.</div>'}
+    <div class="note note-blue" style="margin-bottom:8px;">${modo === 'crono'
+      ? 'Log completo de la factura, en orden cronológico (lo más antiguo arriba). Cada movimiento lleva la referencia <code>OBJ-n</code>.'
+      : 'Agrupado <strong>por caso</strong>: cada objeción con sus respuestas anidadas debajo, para seguir el ida y vuelta de cada planteo por separado.'}</div>
+    ${modo === 'crono'
+      ? (t.length ? renderHilo(nro) : '<div style="color:var(--muted);padding:16px;text-align:center;">Sin movimientos registrados.</div>')
+      : (f ? viewLogPorCaso(f) : '')}
   </div>`;
 }
 window.exportLogConciliacion = function(nro) {
@@ -1418,8 +1664,8 @@ window.exportLogConciliacion = function(nro) {
     ["Fecha","Autor","Rol","Acción","Categorías","Mensaje","Detalles","Adjuntos"]];
   t.forEach(m => rows.push([m.when, m.nombre, m.who, m.accion?.tipo || "—", (m.accion?.categorias || []).join(" · "),
     m.text, (m.accion?.detalles || []).join(" | "), (m.adjuntos || []).map(a => a.nombre).join(" | ")]));
-  rows.push([], ["PLANTEOS"], ["ID","Categoría","Estado","Monto","Prestaciones","Detalle"]);
-  objecionesDe(f).forEach(o => rows.push([o.id, o.categoria, o.estado, o.monto, o.items.join(" | "), o.detalle]));
+  rows.push([], ["PLANTEOS"], ["N°","ID único","Categoría","Estado","Monto","Prestaciones","Detalle"]);
+  objecionesDe(f).forEach(o => rows.push([o.id, o.uid || "", o.categoria, o.estado, o.monto, o.items.join(" | "), o.detalle]));
   exportCSV(`log_conciliacion_${nro}.csv`, rows);
 };
 
@@ -1538,31 +1784,31 @@ window.exportFacturasHosp = function() {
 };
 
 function viewHospital_Facturas() {
-  const facts = state.facturas.filter(f => f.hospital === "H001");
-  const porFin = {};
-  facts.forEach(f => { if (!porFin[f.financiador]) porFin[f.financiador] = []; porFin[f.financiador].push(f); });
+  const sort = state.sortFactHosp;
+  const facts = ordenarFacturas(state.facturas.filter(f => f.hospital === "H001"), sort);
   return `
     <div class="page-header">
-      <div><h1>Mis facturas</h1><div class="sub">Facturación emitida en el sistema central del ministerio</div></div>
+      <div><h1>Mis facturas</h1><div class="sub">Facturación emitida en el sistema central del ministerio — ${facts.length} factura(s)</div></div>
       <button class="btn btn-excel" onclick="exportFacturasHosp()">⬇ Excel</button>
     </div>
-    <div class="filter-bar">
-      <select><option>Todos los estados</option></select>
-      <select><option>Todos los financiadores</option>${FINANCIADORES.filter(f=>f.estado!=="sin_usuario").map(f=>`<option>${f.nombre}</option>`).join('')}</select>
-      <input placeholder="Buscar por N°…" style="min-width:200px;">
-    </div>
     <div class="card" style="padding:0;">
-      ${Object.entries(porFin).map(([finId, fs]) => `
-        <div class="group-header"><span class="caret">▾</span><strong>${finNombre(finId)}</strong><span style="color:var(--muted);font-weight:400;">— ${fs.length} factura(s)</span></div>
-        <table>
-          <thead><tr><th>Factura</th><th>Emisión</th><th>Estado</th><th>Días</th><th class="money-header">Monto</th><th class="money-header">Saldo</th></tr></thead>
-          <tbody>${fs.map(f => `<tr class="clickable" data-open-fact-hosp="${f.nro}">
-            <td><code>${f.nro}</code></td><td>${f.fecha}</td><td>${chip(f.estado)}</td>
-            <td>${f.estado === 'en_cola' ? '—' : diasRestantes(f.fecha)}</td>
-            <td class="money">${money(f.monto)}</td><td class="money"><strong>${money(saldoPendiente(f))}</strong></td>
-          </tr>`).join('')}</tbody>
-        </table>
-      `).join('')}
+      <table>
+        <thead><tr>
+          ${thSort('Factura','nro',sort,'data-sort-fact-hosp')}
+          ${thSort('Financiador','financiador',sort,'data-sort-fact-hosp')}
+          ${thSort('Emisión','fecha',sort,'data-sort-fact-hosp')}
+          ${thSort('Estado','estado',sort,'data-sort-fact-hosp')}
+          ${thSort('Días','dias',sort,'data-sort-fact-hosp')}
+          ${thSort('Monto','monto',sort,'data-sort-fact-hosp','money-header')}
+          ${thSort('Saldo','saldo',sort,'data-sort-fact-hosp','money-header')}
+        </tr></thead>
+        <tbody>${facts.map(f => `<tr class="clickable" data-open-fact-hosp="${f.nro}">
+          <td><code>${f.nro}</code></td><td>${finNombre(f.financiador)}</td><td>${f.fecha}</td>
+          <td>${chip(f.estado)}${marcaPagoPendiente(f.nro)}</td>
+          <td>${f.estado === 'en_cola' ? '—' : diasRestantes(f.fecha)}</td>
+          <td class="money">${money(f.monto)}</td><td class="money"><strong>${money(saldoPendiente(f))}</strong></td>
+        </tr>`).join('')}</tbody>
+      </table>
     </div>
   `;
 }
@@ -1583,6 +1829,8 @@ function viewHospital_DetalleFactura(nro) {
     ${requiereMiRespuesta ? `<div class="action-required-banner">
       <div><strong>La auditoría central te derivó ${planteosAbiertos(f).filter(o => o.estado === "derivado_hospital").length} planteo(s)</strong> — ${money(montoEnDebate(f))} en debate. Respondé cada uno por separado, con su documentación.</div>
     </div>` : ""}
+    ${viewSolicitudRechazo(f, "hospital")}
+    ${viewAuditoriaTerreno(f, "hospital")}
     <div class="two-col">
       <div>
         ${viewPlanteosDeFactura(f, "hospital")}
@@ -2166,6 +2414,40 @@ window.exportNotifLote = function(fecha) {
   exportCSV(`${notifId(fecha)}_facturas.csv`, rows);
 };
 
+/* ---- Ordenamiento de las tablas de facturas por columna ----
+   Los encabezados son clickeables: primer clic ordena asc, segundo desc. Compartido por la vista del
+   financiador y la del hospital (state.sortFactFin / state.sortFactHosp). */
+const FACT_SORT_VAL = {
+  nro: f => f.nro,
+  hospital: f => hospNombre(f.hospital),
+  financiador: f => finNombre(f.financiador),
+  fecha: f => f.fecha,
+  estado: f => f.estado,
+  dias: f => (f.estado === "en_cola" ? 9999 : diasRestantes(f.fecha)),
+  monto: f => f.monto,
+  saldo: f => saldoPendiente(f),
+};
+function ordenarFacturas(facts, sort) {
+  const val = FACT_SORT_VAL[sort.col] || FACT_SORT_VAL.dias;
+  const dir = sort.dir === "desc" ? -1 : 1;
+  return [...facts].sort((a, b) => {
+    const va = val(a), vb = val(b);
+    if (typeof va === "number" && typeof vb === "number") return (va - vb) * dir;
+    return String(va).localeCompare(String(vb), "es") * dir;
+  });
+}
+// Encabezado ordenable: muestra la flecha en la columna activa. `ds` es el data-attribute que lo cablea.
+function thSort(label, col, sort, ds, cls = "") {
+  const active = sort.col === col;
+  const arrow = active ? (sort.dir === "asc" ? " ▲" : " ▼") : " ↕";
+  return `<th class="th-sort ${cls} ${active ? 'active' : ''}" ${ds}="${col}" title="Ordenar por ${label}">${label}<span class="sort-arrow">${arrow}</span></th>`;
+}
+// Alterna dirección si es la misma columna, o arranca ascendente en una nueva.
+function toggleSort(sort, col) {
+  if (sort.col === col) sort.dir = sort.dir === "asc" ? "desc" : "asc";
+  else { sort.col = col; sort.dir = "asc"; }
+}
+
 function facturasFinFiltradas() {
   const fl = state.filtrosFactFin;
   const q = fl.q.trim().toLowerCase();
@@ -2182,13 +2464,12 @@ const LABEL_SITUACION = { TODOS: "Todas", por_vencer: "Por vencer (<15 días)", 
 
 function viewFinanciador_Facturas() {
   const fl = state.filtrosFactFin;
-  const facts = facturasFinFiltradas();
+  const sort = state.sortFactFin;
+  const facts = ordenarFacturas(facturasFinFiltradas(), sort);
   const hayFiltro = fl.hospital !== "TODOS" || fl.estado !== "TODOS" || fl.situacion !== "TODOS" || fl.q;
-  const porHospital = {};
-  facts.forEach(f => { (porHospital[f.hospital] = porHospital[f.hospital] || []).push(f); });
   return `
     <div class="page-header">
-      <div><h1>Facturas a revisar</h1><div class="sub">${facts.length} factura(s) en vista${fl.situacion !== "TODOS" ? ` — ${LABEL_SITUACION[fl.situacion]}` : ''} — ordenadas por urgencia</div></div>
+      <div><h1>Facturas a revisar</h1><div class="sub">${facts.length} factura(s) en vista${fl.situacion !== "TODOS" ? ` — ${LABEL_SITUACION[fl.situacion]}` : ''} · ${money(facts.reduce((s,f)=>s+saldoPendiente(f),0))} de saldo</div></div>
       <button class="btn btn-excel" onclick="exportFacturasFin()">⬇ Excel</button>
     </div>
     ${notaRestriccionHospitales()}
@@ -2205,19 +2486,25 @@ function viewFinanciador_Facturas() {
     </div>
     <div class="card" style="padding:0;">
       ${facts.length === 0 ? '<div style="padding:36px;text-align:center;color:var(--muted);">Sin facturas para estos filtros.</div>' :
-        Object.entries(porHospital).map(([hospId, fs]) => `
-        <div class="group-header"><span class="caret">▾</span><strong>${hospNombre(hospId)}</strong><span style="color:var(--muted);font-weight:400;">— ${fs.length} factura(s) · ${money(fs.reduce((s,f)=>s+saldoPendiente(f),0))} de saldo</span></div>
-        <table>
-          <thead><tr><th>Factura</th><th>Notificada</th><th>Estado</th><th>Días</th><th class="money-header">Monto</th><th class="money-header">Saldo</th></tr></thead>
-          <tbody>${fs.map(f => {
-            const dias = diasRestantes(f.fecha);
-            return `<tr class="clickable" data-open-fact-fin="${f.nro}">
-            <td><code>${f.nro}</code></td><td>${f.fecha}</td><td>${chip(f.estado)}</td>
+      `<table>
+        <thead><tr>
+          ${thSort('Factura','nro',sort,'data-sort-fact')}
+          ${thSort('Hospital','hospital',sort,'data-sort-fact')}
+          ${thSort('Notificada','fecha',sort,'data-sort-fact')}
+          ${thSort('Estado','estado',sort,'data-sort-fact')}
+          ${thSort('Días','dias',sort,'data-sort-fact')}
+          ${thSort('Monto','monto',sort,'data-sort-fact','money-header')}
+          ${thSort('Saldo','saldo',sort,'data-sort-fact','money-header')}
+        </tr></thead>
+        <tbody>${facts.map(f => {
+          const dias = diasRestantes(f.fecha);
+          return `<tr class="clickable" data-open-fact-fin="${f.nro}">
+            <td><code>${f.nro}</code></td><td>${hospCorto(f.hospital)}</td><td>${f.fecha}</td>
+            <td>${chip(f.estado)}${marcaPagoPendiente(f.nro)}</td>
             <td style="color:${dias<0?'var(--danger)':dias<=15?'var(--warn)':'var(--muted)'};font-weight:600;">${dias}</td>
             <td class="money">${money(f.monto)}</td><td class="money"><strong>${money(saldoPendiente(f))}</strong></td>
           </tr>`;}).join('')}</tbody>
-        </table>
-      `).join('')}
+      </table>`}
     </div>
   `;
 }
@@ -2231,6 +2518,12 @@ function viewFinanciador_DetalleFactura(nro) {
   const objetados = objecionesDe(f);
   const idsObjetados = objetados.flatMap(o => o.items);
   const pacientes = [...new Set(items.map(i => i.paciente))];
+  const modo = state.detalleModo === "B" ? "B" : "A";
+  const ventana = ventanaObjecionAbierta(f);
+  const req = solicitudRechazoDe(f);
+  const reqAbierta = reqRechazoAbierta(f);
+  const puedeObjetar = ventana && !reqAbierta;
+  const misPlanteos = objetados.filter(o => planteoEsDe(o, "financiador")).length;
   return `
     <div class="breadcrumb"><a data-nav="panel_financiador">Panel</a> / <a data-nav="facturas_financiador">Facturas</a> / ${nro}</div>
     <div class="page-header">
@@ -2241,12 +2534,28 @@ function viewFinanciador_DetalleFactura(nro) {
         </div>
       </div>
     </div>
+    <div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+      <div style="font-size:12px;color:var(--muted);font-weight:600;">Cómo trabajar la conciliación:</div>
+      <div class="switch-vista">
+        <button data-detalle-modo="A" class="${modo==='A'?'active':''}">Vista A — bloque de planteos</button>
+        <button data-detalle-modo="B" class="${modo==='B'?'active':''}">Vista B — desde las prestaciones</button>
+      </div>
+      <div style="font-size:11.5px;color:var(--muted);flex:1;min-width:220px;">${modo==='A'
+        ? 'Opción A: los planteos a resolver aparecen arriba en tarjetas, con todo el detalle a la vista.'
+        : 'Opción B: sin ese bloque. Las prestaciones a trabajar quedan resaltadas en la tabla y se responden desde “Ver documentación”. Pensada para facturas con muchas objeciones.'}</div>
+    </div>
+    <div class="note ${ventana?'note-blue':''}">${ventana
+      ? `<strong>Ventana de objeción abierta</strong> — quedan <strong>${diasVentanaObjecion(f)} día(s)</strong> de los ${DIAS_VENTANA_OBJECION} para abrir objeciones nuevas sobre esta factura (corre desde la notificación).`
+      : `<strong>Ventana de objeción cerrada</strong> — pasaron más de ${DIAS_VENTANA_OBJECION} días desde la notificación. Ya no se pueden abrir objeciones nuevas; entre el día 16 y el 60 solo se sigue discutiendo lo que ya estaba objetado.`}</div>
     ${objetados.length ? `<div class="note"><strong>${idsObjetados.length} prestación(es) objetada(s)</strong> en ${objetados.length} planteo(s), por ${money(objetados.reduce((s,o)=>s+o.monto,0))}. Quedan marcadas en la tabla.</div>` : ''}
+    ${viewSolicitudRechazo(f, "financiador")}
+    ${viewAuditoriaTerreno(f, "financiador")}
     <div class="two-col">
       <div>
-        ${viewPlanteosDeFactura(f, "financiador")}
+        ${modo==='A' ? viewPlanteosDeFactura(f, "financiador")
+          : (misPlanteos ? `<div class="note"><strong>${misPlanteos} planteo(s) esperan tu respuesta.</strong> En esta vista se responden desde la tabla de abajo: las prestaciones a trabajar están <span style="color:var(--danger);font-weight:600;">resaltadas</span> — abrí “Responder →” en cada una.</div>` : '')}
         <div class="card">
-          ${viewTablaItems(f, { seleccionable: true })}
+          ${viewTablaItems(f, { seleccionable: puedeObjetar, resaltarAccion: modo==='B' })}
           <div class="resumen-respuesta">
             <div class="rr-titulo">Resumen de tu respuesta</div>
             <div class="rr-grid">
@@ -2261,13 +2570,15 @@ function viewFinanciador_DetalleFactura(nro) {
           </div>
           <div class="actions-row">
             <button class="btn btn-success" id="btn-aceptar-total">✓ Aceptar factura completa</button>
-            <button class="btn btn-warn" id="btn-objetar-sel" ${sel.length ? '' : 'disabled title="Seleccioná primero las prestaciones que querés objetar"'}>✎ Objetar prestaciones seleccionadas${sel.length ? ` (${sel.length})` : ''}</button>
-            <button class="btn btn-danger" id="btn-rechazar-total">Rechazar factura completa</button>
+            ${puedeObjetar ? `<button class="btn btn-warn" id="btn-objetar-sel" ${sel.length ? '' : 'disabled title="Seleccioná primero las prestaciones que querés objetar"'}>✎ Objetar prestaciones seleccionadas${sel.length ? ` (${sel.length})` : ''}</button>` : ''}
+            ${puedeObjetar && !req ? `<button class="btn btn-danger" id="btn-rechazar-total">Solicitar rechazo de factura</button>` : ''}
+            ${ventana && !auditoriaTerrenoDe(f.nro) ? `<button class="btn btn-secondary" id="btn-terreno">🏥 Solicitar auditoría en terreno</button>` : ''}
           </div>
           <div style="font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.7;">
             <strong>Aceptar</strong>: reconocés el total; queda a pagar dentro de los 60 días.<br>
-            <strong>Objetar</strong>: discutís solo las prestaciones que marcaste; el resto queda reconocido y cobrable de inmediato.<br>
-            <strong>Rechazar todo</strong>: desconocés la factura íntegra. El hospital puede presentar descargo, no es definitivo.
+            ${puedeObjetar ? `<strong>Objetar</strong>: discutís solo las prestaciones que marcaste; el resto queda reconocido y cobrable de inmediato.<br>
+            <strong>Solicitar rechazo</strong>: pedís desconocer la factura íntegra. <strong>No es unilateral</strong>: lo resuelve la auditoría central del ministerio (aprobar / denegar / derivar al hospital).<br>` : ''}
+            <strong>Auditoría en terreno</strong>: pedís una verificación presencial en el hospital; el ministerio la acepta y se acuerda una fecha en común.
           </div>
         </div>
         ${thread ? viewLogConciliacion(nro) : ''}
@@ -2346,13 +2657,19 @@ function openModalPaciente(nro, paciente) {
   if (!items.length) return;
   const objs = objecionesDe(f);
   const rol = state.role;
-  const puedeObjetar = rol === "financiador";
+  // La objeción solo se puede abrir dentro de la ventana de 15 días desde la notificación.
+  const ventanaAbierta = ventanaObjecionAbierta(f);
+  const puedeObjetar = rol === "financiador" && ventanaAbierta;
+  const ventanaCerrada = rol === "financiador" && !ventanaAbierta;
   const p = items[0];
+  const diags = [...new Set(items.map(i => i.diagnostico).filter(Boolean))];
   // Planteos que alcanzan a alguna prestación de este paciente.
   const idsPac = items.map(i => i.id);
   const susPlanteos = objs.filter(o => o.items.some(id => idsPac.includes(id)));
   openModal(`<h3>${paciente}</h3>
     <p class="subtle">DNI ${p.dni} · ${p.afiliado} · ${items.length} prestación(es) en la factura ${nro} por ${money(items.reduce((s,i)=>s+i.monto,0))}</p>
+    ${diags.length ? `<div class="diag-box"><div class="diag-tit">Diagnóstico${diags.length > 1 ? 's' : ''}</div>${diags.map(d => `<div>${d}</div>`).join('')}</div>` : ''}
+    ${ventanaCerrada ? `<div class="note"><strong>Ventana de objeción cerrada.</strong> Pasaron más de ${DIAS_VENTANA_OBJECION} días desde la notificación (${-diasVentanaObjecion(f)} días desde el cierre): no se pueden abrir objeciones nuevas sobre esta factura. Solo pueden seguir discutiéndose las prestaciones ya objetadas.</div>` : ''}
     <label>Documentación de respaldo</label>
     <div class="attachments">${DOCS_PACIENTE.map(d => `<span class="attachment-chip">📎 ${d.toLowerCase().replace(/ /g,'_')}_${p.dni.replace(/\D/g,'')}.pdf</span>`).join('')}</div>
     ${susPlanteos.length ? `<label>Planteos que alcanzan a este paciente</label>
@@ -2374,6 +2691,21 @@ function openModalPaciente(nro, paciente) {
             El planteo abarca ${o.items.length} prestaciones en total. Lo que decidas acá se aplica solo a las de
             <strong>${paciente}</strong>: el resto queda en ${o.id} para resolverse por separado.
           </div>` : ''}
+          ${(() => {
+            // La conversación completa del planteo: lo que planteé, lo que me respondieron y la
+            // documentación nueva. En Vista B es acá donde el usuario ve el ida y vuelta.
+            const movs = o.respuestas || [];
+            const resto = movs.filter(m => !m.inicial);
+            return `<div class="pac-conversacion">
+              <div class="planteo-origen" style="margin:8px 0 6px;"><div class="planteo-origen-tit">Lo que planteó ${finNombre(f.financiador)}</div>
+                <div style="font-size:12.5px;">${o.detalle}</div>
+                ${o.adjuntos && o.adjuntos.length ? `<div class="attachments" style="margin-top:6px;">${o.adjuntos.map(a => `<span class="attachment-chip">📎 ${a.nombre || a}</span>`).join('')}</div>` : ''}</div>
+              ${resto.length ? `<div style="font-size:10.5px;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);font-weight:600;margin:6px 0 4px;">Respuestas y documentación recibida</div>
+                ${resto.map(m => `<div class="caso-nodo from-${m.who}"><div class="caso-meta">${m.nombre} · ${m.tipo || 'Movimiento'} · ${m.when}</div><div>${m.texto || ''}</div>
+                  ${m.adjuntos && m.adjuntos.length ? `<div class="attachments" style="margin-top:4px;">${m.adjuntos.map(a => `<span class="attachment-chip">📎 ${a.nombre || a}</span>`).join('')}</div>` : ''}</div>`).join('')}`
+                : `<div style="font-size:11.5px;color:var(--muted);margin-top:4px;">Todavía sin respuestas de la otra parte.</div>`}
+            </div>`;
+          })()}
           ${acc ? `<div class="actions-row" style="margin-top:8px;">${acc}</div>` : ''}
         </div>`;
       }).join('')}` : ''}
@@ -2384,9 +2716,9 @@ function openModalPaciente(nro, paciente) {
         return `<div class="paciente-item">
           ${puedeObjetar ? `<input type="checkbox" class="pac-check" data-id="${it.id}" ${o ? 'disabled' : ''}>` : ''}
           <div style="flex:1;">
-            <div><strong>${it.prestacion}</strong> <code>${it.codigo}</code></div>
-            <div style="font-size:11px;color:var(--muted);">Fecha: ${it.fecha} · ${money(it.monto)}</div>
-            ${o ? `<div style="margin-top:4px;"><span class="chip ${PLANTEO_LABEL[o.estado]?.cls || 'chip-esperando-hospital'}">${o.id} · ${o.categoria}</span></div>` : ''}
+            <div><strong>${it.prestacion}</strong> <code>${it.codigo}</code> ${chipAmbito(ambitoDe(it))}</div>
+            <div style="font-size:11px;color:var(--muted);">${ambitoDe(it) === "internacion" ? `Ingreso ${it.fechaIngreso} · Egreso ${it.fechaEgreso}` : `Fecha: ${it.fecha}`} · ${money(it.monto)}</div>
+            ${o ? `<div style="margin-top:4px;"><span class="chip ${PLANTEO_LABEL[o.estado]?.cls || 'chip-esperando-hospital'}" title="${o.uid || ''}">${o.id} · ${o.categoria}</span></div>` : ''}
           </div>
           <div style="font-family:monospace;font-size:13px;">${money(it.monto)}</div>
         </div>`;
@@ -2423,6 +2755,7 @@ const CATEGORIAS_OBJECION = [
 
 function openModalObjetarItems(nro) {
   const f = state.facturas.find(x => x.nro === nro); if (!f) return;
+  if (!ventanaObjecionAbierta(f)) { showToast(`⚠ Ventana de objeción cerrada — pasaron más de ${DIAS_VENTANA_OBJECION} días desde la notificación`); return; }
   const items = itemsDe(nro).filter(i => state.selItems.includes(i.id));
   if (!items.length) { showToast("⚠ No hay prestaciones seleccionadas"); return; }
   const total = items.reduce((s, i) => s + i.monto, 0);
@@ -2436,7 +2769,7 @@ function openModalObjetarItems(nro) {
     <label>Prestaciones alcanzadas</label>
     <div style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;">
       <table style="font-size:12px;"><tbody>${items.map(i => `<tr>
-        <td>${i.paciente}</td><td>${i.prestacion}</td><td><code>${i.codigo}</code></td><td class="money">${money(i.monto)}</td>
+        <td>${i.paciente}</td><td>${i.prestacion}</td><td>${chipAmbito(ambitoDe(i))}</td><td><code>${i.codigo}</code></td><td class="money">${money(i.monto)}</td>
       </tr>`).join('')}</tbody></table>
     </div>
     <label>Motivo de la objeción</label>
@@ -2449,10 +2782,10 @@ function openModalObjetarItems(nro) {
     <label>Monto objetado</label>
     <input type="number" id="obj-monto" value="${total}">
     <div style="font-size:11px;color:var(--muted);margin-top:4px;">Por defecto, el total de las prestaciones seleccionadas. Ajustalo si solo objetás la diferencia de valor.</div>
-    <label>Adjuntar respaldo</label><input type="file" multiple>
+    <label>Adjuntar respaldo</label>${docUploader('obj-uploader')}
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-warn" onclick="confirmarObjecionItems('${nro}')">Enviar objeción al hospital</button>
+      <button class="btn btn-warn" onclick="confirmarObjecionItems('${nro}')">Enviar objeción a la auditoría central</button>
     </div>`);
 }
 window.confirmarObjecionItems = function(nro) {
@@ -2465,8 +2798,8 @@ window.confirmarObjecionItems = function(nro) {
   const detalle = $("#obj-detalle").value.trim() || "(sin detalle)";
   const monto = Math.max(0, Number($("#obj-monto").value) || 0);
   // Toda objeción entra por la auditoría central: el hospital solo interviene si ésta se la deriva.
-  const nuevo = { id: "OBJ-" + (objecionesDe(f).length + 1), items: ids, categoria, detalle, monto, fecha: HOY,
-    estado: "en_auditoria", adjuntos: [{ nombre: `respaldo_objecion_${nro}.pdf`, tipo: "pdf" }], respuestas: [] };
+  const nuevo = { id: "OBJ-" + (objecionesDe(f).length + 1), uid: nuevoUidObjecion(), items: ids, categoria, detalle, monto, fecha: HOY,
+    estado: "en_auditoria", adjuntos: adjuntosDelUploader('obj-uploader', `respaldo_objecion_${nro}.pdf`), respuestas: [] };
   f.objeciones = [...objecionesDe(f), nuevo];
   f.estado = "esperando_auditoria";
   const pacientes = [...new Set(items.map(i => i.paciente))];
@@ -2490,7 +2823,7 @@ function viewFinanciador_Conciliacion(subestado) {
   const facts = state.facturas.filter(f => f.financiador === "F001" && puedeVerHospitalFin(f.hospital) && (subestado === "yo" ? esConcYo_fin(f) : esConcHosp_fin(f)));
   const titulo = subestado === "yo" ? "Esperan mi respuesta" : "Esperando resolución";
   const sub = subestado === "yo"
-    ? "La auditoría o el hospital ya respondieron: te toca re-evaluar."
+    ? "La auditoría o el hospital ya respondieron: te toca re-evaluar. Al abrir una factura elegís cómo trabajarla (Vista A o B) desde el toggle de arriba."
     : "Ya planteaste tu objeción. La resuelve la auditoría central del ministerio, que puede desestimarla o derivarla al hospital.";
   return `
     <div class="page-header"><div><h1>Conciliación — ${titulo}</h1><div class="sub">${sub}</div></div></div>
@@ -3221,7 +3554,23 @@ function viewMinisterio_Auditoria() {
                   ...devueltas.map(f => filaSeguimiento(f, '<span class="chip chip-esperando-financiador">Financiador</span>'))].join('')
                   || '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">Sin conciliaciones en seguimiento.</td></tr>'}</tbody>
       </table>
-    </div>`;
+    </div>
+    ${(() => {
+      const ats = state.auditoriasTerreno.filter(a => !["realizada","rechazada","cancelada"].includes(a.estado));
+      if (!ats.length) return '';
+      return `<div class="card" style="padding:0;">
+        <div class="group-header"><strong>🏥 Auditorías en terreno</strong> <span style="color:var(--muted);font-weight:400;">— verificaciones presenciales solicitadas por los financiadores, a coordinar con el hospital</span></div>
+        <table>
+          <thead><tr><th>Factura</th><th>Hospital</th><th>Financiador</th><th>Estado</th><th>Fecha</th><th></th></tr></thead>
+          <tbody>${ats.map(a => { const st = ESTADO_TERRENO[a.estado] || ESTADO_TERRENO.solicitada; return `<tr class="clickable" data-open-fact-min="${a.factura}">
+            <td><code>${a.factura}</code></td><td>${hospCorto(a.hospital)}</td><td>${finNombre(a.financiador)}</td>
+            <td><span class="chip ${st.cls}">${st.txt}</span></td>
+            <td>${a.fechaPropuesta || a.fechaPreferida || '—'}</td>
+            <td style="text-align:right;"><button class="btn btn-primary btn-sm" data-open-fact-min="${a.factura}">Gestionar →</button></td>
+          </tr>`; }).join('')}</tbody>
+        </table>
+      </div>`;
+    })()}`;
 }
 window.exportMinAuditoria = function() {
   const facts = state.facturas.filter(f => ["esperando_auditoria","esperando_hospital","esperando_financiador"].includes(f.estado));
@@ -3241,6 +3590,8 @@ function viewMinisterio_DetalleFactura(nro) {
   const pacientes = [...new Set(items.map(i => i.paciente))];
   const vence = new Date(new Date(f.fecha).getTime() + 60*86400000).toISOString().split("T")[0];
   const enAud = objecionesDe(f).filter(o => o.estado === "en_auditoria").length;
+  const modo = state.detalleModo === "B" ? "B" : "A";
+  const misPlanteos = objecionesDe(f).filter(o => planteoEsDe(o, "ministerio")).length;
   return `
     <div class="breadcrumb"><a data-nav="auditoria">Auditoría central</a> / ${nro}</div>
     <div class="page-header">
@@ -3253,13 +3604,26 @@ function viewMinisterio_DetalleFactura(nro) {
         </div>
       </div>
     </div>
+    <div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+      <div style="font-size:12px;color:var(--muted);font-weight:600;">Cómo trabajar la conciliación:</div>
+      <div class="switch-vista">
+        <button data-detalle-modo="A" class="${modo==='A'?'active':''}">Vista A — bloque de planteos</button>
+        <button data-detalle-modo="B" class="${modo==='B'?'active':''}">Vista B — desde las prestaciones</button>
+      </div>
+      <div style="font-size:11.5px;color:var(--muted);flex:1;min-width:220px;">${modo==='A'
+        ? 'Opción A: los planteos a resolver aparecen arriba en tarjetas, con todo el detalle a la vista.'
+        : 'Opción B: sin ese bloque. Las prestaciones a resolver quedan resaltadas en la tabla y se resuelven desde “Ver documentación”.'}</div>
+    </div>
     ${enAud > 0 ? `<div class="action-required-banner">
       <div><strong>${enAud} planteo(s) esperan tu resolución.</strong> Revisá la prestación, el paciente y la documentación antes de decidir. Podés desestimar unos y derivar otros: la resolución parcial sale de eso.</div>
-    </div>` : `<div class="note note-blue">No hay planteos pendientes de resolución en esta factura.</div>`}
+    </div>` : (reqRechazoAbierta(f) || auditoriaTerrenoDe(f.nro) ? '' : `<div class="note note-blue">No hay planteos pendientes de resolución en esta factura.</div>`)}
+    ${viewSolicitudRechazo(f, "ministerio")}
+    ${viewAuditoriaTerreno(f, "ministerio")}
     <div class="two-col">
       <div>
-        ${viewPlanteosDeFactura(f, "ministerio")}
-        <div class="card">${viewTablaItems(f, { seleccionable: false })}</div>
+        ${modo==='A' ? viewPlanteosDeFactura(f, "ministerio")
+          : (misPlanteos ? `<div class="note"><strong>${misPlanteos} planteo(s) esperan tu resolución.</strong> En esta vista se resuelven desde la tabla de abajo: las prestaciones a resolver están <span style="color:var(--danger);font-weight:600;">resaltadas</span> — abrí “Responder →” en cada una.</div>` : '')}
+        <div class="card">${viewTablaItems(f, { seleccionable: false, resaltarAccion: modo==='B' })}</div>
         ${viewLogConciliacion(nro)}
       </div>
       <div>
@@ -3609,25 +3973,15 @@ function wireEvents() {
         ? `Esto <strong>da por cerradas las objeciones abiertas</strong> (${money(montoEnDebate(f))}) y deja todo el saldo como cobrable. El plazo de 60 días sigue corriendo.`
         : "El saldo completo queda reconocido y a pagar. El plazo de 60 días sigue corriendo hasta cancelarlo.",
       onOk: () => {
-        f.estado = "aceptada"; f.objeciones = []; f.montoDebate = 0; f.rechazoTotal = false;
+        f.estado = "aceptada"; f.objeciones = []; f.montoDebate = 0; f.rechazoTotal = false; f.solicitudRechazo = null;
         closeModal(); render(); showToast("✓ Factura aceptada — saldo reconocido");
       } });
   });
   const bOS = $("#btn-objetar-sel"); if (bOS && !bOS.disabled) bOS.addEventListener('click', () => openModalObjetarItems(state.context.factura));
-  const bRT = $("#btn-rechazar-total"); if (bRT) bRT.addEventListener('click', () => {
-    const f = factActual(); if (!f) return;
-    confirmarAccion({ titulo: "Rechazar la factura completa", clase: "btn-danger", textoBoton: "Sí, rechazar todo",
-      mensaje: `Vas a desconocer íntegramente la factura ${f.nro} por ${money(f.monto)}.`,
-      detalle: "Queda el total en debate y <strong>nada cobrable</strong> hasta que se resuelva. El planteo lo recibe primero la <strong>auditoría central del ministerio</strong>, que puede desestimarlo o derivarlo al hospital. No es definitivo. Si en realidad discrepás solo con algunas prestaciones, objetá esas y el resto queda cobrable.",
-      onOk: () => {
-        f.estado = "esperando_auditoria"; f.rechazoTotal = true; f.montoDebate = saldoPendiente(f);
-        if (!state.threads[f.nro]) state.threads[f.nro] = [];
-        state.threads[f.nro].push({ who: "financiador", nombre: "IOMA", when: "hoy",
-          text: `Rechazamos la factura en su totalidad (${money(f.monto)}).`,
-          accion: { tipo: "Rechazo total", categorias: ["Desconocimiento íntegro de la factura"], detalles: ["Queda a resolución de la auditoría central, que puede desestimarlo o derivarlo al hospital."] }, adjuntos: [] });
-        closeModal(); render(); showToast("Factura rechazada — elevada a la auditoría central");
-      } });
-  });
+  const bRT = $("#btn-rechazar-total"); if (bRT) bRT.addEventListener('click', () => openModalSolicitarRechazo(state.context.factura));
+  const bTerr = $("#btn-terreno"); if (bTerr) bTerr.addEventListener('click', () => openModalSolicitarTerreno(state.context.factura));
+  // Toggle Vista A / Vista B del detalle de factura del financiador.
+  document.querySelectorAll('[data-detalle-modo]').forEach(el => el.addEventListener('click', () => { state.detalleModo = el.dataset.detalleModo; render(); }));
   /* ---- Filtros del panel del financiador ---- */
   document.querySelectorAll('[data-filtro-panel]').forEach(el => el.addEventListener('change', () => {
     state.filtrosPanelFin[el.dataset.filtroPanel] = el.value; render();
@@ -3655,6 +4009,9 @@ function wireEvents() {
   wireFiltros('[data-filtro-fact]', 'filtroFact', 'filtrosFactFin');
   const ffr = document.querySelector('[data-filtro-fact-reset]');
   if (ffr) ffr.addEventListener('click', () => { state.filtrosFactFin = { hospital: "TODOS", estado: "TODOS", situacion: "TODOS", q: "" }; render(); });
+  /* ---- Ordenamiento por encabezado de las tablas de facturas ---- */
+  document.querySelectorAll('[data-sort-fact]').forEach(el => el.addEventListener('click', () => { toggleSort(state.sortFactFin, el.dataset.sortFact); render(); }));
+  document.querySelectorAll('[data-sort-fact-hosp]').forEach(el => el.addEventListener('click', () => { toggleSort(state.sortFactHosp, el.dataset.sortFactHosp); render(); }));
   /* ---- Selección y filtrado de prestaciones dentro de la factura ---- */
   wireFiltros('[data-filtro-item]', 'filtroItem', 'filtroItems');
   const fir = document.querySelector('[data-filtro-item-reset]');
@@ -3865,6 +4222,65 @@ function wireEventsResto() {
     }
     render(); showToast("✓ Pago confirmado — imputado a las facturas");
   }));
+  /* ---- Solicitud de rechazo total: resolución (ministerio) y respuesta (hospital) ---- */
+  document.querySelectorAll('[data-req-aprobar]').forEach(el => el.addEventListener('click', () => window.__resolverReqRechazo(el.dataset.reqAprobar, "aprobar")));
+  document.querySelectorAll('[data-req-denegar]').forEach(el => el.addEventListener('click', () => window.__resolverReqRechazo(el.dataset.reqDenegar, "denegar")));
+  document.querySelectorAll('[data-req-derivar]').forEach(el => el.addEventListener('click', () => window.__resolverReqRechazo(el.dataset.reqDerivar, "derivar")));
+  document.querySelectorAll('[data-req-hosp-responder]').forEach(el => el.addEventListener('click', () => openModalReqRechazoHosp(el.dataset.reqHospResponder)));
+  /* ---- Auditoría en terreno ---- */
+  document.querySelectorAll('[data-terreno-proponer]').forEach(el => el.addEventListener('click', () => openModalTerrenoProponer(el.dataset.terrenoProponer)));
+  document.querySelectorAll('[data-terreno-proponer-fin]').forEach(el => el.addEventListener('click', () => openModalTerrenoProponerFin(el.dataset.terrenoProponerFin)));
+  document.querySelectorAll('[data-terreno-confirmar]').forEach(el => el.addEventListener('click', () => window.__terrenoConfirmar(el.dataset.terrenoConfirmar, state.role)));
+  document.querySelectorAll('[data-terreno-rechazar]').forEach(el => el.addEventListener('click', () => window.__terrenoRechazar(el.dataset.terrenoRechazar)));
+  document.querySelectorAll('[data-terreno-realizada]').forEach(el => el.addEventListener('click', () => window.__terrenoRealizada(el.dataset.terrenoRealizada)));
+  /* ---- Registro de conciliación: cronológico vs. por caso (árbol) ---- */
+  document.querySelectorAll('[data-log-modo]').forEach(el => el.addEventListener('click', () => { state.logModo = el.dataset.logModo; render(); }));
+}
+
+/* ---- Cargador de documentación repetible ----
+   En todos los formularios donde se adjunta respaldo, el usuario tiene que poder sumar VARIOS
+   documentos (una cirugía suele requerir 5 o 6: historia clínica, autorización, epicrisis, parte
+   quirúrgico…). Este componente arranca con una fila y agrega más con "+ Agregar documento".
+   Es de maqueta: registra el nombre tipeado o el del archivo elegido. */
+function filaUploader() {
+  return `<div class="doc-row">
+    <input type="text" class="doc-nombre" placeholder="Nombre / descripción del documento (ej: historia clínica)">
+    <input type="file" class="doc-file">
+    <button type="button" class="btn btn-secondary btn-sm doc-del" title="Quitar documento">✕</button>
+  </div>`;
+}
+function docUploader(id) {
+  return `<div class="doc-uploader" id="${id}">
+    <div class="doc-uploader-rows">${filaUploader()}</div>
+    <button type="button" class="btn btn-secondary btn-sm" data-add-doc="${id}" style="margin-top:6px;">+ Agregar más documentación</button>
+    <div style="font-size:11px;color:var(--muted);margin-top:4px;">Podés adjuntar tantos documentos como necesites — sumá una fila por cada archivo.</div>
+  </div>`;
+}
+// Lee lo cargado en un uploader concreto (por id) y devuelve la lista de adjuntos {nombre,tipo}.
+function adjuntosDelUploader(id, fallback) {
+  const cont = document.getElementById(id);
+  const docs = [];
+  if (cont) cont.querySelectorAll('.doc-row').forEach(row => {
+    const archivo = row.querySelector('.doc-file')?.files?.[0]?.name || "";
+    const nombre = (row.querySelector('.doc-nombre')?.value.trim()) || archivo;
+    if (nombre) docs.push({ nombre: /\.\w+$/.test(nombre) ? nombre : nombre.toLowerCase().replace(/\s+/g, '_') + ".pdf", tipo: "pdf" });
+  });
+  if (!docs.length && fallback) docs.push({ nombre: fallback, tipo: "pdf" });
+  return docs;
+}
+function wireDocUploaders() {
+  document.querySelectorAll('#modal-content [data-add-doc]').forEach(btn => btn.addEventListener('click', () => {
+    const cont = document.getElementById(btn.dataset.addDoc);
+    cont?.querySelector('.doc-uploader-rows')?.insertAdjacentHTML('beforeend', filaUploader());
+    wireDocDel();
+  }));
+  wireDocDel();
+}
+function wireDocDel() {
+  document.querySelectorAll('#modal-content .doc-del').forEach(b => b.onclick = () => {
+    const rows = b.closest('.doc-uploader-rows');
+    if (rows && rows.children.length > 1) b.closest('.doc-row').remove();
+  });
 }
 
 function openModal(html) {
@@ -3875,6 +4291,7 @@ function openModal(html) {
     const cb = item.querySelector('input[type="checkbox"]');
     if (cb) cb.addEventListener('change', () => item.classList.toggle('checked', cb.checked));
   });
+  wireDocUploaders();
 }
 function closeModal() { $("#modal-backdrop").classList.remove("open"); }
 window.closeModal = closeModal;
@@ -4350,6 +4767,222 @@ window.confirmarFinRespuesta = function(nro, objId, modo) {
   showToast(sostener ? `${o.id} sostenido — vuelve a la auditoría` : `${o.id} — pedido enviado a la auditoría`);
 };
 
+/* ================= SOLICITUD DE RECHAZO TOTAL (flujo nuevo) =================
+   El financiador SOLICITA el rechazo con un motivo libre. Lo resuelve la auditoría central del
+   ministerio: aprobar (queda rechazada), denegar (vuelve a estar reconocida) o derivar al hospital. */
+function openModalSolicitarRechazo(nro) {
+  const f = state.facturas.find(x => x.nro === nro); if (!f) return;
+  if (!ventanaObjecionAbierta(f)) { showToast(`⚠ Ventana de objeción cerrada — no se puede solicitar el rechazo`); return; }
+  openModal(`<h3>Solicitar rechazo de la factura ${nro}</h3>
+    <p class="subtle">${finNombre(f.financiador)} — ${hospNombre(f.hospital)} — ${money(f.monto)}</p>
+    <div class="note">El rechazo total <strong>no es unilateral</strong>: lo resuelve la <strong>auditoría central del ministerio</strong>, que puede aprobarlo, denegarlo o derivarlo al hospital para que responda. Mientras se resuelve, queda el total en debate.</div>
+    <label>Motivo del rechazo (texto libre)</label>
+    <textarea id="req-motivo" placeholder="Ej: la factura corresponde a un afiliado que no pertenece al financiador; se solicita el desconocimiento íntegro."></textarea>
+    <label>Adjuntar respaldo</label>${docUploader('req-uploader')}
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-danger" onclick="confirmarSolicitarRechazo('${nro}')">Enviar solicitud a la auditoría</button>
+    </div>`);
+}
+window.confirmarSolicitarRechazo = function(nro) {
+  const f = state.facturas.find(x => x.nro === nro); if (!f) return;
+  const motivo = ($("#req-motivo")?.value || "").trim();
+  if (!motivo) { showToast("⚠ Ingresá el motivo del rechazo"); return; }
+  const adjuntos = adjuntosDelUploader('req-uploader');
+  f.solicitudRechazo = { motivo, fecha: HOY, estado: "en_auditoria", adjuntos };
+  f.estado = "esperando_auditoria"; f.rechazoTotal = true; f.montoDebate = saldoPendiente(f);
+  if (!state.threads[nro]) state.threads[nro] = [];
+  state.threads[nro].push({ who: "financiador", nombre: "IOMA", when: "hoy",
+    text: `Solicitamos el rechazo total de la factura (${money(f.monto)}).`,
+    accion: { tipo: "Solicitud de rechazo total", categorias: ["Desconocimiento íntegro de la factura"], detalles: [motivo] }, adjuntos });
+  closeModal(); render(); showToast("Solicitud de rechazo elevada a la auditoría central");
+};
+// Ministerio: aprobar o denegar el rechazo (derivar abre su propio modal).
+window.__resolverReqRechazo = function(nro, accion) {
+  const f = state.facturas.find(x => x.nro === nro); if (!f) return;
+  const r = f.solicitudRechazo; if (!r) return;
+  if (accion === "derivar") { openModalReqDerivar(nro); return; }
+  const aprobar = accion === "aprobar";
+  confirmarAccion({ titulo: aprobar ? "Aprobar el rechazo total" : "Denegar el rechazo total",
+    clase: aprobar ? "btn-danger" : "btn-success", textoBoton: aprobar ? "Sí, aprobar el rechazo" : "Sí, denegar",
+    mensaje: aprobar ? `Vas a dar por rechazada íntegramente la factura ${nro} (${money(f.monto)}).`
+                     : `Vas a denegar el pedido de rechazo: la factura ${nro} vuelve a quedar reconocida.`,
+    detalle: aprobar ? "La factura queda <strong>rechazada</strong>. El hospital podrá emitir la nota de crédito total para cerrarla."
+                     : "El financiador es notificado y la factura vuelve a estar aceptada / a pagar dentro de los 60 días.",
+    onOk: () => {
+      if (aprobar) { r.estado = "aprobado"; r.resolucion = "El ministerio aprobó el rechazo total de la factura."; f.estado = "rechazada_total"; }
+      else { r.estado = "denegado"; r.resolucion = "El ministerio denegó el pedido: la factura se mantiene."; f.rechazoTotal = false; f.montoDebate = 0;
+             f.estado = objecionesDe(f).some(planteoAbierto) ? f.estado : "aceptada"; }
+      state.auditoria.resueltas++;
+      if (!state.threads[nro]) state.threads[nro] = [];
+      state.threads[nro].push({ who: "ministerio", nombre: "Auditoría central — SAMO", when: "hoy",
+        text: aprobar ? `Aprobamos el rechazo total de la factura.` : `Denegamos el pedido de rechazo total.`,
+        accion: { tipo: aprobar ? "Rechazo aprobado" : "Rechazo denegado", categorias: ["Resolución de la auditoría"], detalles: [r.resolucion] }, adjuntos: [] });
+      closeModal(); render(); showToast(aprobar ? "✓ Rechazo aprobado — factura rechazada" : "✓ Rechazo denegado — factura reactivada");
+    } });
+};
+function openModalReqDerivar(nro) {
+  const f = state.facturas.find(x => x.nro === nro); if (!f) return;
+  openModal(`<h3>Derivar el pedido de rechazo al hospital</h3>
+    <p class="subtle">Factura ${nro} — ${hospNombre(f.hospital)}</p>
+    <div class="note">El hospital tiene que <strong>responder</strong>: aceptar el rechazo (emitir nota de crédito total) o refutarlo con documentación. Luego el pedido vuelve a la auditoría para su resolución.</div>
+    <label>Instrucción para el hospital</label>
+    <textarea id="req-instr" placeholder="Ej: verificar la titularidad del afiliado y aportar el padrón consultado a la fecha de atención."></textarea>
+    <label>Documentación que aporta la auditoría</label>${docUploader('req-der-uploader')}
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-warn" onclick="confirmarReqDerivar('${nro}')">Derivar al hospital</button>
+    </div>`);
+}
+window.confirmarReqDerivar = function(nro) {
+  const f = state.facturas.find(x => x.nro === nro); if (!f) return;
+  const r = f.solicitudRechazo; if (!r) return;
+  const instr = ($("#req-instr")?.value || "").trim() || "(sin instrucción)";
+  r.estado = "derivado_hospital"; f.estado = "esperando_hospital";
+  state.auditoria.derivadas++;
+  if (!state.threads[nro]) state.threads[nro] = [];
+  state.threads[nro].push({ who: "ministerio", nombre: "Auditoría central — SAMO", when: "hoy",
+    text: `Derivamos el pedido de rechazo total al hospital para su descargo.`,
+    accion: { tipo: "Pedido de rechazo derivado al hospital", categorias: ["Derivación"], detalles: [instr] }, adjuntos: adjuntosDelUploader('req-der-uploader') });
+  closeModal(); render(); showToast("→ Pedido de rechazo derivado al hospital");
+};
+// Hospital: responde al pedido de rechazo derivado (acepta o refuta) → vuelve a la auditoría.
+function openModalReqRechazoHosp(nro) {
+  const f = state.facturas.find(x => x.nro === nro); if (!f) return;
+  openModal(`<h3>Responder el pedido de rechazo — factura ${nro}</h3>
+    <p class="subtle">${finNombre(f.financiador)} solicitó el rechazo total. Respondé con tu descargo.</p>
+    <label>Tu posición</label>
+    <div class="cat-list">
+      <div class="cat-item"><label class="cat-header"><input type="radio" name="req-hosp" value="refutar" checked><span style="flex:1;">Refutar el rechazo<div style="font-weight:400;font-size:11.5px;color:var(--muted);">Sostengo la factura y aporto evidencia.</div></span></label></div>
+      <div class="cat-item"><label class="cat-header"><input type="radio" name="req-hosp" value="aceptar"><span style="flex:1;">Aceptar el rechazo<div style="font-weight:400;font-size:11.5px;color:var(--muted);">Corresponde: emitiré nota de crédito total.</div></span></label></div>
+    </div>
+    <label>Fundamento</label><textarea id="req-hosp-texto" placeholder="Explicá tu respuesta con la evidencia que la respalda."></textarea>
+    <label>Documentación que se adjunta</label>${docUploader('req-hosp-uploader')}
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarReqRechazoHosp('${nro}')">Enviar respuesta a la auditoría</button>
+    </div>`);
+}
+window.confirmarReqRechazoHosp = function(nro) {
+  const f = state.facturas.find(x => x.nro === nro); if (!f) return;
+  const r = f.solicitudRechazo; if (!r) return;
+  const pos = document.querySelector('input[name="req-hosp"]:checked')?.value || "refutar";
+  const texto = ($("#req-hosp-texto")?.value || "").trim() || "(sin fundamento)";
+  r.estado = "respondido_hospital";
+  r.resolucion = (pos === "aceptar" ? "El hospital acepta el rechazo: emitirá nota de crédito total. " : "El hospital refuta el rechazo. ") + texto;
+  f.estado = "esperando_auditoria";
+  if (!state.threads[nro]) state.threads[nro] = [];
+  state.threads[nro].push({ who: "hospital", nombre: "Hosp. San Martín", when: "hoy",
+    text: pos === "aceptar" ? `Aceptamos el pedido de rechazo total.` : `Refutamos el pedido de rechazo total.`,
+    accion: { tipo: pos === "aceptar" ? "Rechazo aceptado por el hospital" : "Rechazo refutado por el hospital", categorias: ["Descargo"], detalles: [texto] },
+    adjuntos: adjuntosDelUploader('req-hosp-uploader') });
+  closeModal(); render(); showToast("✓ Respuesta enviada — vuelve a la auditoría central");
+};
+
+/* ================= AUDITORÍA EN TERRENO (presencial) =================
+   La solicita el financiador; el ministerio la acepta y se acuerda una fecha en común. */
+function openModalSolicitarTerreno(nro) {
+  const f = state.facturas.find(x => x.nro === nro); if (!f) return;
+  if (!ventanaObjecionAbierta(f)) { showToast(`⚠ Ventana cerrada — la auditoría en terreno se solicita dentro de los ${DIAS_VENTANA_OBJECION} días`); return; }
+  openModal(`<h3>Solicitar auditoría en terreno</h3>
+    <p class="subtle">Verificación <strong>presencial</strong> en ${hospNombre(f.hospital)} — factura ${nro}.</p>
+    <div class="note note-blue">La solicitás vos; el <strong>ministerio la acepta</strong> y se acuerda una <strong>fecha en común</strong> para realizarla en el hospital. Sirve para revisar historias clínicas y registros que no se resuelven por documentación digital.</div>
+    <label>Motivo / alcance de la auditoría</label>
+    <textarea id="terr-motivo" placeholder="Ej: revisar historias clínicas y partes quirúrgicos de las prestaciones objetadas."></textarea>
+    <label>Participantes por el financiador</label>
+    <input id="terr-part" placeholder="Ej: 2 auditores médicos + 1 administrativo">
+    <label>Fecha de preferencia (a acordar con el ministerio)</label>
+    <input type="date" id="terr-fecha" value="${HOY}">
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarSolicitarTerreno('${nro}')">Enviar solicitud al ministerio</button>
+    </div>`);
+}
+window.confirmarSolicitarTerreno = function(nro) {
+  const f = state.facturas.find(x => x.nro === nro); if (!f) return;
+  const motivo = ($("#terr-motivo")?.value || "").trim();
+  if (!motivo) { showToast("⚠ Indicá el motivo de la auditoría en terreno"); return; }
+  const a = { id: "AT-" + String(state.auditoriasTerreno.length + 1).padStart(3, "0"),
+    factura: nro, hospital: f.hospital, financiador: f.financiador, motivo,
+    participantes: ($("#terr-part")?.value || "").trim() || "Auditoría del financiador",
+    fechaSolicitud: HOY, estado: "solicitada", fechaPropuesta: null, propuestaPor: null,
+    fechaPreferida: $("#terr-fecha")?.value || null };
+  state.auditoriasTerreno.push(a);
+  if (!state.threads[nro]) state.threads[nro] = [];
+  state.threads[nro].push({ who: "financiador", nombre: "IOMA", when: "hoy",
+    text: `Solicitamos una auditoría en terreno (presencial) en ${hospNombre(f.hospital)}.`,
+    accion: { tipo: "Solicitud de auditoría en terreno", categorias: ["Verificación presencial"], detalles: [motivo, a.fechaPreferida ? `Fecha de preferencia: ${a.fechaPreferida}` : ""].filter(Boolean) }, adjuntos: [] });
+  closeModal(); render(); showToast("🏥 Auditoría en terreno solicitada — espera aceptación del ministerio");
+};
+function openModalTerrenoProponer(id) {
+  const a = state.auditoriasTerreno.find(x => x.id === id); if (!a) return;
+  openModal(`<h3>Proponer fecha para la auditoría en terreno</h3>
+    <p class="subtle">${finNombre(a.financiador)} · ${hospNombre(a.hospital)} · factura ${a.factura}</p>
+    <div class="note">Coordinás con el hospital una fecha para recibir al financiador. Al proponerla, el financiador debe confirmarla o proponer otra: la auditoría queda agendada recién con el <strong>acuerdo de ambas partes</strong>.</div>
+    <div class="note note-blue">${a.motivo}</div>
+    ${a.fechaPreferida ? `<div style="font-size:12px;margin-bottom:4px;">Preferencia del financiador: <strong>${a.fechaPreferida}</strong></div>` : ''}
+    <label>Fecha propuesta</label><input type="date" id="terr-fecha" value="${a.fechaPreferida || a.fechaPropuesta || HOY}">
+    <label>Lugar / referente en el hospital</label><input id="terr-lugar" value="${a.lugar || ''}" placeholder="Ej: Dpto. de Auditoría Médica, 2° piso">
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarTerrenoProponer('${id}')">Proponer fecha</button>
+    </div>`);
+}
+window.confirmarTerrenoProponer = function(id) {
+  const a = state.auditoriasTerreno.find(x => x.id === id); if (!a) return;
+  a.fechaPropuesta = $("#terr-fecha")?.value || HOY;
+  a.lugar = ($("#terr-lugar")?.value || a.lugar || "").trim();
+  a.propuestaPor = "ministerio"; a.estado = "fecha_ministerio";
+  logTerreno(a, "ministerio", `Propusimos realizar la auditoría en terreno el ${a.fechaPropuesta}${a.lugar ? ` (${a.lugar})` : ''}.`);
+  closeModal(); render(); showToast("📅 Fecha propuesta al financiador");
+};
+// El financiador propone otra fecha (contrapropuesta) → vuelve al ministerio para confirmar.
+function openModalTerrenoProponerFin(id) {
+  const a = state.auditoriasTerreno.find(x => x.id === id); if (!a) return;
+  openModal(`<h3>Proponer otra fecha</h3>
+    <p class="subtle">${hospNombre(a.hospital)} · factura ${a.factura}</p>
+    <div class="note note-blue">El ministerio propuso el <strong>${a.fechaPropuesta}</strong>. Si no te sirve, proponé otra: el ministerio tendrá que confirmarla.</div>
+    <label>Nueva fecha propuesta</label><input type="date" id="terr-fecha" value="${a.fechaPropuesta || HOY}">
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarTerrenoProponerFin('${id}')">Proponer fecha</button>
+    </div>`);
+}
+window.confirmarTerrenoProponerFin = function(id) {
+  const a = state.auditoriasTerreno.find(x => x.id === id); if (!a) return;
+  a.fechaPropuesta = $("#terr-fecha")?.value || HOY; a.propuestaPor = "financiador"; a.estado = "fecha_financiador";
+  logTerreno(a, "financiador", `Propusimos otra fecha para la auditoría en terreno: ${a.fechaPropuesta}.`);
+  closeModal(); render(); showToast("📅 Nueva fecha propuesta al ministerio");
+};
+window.__terrenoConfirmar = function(id, quien) {
+  const a = state.auditoriasTerreno.find(x => x.id === id); if (!a) return;
+  confirmarAccion({ titulo: "Confirmar la fecha de la auditoría en terreno", clase: "btn-success", textoBoton: "Sí, confirmar",
+    mensaje: `Vas a confirmar la auditoría en terreno en ${hospNombre(a.hospital)} para el ${a.fechaPropuesta}.`,
+    detalle: "Queda agendada con el acuerdo de ambas partes. El día pactado el financiador concurre al hospital.",
+    onOk: () => { a.estado = "confirmada";
+      logTerreno(a, quien, `Confirmamos la auditoría en terreno para el ${a.fechaPropuesta} en ${hospNombre(a.hospital)}.`);
+      closeModal(); render(); showToast("✓ Auditoría en terreno agendada"); } });
+};
+window.__terrenoRechazar = function(id) {
+  const a = state.auditoriasTerreno.find(x => x.id === id); if (!a) return;
+  confirmarAccion({ titulo: "Rechazar la auditoría en terreno", clase: "btn-danger", textoBoton: "Sí, rechazar",
+    mensaje: `Vas a rechazar la solicitud de auditoría en terreno de ${finNombre(a.financiador)}.`,
+    detalle: "El financiador es notificado. La conciliación sigue por los canales habituales.",
+    onOk: () => { a.estado = "rechazada"; logTerreno(a, "ministerio", `Rechazamos la solicitud de auditoría en terreno.`);
+      closeModal(); render(); showToast("Auditoría en terreno rechazada"); } });
+};
+window.__terrenoRealizada = function(id) {
+  const a = state.auditoriasTerreno.find(x => x.id === id); if (!a) return;
+  a.estado = "realizada"; logTerreno(a, "ministerio", `Se realizó la auditoría en terreno en ${hospNombre(a.hospital)} el ${a.fechaPropuesta}.`);
+  render(); showToast("✓ Auditoría en terreno marcada como realizada");
+};
+function logTerreno(a, who, texto) {
+  const nombre = who === "ministerio" ? "Auditoría central — SAMO" : who === "hospital" ? "Hosp. San Martín" : finNombre(a.financiador);
+  if (!state.threads[a.factura]) state.threads[a.factura] = [];
+  state.threads[a.factura].push({ who, nombre, when: "hoy", text: texto,
+    accion: { tipo: "Auditoría en terreno", categorias: [ESTADO_TERRENO[a.estado]?.txt || a.estado], detalles: [] }, adjuntos: [] });
+}
+
 /* MODAL EMITIR NOTA DE CRÉDITO (hospital) — cierra el circuito de rechazo total o parcial.
    La NC no es unilateral: al emitirla se notifica al financiador por el mismo canal fehaciente
    para que la reconcilie contra la factura original (Fase 6 del documento de proceso). */
@@ -4695,6 +5328,20 @@ document.querySelectorAll('.role-switcher button').forEach(b => {
 
 // 1. Prestaciones de las facturas que no vienen cargadas a mano.
 FACTURAS.forEach(f => { if (!ITEMS_FACTURA[f.nro]) ITEMS_FACTURA[f.nro] = generarItems(f); });
+/* 1.b Completar ámbito / ingreso-egreso / diagnóstico en las prestaciones cargadas a mano (casos
+   testigo), para que también muestren estos datos nuevos sin reescribir el mock a mano. */
+// Los DNI y N° de afiliado se muestran ENTEROS en todo el prototipo (pedido del usuario): si el mock
+// los traía enmascarados con "***", se completan de forma determinística por ítem.
+const __digs = (semilla, n) => { let s = 0; for (const c of semilla) s = (s * 31 + c.charCodeAt(0)) >>> 0; return String(s % (10 ** n)).padStart(n, "0"); };
+Object.values(ITEMS_FACTURA).forEach(items => items.forEach((it, idx) => {
+  if (!it.ambito) it.ambito = ambitoDe(it);
+  if (!it.fechaIngreso) it.fechaIngreso = it.fecha;
+  if (!it.fechaEgreso) { const e = new Date(it.fecha); e.setDate(e.getDate() + (it.ambito === "internacion" ? 2 + (idx % 4) : 0)); it.fechaEgreso = e.toISOString().split("T")[0]; }
+  if (!it.diagnostico) it.diagnostico = DIAGNOSTICOS_POOL[(it.id.charCodeAt(it.id.length - 1) + idx) % DIAGNOSTICOS_POOL.length];
+  // Clave por paciente (no por ítem) para que un mismo paciente conserve el mismo DNI/afiliado.
+  if (it.dni && it.dni.includes("*")) it.dni = it.dni.replace(/\*+/, __digs(it.paciente + "d", 3));
+  if (it.afiliado && it.afiliado.includes("*")) it.afiliado = it.afiliado.replace(/\*+/, "-" + __digs(it.afiliado + "a", 1));
+}));
 
 /* 2. Migración del modelo viejo: las facturas del mock que traían `montoDebate` suelto no tenían
    planteos desagregados, así que en la nueva UI no habría nada que mostrar ni sobre qué responder.
@@ -4715,6 +5362,8 @@ state.facturas.forEach(f => {
    circuito y el estado de la factura se deriva de él (ver recalcularEstadoFactura). */
 state.facturas.forEach(f => {
   objecionesDe(f).forEach(o => {
+    // Identificador único e irrepetible (rastreable), además del número legible OBJ-n.
+    if (!o.uid) o.uid = nuevoUidObjecion();
     /* El planteo tiene que llegarle a la auditoría tal como lo mandó el financiador: con su
        documentación de respaldo y su movimiento inicial. Sin esto, el auditor abre un planteo del
        mock y ve la categoría pero no la evidencia, que es justo lo que necesita para resolver. */
