@@ -946,8 +946,12 @@ const enConciliacion = (f) => ["esperando_financiador","esperando_hospital","rec
    Cada objeción camina sola por el circuito: la auditoría la desestima o la deriva, el hospital
    responde, el financiador acepta o la sostiene. El estado de la FACTURA se deriva de sus planteos,
    así que la "resolución parcial" deja de ser un caso especial: es que cada planteo siguió su camino. */
-const PLANTEO_CERRADO = ["aceptado", "cerrado_nc", "desestimado_firme"];
+/* `sin_acuerdo` = el financiador mantuvo la objeción tras la respuesta y cerró la conciliación sin
+   acuerdo. La objeción queda CERRADA (no hay más ida y vuelta), pero su monto sigue en debate: se
+   define en la instancia legal cuando la factura vence a los 60 días (no vuelve a ser cobrable). */
+const PLANTEO_CERRADO = ["aceptado", "cerrado_nc", "desestimado_firme", "sin_acuerdo"];
 const planteoAbierto = (o) => !PLANTEO_CERRADO.includes(o.estado);
+const planteoTrabado = (o) => o.estado === "sin_acuerdo"; // cerrado pero con monto todavía en disputa
 const planteosAbiertos = (f) => objecionesDe(f).filter(planteoAbierto);
 /* `a_acreditar` = la auditoría le dio la razón al financiador (o el hospital aceptó el planteo): no hay
    nada más que discutir, falta la nota de crédito. Sigue contando como abierto y en debate porque el
@@ -967,6 +971,7 @@ const PLANTEO_LABEL = {
   aceptado: { txt: "Cerrado — respuesta aceptada", cls: "chip-aceptada" },
   cerrado_nc: { txt: "Cerrado con nota de crédito", cls: "chip-cerrada-nc" },
   desestimado_firme: { txt: "Cerrado — objeción desistida", cls: "chip-cerrada" },
+  sin_acuerdo: { txt: "Cerrado sin acuerdo — define en legales", cls: "chip-morosa" },
 };
 const chipPlanteo = (o) => {
   const l = PLANTEO_LABEL[o.estado] || PLANTEO_LABEL.en_auditoria;
@@ -1007,7 +1012,8 @@ const planteoEsDe = (o, rol) =>
 const ESTADOS_CONCILIACION = ["esperando_auditoria", "esperando_hospital", "esperando_financiador", "rechazada_parcial"];
 function recalcularEstadoFactura(f) {
   const abiertos = planteosAbiertos(f);
-  f.montoDebate = abiertos.reduce((s, o) => s + o.monto, 0);
+  // El cache de "en debate" incluye lo cerrado sin acuerdo (sigue en disputa hasta el vencimiento).
+  f.montoDebate = objecionesDe(f).filter(o => planteoAbierto(o) || planteoTrabado(o)).reduce((s, o) => s + o.monto, 0);
   // No pisar estados de pago ni de mora: la conciliación solo gobierna cuando la factura está en conciliación.
   if (!ESTADOS_CONCILIACION.includes(f.estado) && f.estado !== "aceptada") return;
   if (!abiertos.length) { f.estado = saldoPendiente(f) <= 0 ? "cerrada" : "aceptada"; return; }
@@ -1031,7 +1037,7 @@ function sincronizarObjecion(o) {
   o.items = [...new Set(mots.flatMap(m => m.items))];
   o.monto = mots.reduce((s, m) => s + (m.monto || 0), 0);
   o.categoria = [...new Set(mots.map(m => m.categoria))].join(" · ");
-  o.detalle = mots.length > 1 ? mots.map(m => `${m.categoria}: ${m.detalle}`).join(" — ") : (mots[0]?.detalle || "");
+  o.detalle = mots.length > 1 ? mots.map(m => `${m.categoria}: ${m.detalle || ''}`).join(" — ") : (mots[0]?.detalle || "");
   return o;
 }
 // La objeción abierta de un paciente en una factura, si existe (a lo sumo una).
@@ -1046,7 +1052,8 @@ function anotarPlanteo(f, o, { who, nombre, tipo, categoria, texto, detalles = [
 }
 
 function montoEnDebate(f) {
-  const objs = planteosAbiertos(f);
+  // Cuentan las objeciones abiertas Y las cerradas sin acuerdo (siguen en disputa, definen en legales).
+  const objs = objecionesDe(f).filter(o => planteoAbierto(o) || planteoTrabado(o));
   if (objs.length) return Math.min(saldoPendiente(f), objs.reduce((s, o) => s + o.monto, 0));
   return enConciliacion(f) ? Math.min(saldoPendiente(f), f.montoDebate || 0) : 0;
 }
@@ -1547,7 +1554,7 @@ function accionesPlanteo(f, o, rol) {
   if (rol === "financiador" && o.estado === "respondido") return `
     <button class="btn btn-success btn-sm" data-fin-aceptar="${k}">✓ Aceptar la respuesta</button>
     <button class="btn btn-warn btn-sm" data-fin-info="${k}">Pedir más información</button>
-    <button class="btn btn-danger btn-sm" data-fin-sostener="${k}">Mantener la objeción</button>`;
+    <button class="btn btn-danger btn-sm" data-fin-sostener="${k}" title="Cierra la conciliación sin acuerdo: se define en legales al vencimiento">Mantener la objeción</button>`;
   return '';
 }
 
@@ -1694,7 +1701,7 @@ function viewLogPorCaso(f) {
       <div class="caso-tit"><span>${o.id} <span class="obj-uid">${o.uid || ''}</span> · <strong>${pacName}</strong></span> <span>${chipPlanteo(o)} <strong style="font-family:monospace;">${money(o.monto)}</strong></span></div>
       <div class="caso-pacientes">
         ${p0 ? `<div style="margin-bottom:5px;color:var(--muted);">DNI ${p0.dni} · Afiliado ${p0.afiliado}${p0.diagnostico ? ` · Dx: ${p0.diagnostico}` : ''}</div>` : ''}
-        ${mots.map((m, idx) => { const mi = itemsDe(f.nro).filter(i => (m.items || []).includes(i.id)); return `<div style="margin-bottom:4px;"><strong>Motivo ${idx + 1}: ${m.categoria}</strong> <span style="color:var(--muted);">— ${money(m.monto)}</span><div style="color:var(--muted);">${m.detalle}</div>${mi.map(i => `<div style="padding-left:12px;">• ${i.prestacion} <code>${i.codigo}</code> <span style="color:var(--muted);">${money(i.monto)}</span></div>`).join('')}</div>`; }).join('')}
+        ${mots.map((m, idx) => { const mi = itemsDe(f.nro).filter(i => (m.items || []).includes(i.id)); return `<div style="margin-bottom:4px;"><strong>Motivo ${idx + 1}: ${m.categoria}</strong> <span style="color:var(--muted);">— ${money(m.monto)}</span><div style="color:var(--muted);">${m.detalle || ''}</div>${mi.map(i => `<div style="padding-left:12px;">• ${i.prestacion} <code>${i.codigo}</code> <span style="color:var(--muted);">${money(i.monto)}</span></div>`).join('')}</div>`; }).join('')}
       </div>
       <div class="caso-rama">${inicial ? nodo(inicial, 0) : ''}${resto.map(m => nodo(m, 1)).join('')}</div>
     </div>`;
@@ -2725,7 +2732,7 @@ function openModalPaciente(nro, paciente) {
           <div style="margin-top:6px;font-size:12px;"><strong>${mots.length} motivo(s):</strong>
             ${mots.map((m, idx) => { const mi = itemsDe(nro).filter(i => (m.items || []).includes(i.id)); return `<div style="margin-top:4px;padding-left:6px;border-left:2px solid var(--border);">
               <strong>${idx + 1}. ${m.categoria}</strong> <span style="color:var(--muted);">— ${money(m.monto)}</span>
-              <div style="color:var(--muted);">${m.detalle}</div>
+              <div style="color:var(--muted);">${m.detalle || ''}</div>
               <div style="color:var(--muted);font-size:11.5px;">${mi.map(i => `${i.prestacion} (${i.codigo})`).join(" · ")}</div>
             </div>`; }).join('')}
           </div>
@@ -4218,7 +4225,7 @@ function wireAccionesPlanteo(root = document) {
   }));
   $$('[data-fin-sostener]').forEach(el => el.addEventListener('click', () => {
     const { f, o } = buscarPlanteo(el.dataset.finSostener); if (!o) return;
-    openModalFinRespuesta(f, o, "sostener");
+    openModalMantenerObjecion(f, o);
   }));
   // "Ver documentación" desde una tarjeta de planteo: la factura viene en el propio atributo.
   $$('[data-ver-paciente-fact]').forEach(el => el.addEventListener('click', (e) => {
@@ -4617,7 +4624,7 @@ const cabeceraPlanteo = (f, o) => {
   const items = itemsDe(f.nro).filter(i => o.items.includes(i.id));
   const mots = objMotivos(o);
   return `<p class="subtle">Factura ${f.nro} · objeción <strong>${o.id}</strong> ${o.uid ? `<span class="obj-uid">${o.uid}</span>` : ''} — paciente <strong>${o.paciente || (items[0] && items[0].paciente) || ''}</strong></p>
-    <div class="note" style="margin-bottom:10px;">${mots.map(m => `<div><strong>${m.categoria}:</strong> ${m.detalle}</div>`).join('')}</div>
+    <div class="note" style="margin-bottom:10px;">${mots.map(m => `<div><strong>${m.categoria}:</strong> ${m.detalle || ''}</div>`).join('')}</div>
     ${items.length ? `<label>Prestaciones de la objeción — ${items.length} · ${money(o.monto)}</label>
     <div style="max-height:170px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;">
       <table style="font-size:12px;"><tbody>${items.map(i => `<tr>
@@ -4829,6 +4836,41 @@ window.confirmarFinRespuesta = function(nro, objId, modo) {
   recalcularEstadoFactura(f);
   closeModal(); render();
   showToast(sostener ? `${o.id} sostenido — vuelve a la auditoría` : `${o.id} — pedido enviado a la auditoría`);
+};
+
+/* Mantener la objeción = cerrar la conciliación SIN ACUERDO. Es terminal: el financiador ya no está de
+   acuerdo con la respuesta y pedir más documentación no alcanza. Envía un último mensaje y, tras una
+   advertencia de reconfirmación, la objeción queda cerrada sin acuerdo (define en legales al día 60). */
+function openModalMantenerObjecion(f, o) {
+  openModal(`<h3>Mantener la objeción — cerrar sin acuerdo</h3>
+    ${cabeceraPlanteo(f, o)}
+    <div class="note"><strong>Vas a cerrar esta conciliación sin acuerdo.</strong> Usá esta opción cuando ya no estás de acuerdo con la respuesta y pedir más documentación no alcanza. Es <strong>terminal</strong>: no hay más ida y vuelta y se define en la instancia legal al vencimiento.</div>
+    <label>Último mensaje al ministerio / hospital</label>
+    <textarea id="mant-texto" placeholder="Ej: la constancia aportada es posterior a la fecha de la prestación; sostenemos la objeción y damos por cerrada la conciliación."></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-danger" onclick="confirmarMantenerObjecion('${f.nro}','${o.id}')">Cerrar sin acuerdo →</button>
+    </div>`);
+}
+window.confirmarMantenerObjecion = function(nro, objId) {
+  const f = state.facturas.find(x => x.nro === nro); if (!f) return;
+  const o = objecionesDe(f).find(x => x.id === objId); if (!o) return;
+  // Se captura el mensaje ANTES de abrir la reconfirmación (que reemplaza el contenido del modal).
+  const texto = ($("#mant-texto")?.value || "").trim() || "(sin mensaje adicional)";
+  const vence = new Date(new Date(f.fecha).getTime() + 60 * 86400000).toISOString().split("T")[0];
+  confirmarAccion({
+    titulo: "Cerrar la conciliación sin acuerdo", clase: "btn-danger", textoBoton: "Sí, cerrar sin acuerdo",
+    mensaje: `Vas a cerrar la objeción ${o.id} de ${o.paciente || ''} sin acuerdo, por ${money(o.monto)}.`,
+    detalle: `Se está cerrando la conciliación <strong>sin acuerdo</strong>. Se definirá <strong>legalmente cuando venza el plazo de 60 días</strong> desde la notificación de la factura (vence el ${vence}). Es la última acción: no hay más ida y vuelta.`,
+    onOk: () => {
+      o.estado = "sin_acuerdo"; o.resolucion = "sin_acuerdo";
+      anotarPlanteo(f, o, { who: "financiador", nombre: "IOMA", tipo: "Objeción sostenida — cerrada sin acuerdo",
+        texto, detalles: ["Se cierra la conciliación sin acuerdo.", "El monto en disputa se define en la instancia legal al vencer los 60 días desde la notificación."] });
+      recalcularEstadoFactura(f);
+      closeModal(); render();
+      showToast(`${o.id} cerrado sin acuerdo — define en legales al vencimiento`);
+    }
+  });
 };
 
 /* ================= SOLICITUD DE RECHAZO TOTAL (flujo nuevo) =================
@@ -5460,7 +5502,8 @@ state.facturas.forEach(f => {
     let s = 0; for (const c of (f.nro + pac)) s = (s * 31 + c.charCodeAt(0)) >>> 0;
     const categoria = CATEGORIAS_OBJECION[s % CATEGORIAS_OBJECION.length];
     const pool = DETALLE_POR_CATEGORIA[categoria];
-    const detalle = pool[(s >> 4) % pool.length];
+    // `>>>` (no `>>`): el corrimiento con signo puede dar índice negativo → pool[neg] = undefined.
+    const detalle = pool[(s >>> 4) % pool.length] || pool[0];
     return sincronizarObjecion({
       id: "OBJ-" + (idx + 1), paciente: pac,
       motivos: [{ categoria, detalle, items: its.map(i => i.id), monto: its.reduce((sm, i) => sm + i.monto, 0), fecha: f.fecha, adjuntos: [] }],
