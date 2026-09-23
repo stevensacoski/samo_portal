@@ -484,6 +484,63 @@ const FACTURAS = [
   { nro: "0007-00017200", hospital: "H003", financiador: "F001", fecha: "2025-04-18", monto: 1650000, montoPagado: 400000, estado: "judicializada", pacientes: 10, fechaIntimacion: "2025-09-05", expediente: "EXP-2025-0007" },
   { nro: "0007-00017450", hospital: "H003", financiador: "F001", fecha: "2025-08-30", monto: 1280000, montoPagado: 0, estado: "judicializada", pacientes: 7, fechaIntimacion: "2025-11-02", expediente: "EXP-2025-0007" },
 ];
+
+/* ===== DEUDA PRE-PORTAL (situación histórica, previa a la adhesión) =====
+   El portal no arranca de cero: se inserta en un proceso que venía manual (notificación presencial,
+   deuda gestionada por otros canales). Cada financiador trae su situación histórica a nivel N° de
+   factura, monto y saldo adeudado. Es un SNAPSHOT INFORMATIVO, de solo lectura: NO entra al circuito
+   del portal (no tiene reloj de 60 días, no se objeta, no se concilia acá) ni al acumulador de 6 JUS
+   (definición del usuario: mucha ya está judicializada por canales previos). Su gestión sigue por los
+   canales actuales. Por eso vive en su propio const, aparte de `state.facturas`, y ningún helper del
+   circuito (evaluarVencimientos / recalcularEstadoFactura / esMorosa …) lo toca.
+   Estados propios: `impaga` · `parcial` (pago recibido por fuera del portal) · `judicial` (ya en
+   litigio por el canal previo). Las fechas son anteriores al alta del financiador en el portal. */
+const PREPORTAL_ESTADO_LABEL = {
+  impaga: "Impaga — reclamo administrativo",
+  parcial: "Pago parcial (fuera del portal)",
+  judicial: "En gestión judicial (previa)",
+};
+const DEUDA_PREPORTAL = [
+  // --- IOMA (F001) — el actor fijo del rol Financiador: su histórico es el que más se demuestra ---
+  { nro: "0001-00031204", financiador: "F001", hospital: "H001", fecha: "2024-09-12", monto: 1980000, saldo: 1980000, estado: "impaga",   gestion: "Reclamo administrativo — nota DPSAMO 2024" },
+  { nro: "0001-00032890", financiador: "F001", hospital: "H001", fecha: "2024-11-25", monto: 2450000, saldo: 1200000, estado: "parcial",  gestion: "Convenio de pago parcial (2 cuotas)" },
+  { nro: "0001-00034115", financiador: "F001", hospital: "H001", fecha: "2025-02-08", monto: 1670000, saldo: 1670000, estado: "judicial", gestion: "Expediente judicial previo — Juzgado C. y C. N°4 La Plata" },
+  { nro: "0004-00021880", financiador: "F001", hospital: "H002", fecha: "2024-08-30", monto: 1340000, saldo: 1340000, estado: "impaga",   gestion: "Reclamo administrativo — nota DPSAMO 2024" },
+  { nro: "0004-00023110", financiador: "F001", hospital: "H002", fecha: "2025-01-14", monto: 2210000, saldo: 2210000, estado: "judicial", gestion: "Expediente judicial previo — canal externo" },
+  { nro: "0007-00015002", financiador: "F001", hospital: "H003", fecha: "2024-10-05", monto: 1890000, saldo: 900000,  estado: "parcial",  gestion: "Pago parcial informado por mesa de entradas" },
+  { nro: "0007-00016340", financiador: "F001", hospital: "H003", fecha: "2025-01-30", monto: 1120000, saldo: 1120000, estado: "impaga",   gestion: "Reclamo administrativo — nota DPSAMO 2025" },
+  { nro: "0012-00007210", financiador: "F001", hospital: "H004", fecha: "2024-07-18", monto: 980000,  saldo: 980000,  estado: "judicial", gestion: "Expediente judicial previo — canal externo" },
+  { nro: "0012-00008450", financiador: "F001", hospital: "H004", fecha: "2024-12-02", monto: 1560000, saldo: 1560000, estado: "impaga",   gestion: "Reclamo administrativo — nota DPSAMO 2024" },
+  { nro: "0015-00004980", financiador: "F001", hospital: "H005", fecha: "2025-02-20", monto: 2740000, saldo: 2740000, estado: "impaga",   gestion: "Reclamo administrativo — nota DPSAMO 2025" },
+  { nro: "0015-00005610", financiador: "F001", hospital: "H005", fecha: "2024-11-11", monto: 1420000, saldo: 700000,  estado: "parcial",  gestion: "Convenio de pago parcial" },
+  { nro: "0001-00030110", financiador: "F001", hospital: "H001", fecha: "2024-06-04", monto: 1230000, saldo: 1230000, estado: "judicial", gestion: "Expediente judicial previo — Juzgado C. y C. N°2 La Plata" },
+  // --- Otros financiadores — para que el consolidado del ministerio tenga volumen histórico ---
+  { nro: "0007-00014200", financiador: "F003", hospital: "H003", fecha: "2024-09-01", monto: 2100000, saldo: 2100000, estado: "judicial", gestion: "Expediente judicial previo — par OSDE–Evita" },
+  { nro: "0007-00014870", financiador: "F003", hospital: "H003", fecha: "2024-12-15", monto: 1350000, saldo: 1350000, estado: "impaga",   gestion: "Reclamo administrativo previo" },
+  { nro: "0001-00029980", financiador: "F002", hospital: "H001", fecha: "2024-08-22", monto: 3200000, saldo: 3200000, estado: "judicial", gestion: "Expediente judicial previo — canal externo" },
+  { nro: "0001-00031500", financiador: "F002", hospital: "H001", fecha: "2025-01-09", monto: 1780000, saldo: 900000,  estado: "parcial",  gestion: "Pago parcial fuera del portal" },
+  { nro: "0012-00006900", financiador: "F004", hospital: "H004", fecha: "2024-10-28", monto: 1140000, saldo: 1140000, estado: "impaga",   gestion: "Reclamo administrativo previo" },
+  { nro: "0004-00022050", financiador: "F005", hospital: "H002", fecha: "2024-11-30", monto: 860000,  saldo: 860000,  estado: "impaga",   gestion: "Reclamo administrativo previo" },
+];
+/* Helpers de deuda pre-portal. Solo lectura; no mutan nada.
+   - `deudaPreportalDe(finId, hospId)`: filas de un financiador (opcionalmente acotadas a un hospital).
+   - `deudaPreportalHosp(hospId)`: filas que se le deben a un hospital (todas las financiadoras).
+   - `deudaPreportalMonto(arr)`: suma de saldos.
+   - `deudaPortalFin(finId)`: deuda VIVA del financiador dentro del portal (para el consolidado). */
+const deudaPreportalDe = (finId, hospId) => DEUDA_PREPORTAL.filter(d => d.financiador === finId && (!hospId || hospId === "TODOS" || d.hospital === hospId));
+const deudaPreportalHosp = (hospId) => DEUDA_PREPORTAL.filter(d => d.hospital === hospId);
+const deudaPreportalMonto = (arr) => arr.reduce((s, d) => s + d.saldo, 0);
+function deudaPortalFin(finId, hospId) {
+  return state.facturas.filter(f => f.financiador === finId && f.estado !== "en_cola" && isImpaga(f)
+      && (!hospId || hospId === "TODOS" || f.hospital === hospId))
+    .reduce((s, f) => s + saldoPendiente(f), 0);
+}
+// Chip de estado pre-portal (aparte de chip(): son estados de otro circuito, no los del portal).
+function chipPreportal(estado) {
+  const cls = estado === "judicial" ? "chip-judicializada" : estado === "parcial" ? "chip-pago-parcial" : "chip-morosa";
+  return `<span class="chip ${cls}">${PREPORTAL_ESTADO_LABEL[estado] || estado}</span>`;
+}
+
 /* ----- Generador determinístico de facturas de relleno -----
    Los casos testigo (auditoría parcial, pago efectuado, morosidad OSDE–Evita, etc.) están cargados
    a mano arriba. Acá se generan las notificaciones grandes que dan volumen realista a la demo:
@@ -833,6 +890,8 @@ let state = {
   // Orden de las tablas de facturas (columna + dirección), clickeable en los encabezados.
   sortFactFin: { col: "dias", dir: "asc" },
   sortFactHosp: { col: "dias", dir: "asc" },
+  // Orden de la tabla de deuda pre-portal (histórica). Por defecto, la más reciente arriba.
+  sortPreportal: { col: "fecha", dir: "desc" },
   /* Auditorías en terreno (presenciales) solicitadas por el financiador. El ministerio acepta y se
      acuerda fecha en común. Un caso testigo ya solicitado, esperando que el ministerio proponga fecha. */
   auditoriasTerreno: [
@@ -896,6 +955,7 @@ const NAV = {
     { label: "Panel", view: "panel_financiador" },
     { label: "Notificaciones recibidas", view: "notificaciones" },
     { label: "Facturas a revisar", view: "facturas_financiador" },
+    { label: "Deuda pre-portal", view: "deuda_preportal" },
     { label: "Notas de crédito", view: "notas_credito" },
     { label: "Conciliación", view: "conciliacion_financiador", sub: [
       { label: "Esperan mi respuesta", view: "conc_esperan_yo" },
@@ -1759,6 +1819,10 @@ function viewHospital_Panel() {
       <div class="kpi warning"><div class="label">Por vencer (&lt;15d)</div><div class="value warn">${k.porVencer}</div><div class="hint money">${money(k.porVencerMonto)}</div></div>
       <div class="kpi action-required"><div class="label">Vencidas</div><div class="value danger">${k.vencidas}</div><div class="hint money">${money(k.vencidasMonto)}</div></div>
     </div>
+    ${(() => { const pre = deudaPreportalHosp("H001"); const preMonto = deudaPreportalMonto(pre); return pre.length ? `
+    <div style="background:var(--surface-alt);border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;gap:12px;">
+      <div><strong>Deuda pre-portal (previa a la adhesión):</strong> ${money(preMonto)} en ${pre.length} factura(s) de ${new Set(pre.map(d=>d.financiador)).size} financiador(es). <span style="color:var(--muted);">Situación histórica — se gestiona por los canales previos, no ingresa al circuito del portal.</span></div>
+    </div>` : ''; })()}
     <div class="card">
       <h3 class="card-title">Conciliaciones abiertas</h3>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
@@ -2159,8 +2223,12 @@ function viewFinanciador_Panel() {
         ${(fl.hospital !== "TODOS" || fl.periodo !== "TODOS") ? `<button class="btn btn-secondary btn-sm" data-filtro-panel-reset="1">Limpiar filtros</button>` : ''}
       </div>
     </div>
+    ${fl.periodo === "TODOS" && deudaPreportalDe("F001", fl.hospital).length ? `
+      ${bloqueDeudaConsolidada("F001", fl.hospital)}
+      <div class="note note-blue" style="margin-top:-8px;margin-bottom:16px;">Incluye la <strong>deuda histórica previa al portal</strong>. <a data-goto="deuda_preportal" style="cursor:pointer;text-decoration:underline;color:var(--primary);">Ver detalle de deuda pre-portal →</a> Los KPIs de abajo corresponden solo a lo notificado por el portal.</div>
+    ` : ''}
     <div class="kpi-grid">
-      <div class="kpi"><div class="label">Deuda total</div><div class="value money danger">${money(k.deudaTotal)}</div><div class="hint">${k.deudaCount} factura(s) activa(s)</div></div>
+      <div class="kpi"><div class="label">Deuda total (portal)</div><div class="value money danger">${money(k.deudaTotal)}</div><div class="hint">${k.deudaCount} factura(s) activa(s)</div></div>
       <div class="kpi good"><div class="label">Pagado</div><div class="value money success">${money(k.pagado)}</div><div class="hint">${k.pagadoCount} factura(s) con pagos</div></div>
       <div class="kpi"><div class="label">Notificadas sin revisar</div><div class="value money">${money(k.notificadasMonto)}</div><div class="hint">${k.notificadas} factura(s)</div></div>
       <div class="kpi warning" style="cursor:pointer;" data-ir-facturas="por_vencer"><div class="label">Facturas por vencer (&lt;15d)</div><div class="value warn">${k.porVencer}</div><div class="hint money">${money(k.porVencerMonto)} →</div></div>
@@ -2572,6 +2640,111 @@ function viewFinanciador_Facturas() {
     </div>
   `;
 }
+
+/* ----- Deuda pre-portal (histórica) del financiador ----- */
+const PREPORTAL_SORT_VAL = {
+  nro: d => d.nro, hospital: d => hospNombre(d.hospital), fecha: d => d.fecha,
+  monto: d => d.monto, saldo: d => d.saldo, estado: d => d.estado, gestion: d => d.gestion,
+};
+function ordenarPreportal(arr, sort) {
+  const val = PREPORTAL_SORT_VAL[sort.col] || PREPORTAL_SORT_VAL.fecha;
+  const dir = sort.dir === "desc" ? -1 : 1;
+  return [...arr].sort((a, b) => {
+    const va = val(a), vb = val(b);
+    if (typeof va === "number" && typeof vb === "number") return (va - vb) * dir;
+    return String(va).localeCompare(String(vb), "es") * dir;
+  });
+}
+/* Bloque de deuda consolidada (pre-portal + portal). Reutilizable en el panel del financiador y en la
+   propia vista de deuda pre-portal. `hospId` acota al hospital elegido (o "TODOS"). */
+function bloqueDeudaConsolidada(finId, hospId) {
+  const pre = deudaPreportalMonto(deudaPreportalDe(finId, hospId));
+  const portal = deudaPortalFin(finId, hospId);
+  const total = pre + portal;
+  const pct = (n) => total > 0 ? Math.round(n / total * 100) : 0;
+  return `<div class="card" style="padding:16px;">
+    <h3 class="card-title" style="margin-bottom:12px;">Deuda consolidada${hospId && hospId !== "TODOS" ? ` — ${hospCorto(hospId)}` : ''}</h3>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+      <div class="kpi" style="border-left:4px solid var(--danger);">
+        <div class="label">Deuda total</div>
+        <div class="value money danger">${money(total)}</div>
+        <div class="hint">pre-portal + portal</div>
+      </div>
+      <div class="kpi" style="border-left:4px solid var(--muted);">
+        <div class="label">Deuda pre-portal <span style="font-weight:400;">(histórica)</span></div>
+        <div class="value money">${money(pre)}</div>
+        <div class="hint">${pct(pre)}% del total · previa al portal</div>
+      </div>
+      <div class="kpi" style="border-left:4px solid var(--primary);">
+        <div class="label">Deuda portal</div>
+        <div class="value money">${money(portal)}</div>
+        <div class="hint">${pct(portal)}% del total · notificada por el portal</div>
+      </div>
+    </div>
+  </div>`;
+}
+function viewFinanciador_DeudaPreportal() {
+  const finId = "F001";
+  const filas = ordenarPreportal(deudaPreportalDe(finId), state.sortPreportal);
+  const sort = state.sortPreportal;
+  const totalPre = deudaPreportalMonto(filas);
+  const cuenta = { impaga: 0, parcial: 0, judicial: 0 };
+  filas.forEach(d => cuenta[d.estado]++);
+  return `
+    <div class="page-header">
+      <div><h1>Deuda pre-portal — IOMA</h1><div class="sub">Situación histórica previa a la adhesión al portal — ${filas.length} factura(s), ${money(totalPre)} de saldo</div></div>
+      <button class="btn btn-excel" onclick="exportDeudaPreportal()">⬇ Excel</button>
+    </div>
+    <div class="note note-blue" style="margin-bottom:16px;">
+      <strong>Registro informativo, de solo lectura.</strong> Estas facturas <strong>no ingresaron por el portal</strong>: vienen del proceso previo (notificación presencial, gestión por otros canales).
+      No tienen reloj de 60 días ni conciliación en el portal, y <strong>no entran al acumulador de 6 JUS</strong> — buena parte ya está judicializada por la vía previa. Su gestión continúa por los canales actuales.
+    </div>
+    ${bloqueDeudaConsolidada(finId, "TODOS")}
+    <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);">
+      <div class="kpi"><div class="label">Impagas</div><div class="value">${cuenta.impaga}</div><div class="hint">reclamo administrativo</div></div>
+      <div class="kpi"><div class="label">Con pago parcial</div><div class="value">${cuenta.parcial}</div><div class="hint">saldo remanente</div></div>
+      <div class="kpi"><div class="label">En gestión judicial previa</div><div class="value">${cuenta.judicial}</div><div class="hint">canal externo al portal</div></div>
+    </div>
+    <div class="card" style="padding:0;">
+      ${filas.length === 0 ? '<div style="padding:36px;text-align:center;color:var(--muted);">Sin deuda pre-portal registrada.</div>' :
+      `<table>
+        <thead><tr>
+          ${thSort('Factura','nro',sort,'data-sort-preportal')}
+          ${thSort('Hospital','hospital',sort,'data-sort-preportal')}
+          ${thSort('Fecha','fecha',sort,'data-sort-preportal')}
+          ${thSort('Estado','estado',sort,'data-sort-preportal')}
+          ${thSort('Gestión','gestion',sort,'data-sort-preportal')}
+          ${thSort('Monto','monto',sort,'data-sort-preportal','money-header')}
+          ${thSort('Saldo adeudado','saldo',sort,'data-sort-preportal','money-header')}
+        </tr></thead>
+        <tbody>${filas.map(d => `<tr>
+          <td><code>${d.nro}</code></td>
+          <td>${hospCorto(d.hospital)}</td>
+          <td>${d.fecha}</td>
+          <td>${chipPreportal(d.estado)}</td>
+          <td style="font-size:12px;color:var(--muted);">${d.gestion}</td>
+          <td class="money">${money(d.monto)}</td>
+          <td class="money"><strong>${money(d.saldo)}</strong></td>
+        </tr>`).join('')}
+        <tr style="background:var(--surface-alt);font-weight:700;">
+          <td colspan="6" style="text-align:right;">Total adeudado (pre-portal)</td>
+          <td class="money">${money(totalPre)}</td>
+        </tr></tbody>
+      </table>`}
+    </div>
+    <div class="decision-abierta">
+      <strong>A definir —</strong> si la deuda pre-portal se <strong>incorpora al portal</strong> a futuro (para
+      gestionarla o judicializarla desde acá) o sigue tramitándose por los canales actuales. Hoy el prototipo la
+      trata como <strong>registro informativo</strong>: no ingresa al circuito ni al acumulador de 6 JUS.
+    </div>
+  `;
+}
+window.exportDeudaPreportal = function() {
+  const filas = ordenarPreportal(deudaPreportalDe("F001"), state.sortPreportal);
+  const rows = [["Factura","Hospital","Fecha","Estado","Gestión","Monto","Saldo adeudado"]];
+  filas.forEach(d => rows.push([d.nro, hospNombre(d.hospital), d.fecha, PREPORTAL_ESTADO_LABEL[d.estado], d.gestion, d.monto, d.saldo]));
+  exportCSV("deuda_preportal_ioma.csv", rows);
+};
 
 function viewFinanciador_DetalleFactura(nro) {
   const f = state.facturas.find(x => x.nro === nro); if (!f) return "No encontrada.";
@@ -3217,6 +3390,10 @@ function viewMinisterio_Dashboard() {
   const porFin = agruparMinisterioPor("financiador");
   const porHosp = agruparMinisterioPor("hospital");
   const enConciliacion = k.espAud + k.espFin + k.espHosp;
+  // Deuda histórica previa al portal (informativa; no entra al circuito ni al acumulador de 6 JUS).
+  const preTotal = deudaPreportalMonto(DEUDA_PREPORTAL);
+  const preFins = new Set(DEUDA_PREPORTAL.map(d => d.financiador)).size;
+  const consolidada = preTotal + k.deudaTotal;
   return `
     <div class="page-header">
       <div><h1>Panel general</h1><div class="sub">Visión consolidada de todo el circuito de recuperación de costos</div></div>
@@ -3235,8 +3412,17 @@ function viewMinisterio_Dashboard() {
       <button class="btn btn-secondary btn-sm" data-goto="auditoria">Ir a auditoría →</button>
     </div>` : ""}
 
+    <div class="card" style="padding:16px;">
+      <h3 class="card-title" style="margin-bottom:12px;">Deuda consolidada del sistema</h3>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;">
+        <div class="kpi" style="border-left:4px solid var(--danger);"><div class="label">Deuda total consolidada</div><div class="value money danger">${money(consolidada)}</div><div class="hint">pre-portal + portal</div></div>
+        <div class="kpi" style="border-left:4px solid var(--muted);"><div class="label">Deuda pre-portal <span style="font-weight:400;">(histórica)</span></div><div class="value money">${money(preTotal)}</div><div class="hint">${DEUDA_PREPORTAL.length} factura(s) · ${preFins} financiador(es) · gestión por canales previos</div></div>
+        <div class="kpi" style="border-left:4px solid var(--primary);"><div class="label">Deuda portal</div><div class="value money">${money(k.deudaTotal)}</div><div class="hint">${k.total} facturas activas notificadas</div></div>
+      </div>
+      <div class="note note-blue" style="margin-top:12px;margin-bottom:0;">La deuda <strong>pre-portal</strong> es la situación histórica previa a la adhesión de cada financiador: informativa, no ingresa al circuito del portal ni al acumulador de 6 JUS (buena parte ya está judicializada por la vía previa).</div>
+    </div>
     <div class="kpi-grid">
-      <div class="kpi"><div class="label">Deuda total del sistema</div><div class="value money">${money(k.deudaTotal)}</div><div class="hint">${k.total} facturas activas</div></div>
+      <div class="kpi"><div class="label">Deuda del sistema (portal)</div><div class="value money">${money(k.deudaTotal)}</div><div class="hint">${k.total} facturas activas</div></div>
       <div class="kpi"><div class="label">En cola de notificación</div><div class="value">${k.enCola}</div><div class="hint money">${money(k.enColaMonto)}</div></div>
       <div class="kpi good"><div class="label">Aceptado sin pagar</div><div class="value success">${k.aceptado}</div><div class="hint money">${money(k.aceptadoMonto)}</div></div>
       <div class="kpi"><div class="label">En conciliación</div><div class="value">${enConciliacion}</div><div class="hint">${k.espAud} auditoría · ${k.espFin} financ. · ${k.espHosp} hosp.</div></div>
@@ -3940,6 +4126,7 @@ function render() {
     else if (view === "detalle_hospital") html = viewFinanciador_DetalleHospital(state.context.hospital);
     else if (view === "notificaciones") html = viewFinanciador_Notificaciones();
     else if (view === "facturas_financiador") html = viewFinanciador_Facturas();
+    else if (view === "deuda_preportal") html = viewFinanciador_DeudaPreportal();
     else if (view === "notas_credito") html = viewFinanciador_NotasCredito();
     else if (view === "detalle_factura") html = viewFinanciador_DetalleFactura(state.context.factura);
     else if (view === "conciliacion_financiador" || view === "conc_esperan_yo") html = viewFinanciador_Conciliacion("yo");
@@ -4104,6 +4291,7 @@ function wireEvents() {
   /* ---- Ordenamiento por encabezado de las tablas de facturas ---- */
   document.querySelectorAll('[data-sort-fact]').forEach(el => el.addEventListener('click', () => { toggleSort(state.sortFactFin, el.dataset.sortFact); render(); }));
   document.querySelectorAll('[data-sort-fact-hosp]').forEach(el => el.addEventListener('click', () => { toggleSort(state.sortFactHosp, el.dataset.sortFactHosp); render(); }));
+  document.querySelectorAll('[data-sort-preportal]').forEach(el => el.addEventListener('click', () => { toggleSort(state.sortPreportal, el.dataset.sortPreportal); render(); }));
   /* ---- Selección y filtrado de prestaciones dentro de la factura ---- */
   wireFiltros('[data-filtro-item]', 'filtroItem', 'filtroItems');
   const fir = document.querySelector('[data-filtro-item-reset]');
