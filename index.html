@@ -63,6 +63,7 @@
   .chip-plan-vigente { background: #e6f7ed; color: #177245; }
   .chip-plan-riesgo { background: #fff3e0; color: #b25f00; }
   .chip-plan-caduco { background: #fdecea; color: #b3261e; }
+  .chip-plan-fin { background: #e6eef7; color: #2c5d8f; }
   .chip-plan-paga { background: #e6f7ed; color: #177245; }
   .chip-plan-pend { background: #eef1f5; color: #417099; }
   .chip-plan-venc { background: #fdecea; color: #b3261e; }
@@ -315,6 +316,7 @@
     <span class="mode-toggle-lbl">Versión</span>
     <button data-mode="original" class="active">Portal original</button>
     <button data-mode="plan">Plan de Pago</button>
+    <button data-mode="combinado">Combinado</button>
   </div>
   <div class="role-switcher">
     <button data-role="ministerio">Ministerio</button>
@@ -333,12 +335,14 @@
 
 <script>
 const HOSPITALES = [
-  { id: "H001", nombre: "Hospital Interzonal San Martín (La Plata)" },
-  { id: "H002", nombre: "Hospital Provincial Rossi (La Plata)" },
-  { id: "H003", nombre: "Hospital Municipal Evita (Lanús)" },
-  { id: "H004", nombre: "Hospital Zonal Ricardo Gutiérrez (La Plata)" },
-  { id: "H005", nombre: "Hospital El Cruce (Florencio Varela)" },
+  { id: "H001", nombre: "Hospital Interzonal San Martín (La Plata)", cuit: "30-99887766-1" },
+  { id: "H002", nombre: "Hospital Provincial Rossi (La Plata)", cuit: "30-99887766-2" },
+  { id: "H003", nombre: "Hospital Municipal Evita (Lanús)", cuit: "30-99887766-3" },
+  { id: "H004", nombre: "Hospital Zonal Ricardo Gutiérrez (La Plata)", cuit: "30-99887766-4" },
+  { id: "H005", nombre: "Hospital El Cruce (Florencio Varela)", cuit: "30-99887766-5" },
 ];
+// Búsqueda de hospital por CUIT (para autocompletar el nombre en la intimación de nueva deuda).
+const hospPorCuit = (cuit) => HOSPITALES.find(h => h.cuit === (cuit || "").trim());
 /* Estado del financiador (definición 11/8, refinada):
      - "sin_usuario": no hay usuario creado en el portal. Sus facturas NO entran al portal ni al proceso.
      - "activo": usuario creado y facturación activa. Sus facturas se listan en la cola y se notifican.
@@ -931,6 +935,7 @@ let state = {
     { id: "USR-F001-3", financiador: "F001", rol: "operador", nombre: "Lucía", apellido: "Fernández", dni: "31.902.556", mail: "lfernandez@ioma.gba.gob.ar", telefono: "221-4567892", cargo: "Auditoría médica — zona sur", estado: "activo", fechaSolicitud: "2026-05-11", fechaAlta: "2026-05-13", hospitales: ["H001", "H003", "H005"] },
     { id: "USR-F001-4", financiador: "F001", rol: "operador", nombre: "Diego", apellido: "Ramírez", dni: "33.120.887", mail: "dramirez@ioma.gba.gob.ar", telefono: "221-4567893", cargo: "Liquidaciones", estado: "pendiente", fechaSolicitud: "2026-08-01", fechaAlta: null, hospitales: null },
     { id: "USR-F002-1", financiador: "F002", rol: "admin", nombre: "Roberto", apellido: "Suárez", dni: "20.445.318", mail: "rsuarez@pami.org.ar", telefono: "11-43210000", cargo: "Apoderado", cuit: "30-64567890-1", estado: "activo", fechaSolicitud: "2026-04-15", fechaAlta: "2026-04-15", hospitales: null },
+    { id: "USR-F002-2", financiador: "F002", rol: "operador", nombre: "Analía", apellido: "Godoy", dni: "29.556.780", mail: "agodoy@pami.org.ar", telefono: "11-43210001", cargo: "Regularización de deudas", estado: "activo", fechaSolicitud: "2026-04-20", fechaAlta: "2026-04-22", hospitales: null },
     { id: "USR-F003-1", financiador: "F003", rol: "admin", nombre: "Carolina", apellido: "Vega", dni: "27.109.664", mail: "cvega@osde.com.ar", telefono: "11-53200000", cargo: "Apoderada", cuit: "30-54876543-2", estado: "activo", fechaSolicitud: "2026-05-04", fechaAlta: "2026-05-04", hospitales: null },
     { id: "USR-F003-2", financiador: "F003", rol: "operador", nombre: "Martín", apellido: "Ibáñez", dni: "30.778.213", mail: "mibanez@osde.com.ar", telefono: "11-53200001", cargo: "Convenios hospitalarios", estado: "pendiente", fechaSolicitud: "2026-08-02", fechaAlta: null, hospitales: null },
     { id: "USR-F004-1", financiador: "F004", rol: "admin", nombre: "Silvina", apellido: "Rossi", dni: "26.554.902", mail: "srossi@swissmedical.com.ar", telefono: "11-51520000", cargo: "Apoderada", cuit: "30-59123456-7", estado: "activo", fechaSolicitud: "2026-06-01", fechaAlta: "2026-06-01", hospitales: null },
@@ -1410,17 +1415,19 @@ function renderSidebar() {
      para demostrar la restricción por hospital y qué ve un operador vs. el admin. Va siempre visible
      (incluso impersonando a un operador que no ve Gestión de usuarios) para poder volver al admin. */
   if (state.role === "financiador") {
-    const us = usuariosActivosDeFin("F001");
+    let us = usuariosActivosDeFin("F001");
+    // En modo combinado sumamos una OS SIN plan (Swiss Medical) para mostrar que ve solo el circuito original.
+    if (enModoCombinado()) { const sinPlan = adminDeFin("F004"); if (sinPlan) us = [...us, sinPlan]; }
     const uAct = usuarioFinActual();
     html.push(`<div style="padding:2px 20px 10px;">
       <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);font-weight:600;margin-bottom:4px;">Ver como usuario</div>
       <select id="ver-como-usr" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;background:#fff;">
-        ${us.map(u => `<option value="${u.id}" ${uAct && uAct.id === u.id ? 'selected' : ''}>${u.nombre} ${u.apellido} · ${ROL_USR_LABEL[u.rol]}${Array.isArray(u.hospitales) ? ` (${u.hospitales.length} hosp.)` : ''}</option>`).join('')}
+        ${us.map(u => { const otra = u.financiador !== "F001" ? ` — ${finNombre(u.financiador)} (sin plan)` : ''; return `<option value="${u.id}" ${uAct && uAct.id === u.id ? 'selected' : ''}>${u.nombre} ${u.apellido} · ${ROL_USR_LABEL[u.rol]}${otra}${Array.isArray(u.hospitales) ? ` (${u.hospitales.length} hosp.)` : ''}</option>`; }).join('')}
       </select>
     </div>`);
   }
   // PLAN DE PAGO — aviso al ministerio de pagos informados sin confirmar (badge rojo en la nav).
-  const pagosPend = (state.role === "ministerio" && enModoPlan()) ? pagosInformadosPendientes() : 0;
+  const pagosPend = (state.role === "ministerio" && (enModoPlan() || enModoCombinado())) ? pagosInformadosPendientes() : 0;
   items.forEach(item => {
     if (item.soloAdmin && !esAdminFinActual()) return;
     const activeCls = state.view === item.view || (item.sub && item.sub.some(s => s.view === state.view)) ? "active" : "";
@@ -2235,6 +2242,12 @@ function viewFinanciador_Panel() {
       <div><h1>Panel — IOMA</h1><div class="sub">Situación consolidada de facturación del Ministerio de Salud PBA</div></div>
       <div class="page-actions"><button class="btn btn-excel" onclick="exportPanelFin()">⬇ Descargar Excel</button></div>
     </div>
+    ${enModoCombinado() ? (tienePlan(usuarioFinActual()?.financiador || "F001")
+      ? `<div class="note note-blue" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div><strong>📋 Este financiador tiene un plan de regularización vigente.</strong> Su deuda vieja se paga por cuotas, aparte del circuito corriente de esta pantalla.</div>
+      <button class="btn btn-secondary btn-sm" data-goto="plan_fin_resumen">Ver mi plan de pago →</button>
+    </div>`
+      : `<div class="note"><strong>${finNombre(usuarioFinActual().financiador)} no está en el Plan de Pago.</strong> Ve <strong>solo el circuito de facturación corriente</strong> (no le aparece la sección Plan de Pagos). <em>Nota de demo: los datos de facturas que se muestran son ilustrativos, los de IOMA.</em></div>`) : ""}
     ${notif && notif.sinRevisar > 0 ? `<div class="action-required-banner">
       <div><strong>📬 Recibiste una nueva notificación de facturas a pagar</strong> — ${notif.fecha}: ${notif.lote.length} factura(s) de ${notif.hospitales} hospital(es) por ${money(notif.monto)}. ${notif.sinRevisar} sin revisar.</div>
       <button class="btn btn-danger btn-sm" data-goto="notificaciones">Revisar →</button>
@@ -4136,23 +4149,29 @@ function render() {
   syncModeToggle();
   let html = "";
   const planMode = enModoPlan();
-  if (planMode && role === "financiador") {
-    // PLAN DE PAGO — router del financiador en modo plan.
-    if (view === "plan_fin_cronograma") html = viewPlan_Fin_Cronograma();
-    else if (view === "plan_fin_facturas") html = viewPlan_Fin_Facturas();
-    else if (view === "plan_fin_docs") html = viewPlan_Fin_Docs();
-    else if (view === "plan_fin_notif") html = viewPlan_Fin_Notif();
-    else if (view === "plan_fin_pagos") html = viewPlan_Fin_Pagos();
-    else if (view === "usuarios_financiador") html = esAdminFinActual() ? viewFinanciador_Usuarios() : viewPlan_Fin_Resumen();
+  // Las vistas del plan (plan_*) se enrutan igual en modo plan y en combinado (para ministerio y financiador).
+  if (role !== "hospital" && view.indexOf("plan_") === 0) {
+    if (role === "financiador") {
+      if (view === "plan_fin_cronograma") html = viewPlan_Fin_Cronograma();
+      else if (view === "plan_fin_facturas") html = viewPlan_Fin_Facturas();
+      else if (view === "plan_fin_docs") html = viewPlan_Fin_Docs();
+      else if (view === "plan_fin_notif") html = viewPlan_Fin_Notif();
+      else if (view === "plan_fin_pagos") html = viewPlan_Fin_Pagos();
+      else html = viewPlan_Fin_Resumen();
+    } else { // ministerio
+      if (view === "plan_min_detalle") html = viewPlan_Min_Detalle(state.planCtx);
+      else if (view === "plan_min_alertas") html = viewPlan_Min_Alertas();
+      else if (view === "plan_min_altas") html = viewPlan_Min_Altas();
+      else if (view === "plan_min_notif") html = viewPlan_Min_Notif();
+      else if (view === "plan_min_usuarios") html = viewPlan_Min_Usuarios();
+      else html = viewPlan_Min_Planes();
+    }
+  } else if (planMode && role === "financiador") {
+    // Modo plan puro: cualquier vista no-plan cae al resumen del plan.
+    if (view === "usuarios_financiador") html = esAdminFinActual() ? viewFinanciador_Usuarios() : viewPlan_Fin_Resumen();
     else html = viewPlan_Fin_Resumen();
   } else if (planMode && role === "ministerio") {
-    // PLAN DE PAGO — router del ministerio (DRC) en modo plan.
-    if (view === "plan_min_detalle") html = viewPlan_Min_Detalle(state.planCtx);
-    else if (view === "plan_min_alertas") html = viewPlan_Min_Alertas();
-    else if (view === "plan_min_altas") html = viewPlan_Min_Altas();
-    else if (view === "plan_min_notif") html = viewPlan_Min_Notif();
-    else if (view === "plan_min_usuarios") html = viewPlan_Min_Usuarios();
-    else html = viewPlan_Min_Planes();
+    html = viewPlan_Min_Planes();
   } else if (role === "ministerio") {
     if (view === "dashboard") html = viewMinisterio_Dashboard();
     else if (view === "cola") html = viewMinisterio_Cola();
@@ -4191,8 +4210,8 @@ function render() {
   if (planMode) {
     // En modo Plan de Pago la leyenda de estados del circuito corriente no aplica: se muestra la del plan.
     html += `<div class="legend"><h4>Estados — Plan de Pago</h4><div class="legend-items">
-      ${chipPlan("VIGENTE")} ${chipPlan("EN_RIESGO")} ${chipPlan("CADUCO")}
-      ${chipCuota("PENDIENTE")} ${chipCuota("PAGA")} ${chipCuota("VENCIDA")}
+      ${chipPlan("VIGENTE")} ${chipPlan("EN_RIESGO")} ${chipPlan("FINALIZADO")} ${chipPlan("CADUCO")}
+      ${chipCuota("PENDIENTE")} ${chipCuota("INFORMADA")} ${chipCuota("PAGA")} ${chipCuota("VENCIDA")}
     </div></div>`;
   } else {
     html += `<div class="legend"><h4>Ciclo de vida — estados</h4><div class="legend-items">
@@ -5685,6 +5704,8 @@ document.querySelectorAll('.role-switcher button').forEach(b => {
 document.querySelectorAll('#mode-toggle button').forEach(b => {
   b.addEventListener('click', () => {
     state.portalMode = b.dataset.mode;
+    // Fuera de combinado, la impersonación vuelve a IOMA (la OS "sin plan" solo aplica en combinado).
+    if (state.portalMode !== "combinado") { const u = usuarioFinActual(); if (u && u.financiador !== "F001") { const a = adminDeFin("F001"); if (a) state.usuarioActivoFin = a.id; } }
     state.view = navFor(state.role)[0].view;
     state.context = {}; state.planCtx = null;
     render();
@@ -5748,12 +5769,21 @@ function sintetizarConversacion(f, o) {
    ============================================================================================ */
 
 const MODALIDAD_PLAN = { CONTADO: "Contado (1 cuota)", HASTA_18: "Hasta 18 cuotas sin interés", HASTA_24: "Hasta 24 cuotas (4% anual)" };
-const ESTADO_PLAN_LABEL = { VIGENTE: "Vigente", EN_RIESGO: "En riesgo", CADUCO: "Caduco" };
+/* Estados del plan: VIGENTE = al día · EN_RIESGO = vigente pero con cuotas impagas o nueva deuda ·
+   FINALIZADO = terminó de pagar todas las cuotas · CADUCO = se cayó por incumplimiento. */
+const ESTADO_PLAN_LABEL = { VIGENTE: "Al día", EN_RIESGO: "En riesgo", FINALIZADO: "Finalizado", CADUCO: "Caduco" };
+// Causas por las que un plan puede caducar (se eligen al declarar la caducidad).
+const CAUSAS_CADUCIDAD = [
+  "Falta de pago de la cuota contado",
+  "Tres (3) cuotas impagas (consecutivas o alternadas)",
+  "Transcurrieron 45 días corridos desde el vencimiento de la última cuota impaga",
+  "Nueva deuda post-adhesión no regularizada dentro de los 10 días hábiles",
+];
 /* Estados de la cuota. INFORMADA = el financiador informó el pago y espera la confirmación de la DRC
    (pago en dos pasos): PENDIENTE/VENCIDA → (financiador informa) INFORMADA → (DRC confirma) PAGA. */
 const ESTADO_CUOTA_LABEL = { PENDIENTE: "Pendiente", INFORMADA: "Pago informado", PAGA: "Paga", VENCIDA: "Vencida" };
-const TIPO_DRC_LABEL = { LIQUIDACION_CUOTA: "Liquidación de cuota", INTIMACION_NUEVA_DEUDA: "Intimación por nueva deuda" };
-const chipPlan = (e) => `<span class="chip ${({VIGENTE:'chip-plan-vigente',EN_RIESGO:'chip-plan-riesgo',CADUCO:'chip-plan-caduco'})[e] || 'chip-plan-pend'}">${ESTADO_PLAN_LABEL[e] || e}</span>`;
+const TIPO_DRC_LABEL = { LIQUIDACION_CUOTA: "Liquidación de cuota", INTIMACION_NUEVA_DEUDA: "Intimación por nueva deuda", CADUCIDAD_PLAN: "Caducidad del plan" };
+const chipPlan = (e) => `<span class="chip ${({VIGENTE:'chip-plan-vigente',EN_RIESGO:'chip-plan-riesgo',FINALIZADO:'chip-plan-fin',CADUCO:'chip-plan-caduco'})[e] || 'chip-plan-pend'}">${ESTADO_PLAN_LABEL[e] || e}</span>`;
 const chipCuota = (e) => `<span class="chip ${({PENDIENTE:'chip-plan-pend',INFORMADA:'chip-por-vencer',PAGA:'chip-plan-paga',VENCIDA:'chip-plan-venc'})[e] || 'chip-plan-pend'}">${ESTADO_CUOTA_LABEL[e] || e}</span>`;
 
 /* Datos mock de planes. Cubren los cuatro caminos de la demo: al día, con cuotas vencidas, con nueva
@@ -5876,6 +5906,12 @@ const proximaCuota = (plan) => cuotasDe(plan).find(c => c.estado !== "PAGA");
 // Monto ya cobrado (cuotas pagas) y saldo del plan que todavía falta pagar.
 const montoPagadoPlan = (plan) => cuotasPagasDe(plan).reduce((s, c) => s + c.total, 0);
 const saldoPlan = (plan) => (plan.deudaTotalRegularizada || 0) - montoPagadoPlan(plan);
+// Un plan está "activo" (se le puede notificar/liquidar) si está vigente o en riesgo — no si finalizó o caducó.
+const planActivo = (plan) => plan && (plan.estado === "VIGENTE" || plan.estado === "EN_RIESGO");
+// ¿El plan terminó de pagar todas sus cuotas? (para marcarlo FINALIZADO).
+const planTerminado = (plan) => cuotasDe(plan).length > 0 && cuotasDe(plan).every(c => c.estado === "PAGA");
+// Porcentaje legible de una parte sobre un total (para mostrar debajo de cada KPI).
+const pct = (parte, total) => total > 0 ? Math.round((parte / total) * 100) + "%" : "0%";
 // Contadores de riesgo informativos (§4.1). Caducidad automática = 3 cuotas impagas / 45 días.
 const faltanParaCaducidad = (plan) => Math.max(0, 3 - cuotasImpagas(plan).length);
 const diasParaCaducidadAuto = (plan) => {
@@ -5918,7 +5954,40 @@ const NAV_PLAN = {
   ]
 };
 const enModoPlan = () => state.portalMode === "plan" && state.role !== "hospital";
-function navFor(role) { return (state.portalMode === "plan" && NAV_PLAN[role]) ? NAV_PLAN[role] : NAV[role]; }
+const enModoCombinado = () => state.portalMode === "combinado" && state.role !== "hospital";
+// ¿Este financiador tiene un plan de regularización? En modo combinado, solo esos ven la sección del plan.
+const tienePlan = (finId) => state.planesPago.some(p => p.financiadorId === finId);
+/* Sección "Plan de Pagos" que se ANEXA a la navegación original en modo combinado (padre + sub-secciones,
+   igual que Conciliación). Reusa las mismas vistas del modo plan. */
+const PLAN_SUB_FIN = { label: "Plan de Pagos", view: "plan_fin_resumen", sub: [
+  { label: "Mi plan", view: "plan_fin_resumen" },
+  { label: "Cronograma de cuotas", view: "plan_fin_cronograma" },
+  { label: "Facturas incluidas", view: "plan_fin_facturas" },
+  { label: "Informar pago plan", view: "plan_fin_pagos" },
+  { label: "Notificaciones DRC", view: "plan_fin_notif" },
+  { label: "Documentos", view: "plan_fin_docs" },
+]};
+const PLAN_SUB_MIN = { label: "Plan de Pagos", view: "plan_min_planes", sub: [
+  { label: "Gestión de planes", view: "plan_min_planes" },
+  { label: "Financiadores del plan", view: "plan_min_altas" },
+  { label: "Alertas", view: "plan_min_alertas" },
+  { label: "Notificaciones DRC", view: "plan_min_notif" },
+]};
+/* Navegación efectiva según el modo:
+   - original: NAV (circuito corriente).
+   - plan: NAV_PLAN (solo el plan + transversales).
+   - combinado: NAV original + sección "Plan de Pagos" anexada. Para el financiador, la sección del plan
+     aparece SOLO si ese financiador tiene un plan (los que no están en el plan ven el portal original tal cual).
+   El hospital siempre usa NAV (no lo toca el toggle). */
+function navFor(role) {
+  if (role === "hospital") return NAV.hospital;
+  if (state.portalMode === "plan" && NAV_PLAN[role]) return NAV_PLAN[role];
+  if (state.portalMode === "combinado") {
+    if (role === "ministerio") return [...NAV.ministerio, PLAN_SUB_MIN];
+    if (role === "financiador") return tienePlan(usuarioFinActual()?.financiador || "F001") ? [...NAV.financiador, PLAN_SUB_FIN] : NAV.financiador;
+  }
+  return NAV[role];
+}
 function syncModeToggle() {
   const mt = document.getElementById('mode-toggle'); if (!mt) return;
   mt.style.display = state.role === 'hospital' ? 'none' : 'flex';
@@ -5972,6 +6041,7 @@ function viewPlan_Fin_Resumen() {
       <div><h1>Mi plan — ${plan.denominacionOS}</h1><div class="sub">Régimen de Regularización de Deudas · RESO-2026-103-GDEBA-SAMO</div></div>
       <div class="page-actions">${chipPlan(plan.estado)}</div>
     </div>
+    ${enModoCombinado() ? `<div class="note"><strong>Vista combinada.</strong> Este financiador está en el plan de regularización <em>y además</em> opera el circuito de facturación corriente. Acá ves <strong>solo su plan</strong> (deuda vieja regularizada en cuotas); sus facturas corrientes siguen en las secciones habituales (Facturas a revisar, Conciliación, Informar pagos).</div>` : ''}
     <div class="note note-blue">Las facturas de este plan están <strong>congeladas</strong>: no corre el reloj de 60 días ni la morosidad del circuito corriente sobre ellas. El plan avanza por <strong>cuotas con vencimiento el día 10</strong> de cada mes.</div>
     <div class="kpi-grid">
       <div class="kpi"><div class="label">Deuda total del plan</div><div class="value money">${money(plan.deudaTotalRegularizada)}</div><div class="hint">capital + intereses (total a pagar)</div></div>
@@ -6070,11 +6140,11 @@ function viewPlan_Fin_Notif() {
         <thead><tr><th>Fecha</th><th>Tipo</th><th>Cuota</th><th class="money-header">Monto</th><th style="text-align:center;">Estado de la cuota</th><th></th></tr></thead>
         <tbody>${ns.map(n => { const c = cuotaDeNotif(n); return `<tr>
           <td>${n.fecha}</td>
-          <td>${n.tipo === 'INTIMACION_NUEVA_DEUDA' ? '⚖ ' : '📨 '}${TIPO_DRC_LABEL[n.tipo]}</td>
+          <td>${n.tipo === 'INTIMACION_NUEVA_DEUDA' ? '⚖ ' : n.tipo === 'CADUCIDAD_PLAN' ? '⛔ ' : '📨 '}${TIPO_DRC_LABEL[n.tipo]}</td>
           <td>${n.cuotaNro ? 'N° ' + n.cuotaNro : '—'}</td>
           <td class="money">${n.monto ? money(n.monto) : '—'}</td>
           <td style="text-align:center;">${c ? chipCuota(c.estado) : '<span class="chip chip-plan-pend">Emitida</span>'}</td>
-          <td style="text-align:right;">${n.tipo === 'LIQUIDACION_CUOTA' ? `<button class="btn btn-secondary btn-sm" data-plan-factura="${n.planId}:${n.cuotaNro}">📄 Ver factura</button>` : ''}</td>
+          <td style="text-align:right;"><button class="btn btn-secondary btn-sm" data-ver-notif="${n.id}">${n.tipo === 'LIQUIDACION_CUOTA' ? '📄 Ver factura' : '📄 Ver'}</button></td>
         </tr>`; }).join('')}</tbody>
       </table>` : '<div class="note">No hay notificaciones de la DRC para este plan.</div>'}
     </div>
@@ -6084,8 +6154,10 @@ function viewPlan_Fin_Notif() {
 /* ===================== VISTAS PLAN DE PAGO — MINISTERIO (DRC) ===================== */
 function viewPlan_Min_Planes() {
   const planes = planesTodos();
-  const vig = planes.filter(p => p.estado === "VIGENTE").length;
+  const firmados = planes.length; // todos los que alguna vez se subieron a la plataforma
+  const vig = planes.filter(p => p.estado === "VIGENTE").length;     // al día
   const rie = planes.filter(p => p.estado === "EN_RIESGO").length;
+  const fin = planes.filter(p => p.estado === "FINALIZADO").length;
   const cad = planes.filter(p => p.estado === "CADUCO").length;
   const deudaTotal = planes.reduce((s, p) => s + p.deudaTotalRegularizada, 0);
   const recaudado = planes.reduce((s, p) => s + montoPagadoPlan(p), 0);
@@ -6096,16 +6168,20 @@ function viewPlan_Min_Planes() {
       <div><strong>📥 Tenés ${pagosInformadosPendientes()} pago(s) informado(s) esperando confirmación</strong> — el financiador informó pagos de cuotas y hay que confirmarlos.</div>
       <button class="btn btn-danger btn-sm" data-goto="plan_min_alertas">Ver y confirmar →</button>
     </div>` : ''}
+    ${enModoCombinado() ? `<div class="note"><strong>Vista combinada.</strong> Conviven las dos operatorias: el circuito de facturación corriente (Panel, Cola, Auditoría, Morosidad…) <em>y</em> el Régimen de Regularización. Los financiadores adheridos aparecen acá; los que no están en el plan operan solo el circuito corriente.</div>` : ''}
     <div class="note note-blue">Alcance subjetivo del régimen: <strong>obras sociales nacionales</strong> (Ley 23.660, art. 1 inc. a y e). En modo Plan de Pago, prepagas y ART no aplican.</div>
-    <div class="note"><strong>Cómo leer los montos:</strong> <em>Deuda total del plan</em> = capital + intereses = todo lo que se comprometió a pagar. <em>Pagado</em> = cuotas ya cobradas. <em>Saldo</em> = lo que todavía falta cobrar.</div>
+    <div class="note"><strong>Cómo leer los montos:</strong> <em>Deuda total del plan</em> = capital + intereses = todo lo que se comprometió a pagar. <em>Pagado</em> = cuotas ya cobradas. <em>Saldo</em> = lo que todavía falta cobrar. El % debajo de cada valor indica cuánto representa del total.</div>
     <div class="kpi-grid">
-      <div class="kpi"><div class="label">Planes activos</div><div class="value">${vig + rie}</div><div class="hint">vigentes + en riesgo</div></div>
-      <div class="kpi good"><div class="label">Planes vigentes</div><div class="value success">${vig}</div></div>
-      <div class="kpi warning"><div class="label">En riesgo</div><div class="value warn">${rie}</div></div>
-      <div class="kpi action-required"><div class="label">Caducos</div><div class="value danger">${cad}</div></div>
-      <div class="kpi"><div class="label">Deuda total del plan</div><div class="value money">${money(deudaTotal)}</div><div class="hint">comprometido a pagar</div></div>
-      <div class="kpi good"><div class="label">Pagado</div><div class="value money success">${money(recaudado)}</div></div>
-      <div class="kpi"><div class="label">Saldo a cobrar</div><div class="value money">${money(saldo)}</div></div>
+      <div class="kpi"><div class="label">Planes firmados</div><div class="value">${firmados}</div><div class="hint">todos los cargados en la plataforma</div></div>
+      <div class="kpi good"><div class="label">Al día</div><div class="value success">${vig}</div><div class="hint">${pct(vig, firmados)} del total</div></div>
+      <div class="kpi warning"><div class="label">En riesgo</div><div class="value warn">${rie}</div><div class="hint">${pct(rie, firmados)} del total</div></div>
+      <div class="kpi"><div class="label">Finalizados</div><div class="value" style="color:#2c5d8f;">${fin}</div><div class="hint">${pct(fin, firmados)} del total</div></div>
+      <div class="kpi action-required"><div class="label">Caducos</div><div class="value danger">${cad}</div><div class="hint">${pct(cad, firmados)} del total</div></div>
+    </div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">Deuda total del plan</div><div class="value money">${money(deudaTotal)}</div><div class="hint">comprometido a pagar (100%)</div></div>
+      <div class="kpi good"><div class="label">Pagado</div><div class="value money success">${money(recaudado)}</div><div class="hint">${pct(recaudado, deudaTotal)} de la deuda total</div></div>
+      <div class="kpi"><div class="label">Saldo a cobrar</div><div class="value money">${money(saldo)}</div><div class="hint">${pct(saldo, deudaTotal)} de la deuda total</div></div>
     </div>
     <div class="card">
       <h3 class="card-title">Obras sociales adheridas</h3>
@@ -6146,11 +6222,12 @@ function viewPlan_Min_Detalle(planId) {
     </div>
     <div class="card">
       <h3 class="card-title">Acciones de la DRC</h3>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      ${planActivo(plan) ? `<div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn btn-primary btn-sm" data-plan-liquidar="${plan.id}">📨 Notificar / liquidar cuota del día 10</button>
         <button class="btn btn-danger btn-sm" data-plan-intimar="${plan.id}">⚖ Intimar por nueva deuda</button>
-        <button class="btn btn-danger btn-sm" data-plan-caducidad="${plan.id}" ${plan.estado === 'CADUCO' ? 'disabled' : ''}>Declarar caducidad</button>
-      </div>
+        <button class="btn btn-danger btn-sm" data-plan-caducidad="${plan.id}">Declarar caducidad</button>
+      </div>`
+      : `<div class="note">El plan está <strong>${ESTADO_PLAN_LABEL[plan.estado]}</strong>: no hay acciones de notificación disponibles (solo se puede notificar/liquidar, intimar o declarar caducidad sobre planes al día o en riesgo).</div>`}
       ${plan.deudaNueva ? `<div class="note" style="margin-top:12px;"><strong>Nueva deuda intimada:</strong> ${money(plan.deudaNueva.monto)} — intimación del ${plan.deudaNueva.fechaIntimacion}, ${plan.deudaNueva.diasHabilesRestantes} días hábiles restantes para regularizar (caducidad no automática).</div>` : ''}
     </div>
     ${cuotasInformadas(plan).length ? `<div class="card" style="border:1px solid var(--warn);">
@@ -6237,14 +6314,15 @@ function viewPlan_Min_Notif() {
     <div class="card">
       <h3 class="card-title">Notificaciones emitidas — ${ns.length}</h3>
       ${ns.length ? `<table>
-        <thead><tr><th>Fecha</th><th>Obra social</th><th>Tipo</th><th>Cuota</th><th class="money-header">Monto</th><th style="text-align:center;">Estado de la cuota</th></tr></thead>
+        <thead><tr><th>Fecha</th><th>Obra social</th><th>Tipo</th><th>Cuota</th><th class="money-header">Monto</th><th style="text-align:center;">Estado de la cuota</th><th></th></tr></thead>
         <tbody>${ns.map(n => { const c = cuotaDeNotif(n); return `<tr>
           <td>${n.fecha}</td>
           <td><strong>${nombrePlanOS(n.planId)}</strong></td>
-          <td>${n.tipo === 'INTIMACION_NUEVA_DEUDA' ? '⚖ ' : '📨 '}${TIPO_DRC_LABEL[n.tipo]}</td>
+          <td>${n.tipo === 'INTIMACION_NUEVA_DEUDA' ? '⚖ ' : n.tipo === 'CADUCIDAD_PLAN' ? '⛔ ' : '📨 '}${TIPO_DRC_LABEL[n.tipo]}</td>
           <td>${n.cuotaNro ? 'N° ' + n.cuotaNro : '—'}</td>
           <td class="money">${n.monto ? money(n.monto) : '—'}</td>
           <td style="text-align:center;">${c ? chipCuota(c.estado) : '<span class="chip chip-plan-pend">Emitida</span>'}</td>
+          <td style="text-align:right;"><button class="btn btn-secondary btn-sm" data-ver-notif="${n.id}">Ver</button></td>
         </tr>`; }).join('')}</tbody>
       </table>` : '<div class="note">Todavía no se emitieron notificaciones.</div>'}
     </div>
@@ -6256,16 +6334,19 @@ function viewPlan_Min_Usuarios() {
     <div class="page-header"><div><h1>Usuarios</h1><div class="sub">Usuarios de las obras sociales adheridas al plan</div></div></div>
     <div class="note note-blue">En modo Plan de Pago, la administración de usuarios queda acotada a las <strong>obras sociales adheridas</strong> al régimen. Cada OS opera con el <strong>domicilio electrónico constituido en su CUIT</strong> (la adhesión es externa al portal).</div>
     <div class="card">
-      <h3 class="card-title">Obras sociales adheridas y su usuario admin</h3>
+      <h3 class="card-title">Usuarios por obra social adherida</h3>
       <table>
-        <thead><tr><th>Obra social</th><th>CUIT (domicilio electrónico)</th><th>RNAS</th><th>Usuario administrador</th><th style="text-align:center;">Estado del plan</th></tr></thead>
-        <tbody>${planes.map(p => { const admin = adminDeFin(p.financiadorId); return `<tr>
-          <td><strong>${p.denominacionOS}</strong></td>
-          <td>${p.cuit}</td>
-          <td>${p.rnas}</td>
-          <td style="font-size:12px;">${admin ? admin.nombre + ' ' + admin.apellido : '<span style="color:var(--muted);">—</span>'}</td>
-          <td style="text-align:center;">${chipPlan(p.estado)}</td>
-        </tr>`; }).join('')}</tbody>
+        <thead><tr><th>Obra social</th><th>CUIT (domicilio electrónico)</th><th>Usuario</th><th>Rol</th><th style="text-align:center;">Estado</th></tr></thead>
+        <tbody>${planes.map(p => { const us = usuariosDeFin(p.financiadorId);
+          if (!us.length) return `<tr><td><strong>${p.denominacionOS}</strong></td><td>${p.cuit}</td><td colspan="3" style="color:var(--muted);">Sin usuarios cargados</td></tr>`;
+          return us.map((u, i) => `<tr>
+            <td>${i === 0 ? `<strong>${p.denominacionOS}</strong>` : ''}</td>
+            <td>${i === 0 ? p.cuit : ''}</td>
+            <td>${u.nombre} ${u.apellido}<div style="font-size:11px;color:var(--muted);">${u.cargo || ''}</div></td>
+            <td>${ROL_USR_LABEL[u.rol]}</td>
+            <td style="text-align:center;">${chipUsr(u.estado)}</td>
+          </tr>`).join('');
+        }).join('')}</tbody>
       </table>
     </div>
   `;
@@ -6295,36 +6376,148 @@ window.__planConfirmarPagoCuota = function(id, nro) {
     detalle: "El financiador informó este pago. Al confirmarlo, la cuota queda <strong>Paga</strong>. Si el plan no tiene otras cuotas vencidas ni nueva deuda intimada, vuelve a estado Vigente.",
     onOk: () => {
       c.estado = "PAGA"; c.fechaPago = HOY; plan.cuotasPagas = cuotasPagasDe(plan).length;
-      if (plan.estado !== "CADUCO") plan.estado = plan.deudaNueva ? "EN_RIESGO" : (cuotasImpagas(plan).length ? "EN_RIESGO" : "VIGENTE");
-      closeModal(); render(); showToast("✓ Pago de cuota confirmado");
+      if (plan.estado !== "CADUCO") {
+        plan.estado = planTerminado(plan) ? "FINALIZADO" : (plan.deudaNueva ? "EN_RIESGO" : (cuotasImpagas(plan).length ? "EN_RIESGO" : "VIGENTE"));
+      }
+      closeModal(); render(); showToast(planTerminado(plan) ? "✓ Última cuota confirmada — plan finalizado" : "✓ Pago de cuota confirmado");
     } });
 };
+/* ---- Intimación por nueva deuda: form con datos + nota autocompletada + notificación (texto + PDF) ----
+   Mismo espíritu que "generar expediente judicial" del portal original, pero en lugar de descargar el PDF,
+   manda la notificación al domicilio electrónico con el texto y el PDF adjunto. */
+function notaIntimacion(plan, d) {
+  return `<div class="nota-modelo">
+    <p><strong>INTIMACIÓN — Nueva deuda post-adhesión (Régimen de Regularización RESO-2026-103-GDEBA-SAMO)</strong></p>
+    <p>La Plata, <span class="campo">${d.fecha}</span>.</p>
+    <p>La Dirección de Recuperación de Costos intima a <span class="campo">${plan.denominacionOS}</span>
+    (CUIT <span class="campo">${plan.cuit}</span>) por la <strong>deuda generada con posterioridad a la adhesión</strong>,
+    correspondiente a facturas emitidas por <span class="campo">${d.hospNombre}</span>
+    (CUIT <span class="campo">${d.hospCuit}</span>), notificadas originalmente el
+    <span class="campo">${d.fechaNotifOriginal}</span>, por un monto exigido de <span class="campo">${money(d.monto)}</span>.</p>
+    <p>Se otorga un plazo de <span class="campo">10 días hábiles</span> para regularizar. Vencido dicho plazo sin
+    respuesta, podrá declararse la caducidad del plan por acto administrativo (caducidad no automática).</p>
+    <p>Notificación al domicilio electrónico constituido en el CUIT <span class="campo">${plan.cuit}</span>.</p>
+  </div>`;
+}
 window.__planIntimarNuevaDeuda = function(id) {
   const plan = planPorId(id); if (!plan) return;
+  const d = state.__intimDraft || {};
   openModal(`<h3>Intimar por nueva deuda</h3>
     <p class="subtle">Obra social: <strong>${plan.denominacionOS}</strong> · Plan ${plan.id}</p>
-    <div class="note">La intimación se cursa al domicilio electrónico constituido en el CUIT ${plan.cuit}. Arranca el contador de <strong>10 días hábiles</strong> para regularizar; vencidos sin respuesta, el plan puede declararse caduco por acto administrativo (caducidad NO automática).</div>
-    <label>Monto de la nueva deuda post-adhesión</label>
-    <input type="number" id="plan-nd-monto" placeholder="0" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:14px;">
+    <div class="note">Se notifica al domicilio electrónico constituido en el CUIT ${plan.cuit}. Arranca el contador de <strong>10 días hábiles</strong>; vencido sin respuesta, puede declararse la caducidad por acto administrativo.</div>
+    <label>Fecha de la intimación</label><input type="date" id="intim-fecha" value="${d.fecha || HOY}">
+    <label>Fecha de notificación original de la deuda</label><input type="date" id="intim-fecha-orig" value="${d.fechaNotifOriginal && d.fechaNotifOriginal !== '—' ? d.fechaNotifOriginal : ''}">
+    <label>CUIT del hospital que emitió las facturas</label>
+    <input id="intim-hosp-cuit" placeholder="30-99887766-1" value="${d.hospCuit && d.hospCuit !== '—' ? d.hospCuit : ''}" oninput="window.__cuitHospInput(this.value)">
+    <div id="intim-hosp-nombre" style="font-size:12px;color:var(--muted);margin-top:4px;">${d.hospNombre && d.hospNombre !== 'Hospital no identificado' ? 'Hospital: <strong>' + d.hospNombre + '</strong>' : 'Ingresá el CUIT para ver el hospital.'}</div>
+    <label style="margin-top:8px;">Monto exigido</label><input type="number" id="intim-monto" placeholder="0" value="${d.monto || ''}">
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-danger" onclick="window.__confirmarIntimarNuevaDeuda('${id}')">Cursar intimación</button>
+      <button class="btn btn-danger" onclick="window.__revisarIntimacion('${id}')">Generar intimación →</button>
     </div>`);
 };
-window.__confirmarIntimarNuevaDeuda = function(id) {
-  const plan = planPorId(id); if (!plan) return;
-  const monto = Number(document.getElementById('plan-nd-monto')?.value) || 0;
-  plan.deudaNueva = { monto, fechaIntimacion: HOY, diasHabilesRestantes: 10 };
-  if (plan.estado !== "CADUCO") plan.estado = "EN_RIESGO";
-  state.notificacionesDRC.unshift({ id: "NDRC-" + (state.notificacionesDRC.length + 1 + Date.now() % 1000), planId: id, tipo: "INTIMACION_NUEVA_DEUDA", fecha: HOY, cuotaNro: null, estado: "EMITIDA", monto });
-  closeModal(); render(); showToast("⚖ Intimación por nueva deuda cursada a " + plan.denominacionOS);
+// Autocompleta el nombre del hospital a partir del CUIT tipeado.
+window.__cuitHospInput = function(val) {
+  const cont = document.getElementById('intim-hosp-nombre'); if (!cont) return;
+  const h = hospPorCuit(val);
+  cont.innerHTML = h ? `Hospital: <strong>${h.nombre}</strong>` : (val ? '<span style="color:var(--danger);">CUIT no reconocido</span>' : 'Ingresá el CUIT para ver el hospital.');
 };
+window.__revisarIntimacion = function(id) {
+  const plan = planPorId(id); if (!plan) return;
+  const val = (i) => (document.getElementById(i)?.value || "").trim();
+  const monto = Number(document.getElementById('intim-monto')?.value) || 0;
+  if (monto <= 0) { showToast("⚠ Indicá el monto exigido"); return; }
+  const cuit = val('intim-hosp-cuit'); const h = hospPorCuit(cuit);
+  const d = { fecha: val('intim-fecha') || HOY, fechaNotifOriginal: val('intim-fecha-orig') || '—',
+    hospCuit: cuit || '—', hospNombre: h ? h.nombre : 'Hospital no identificado', monto };
+  state.__intimDraft = d;
+  openModal(`<h3>Revisar intimación antes de notificar</h3>
+    <p class="subtle">${plan.denominacionOS} · Plan ${plan.id}</p>
+    ${notaIntimacion(plan, d)}
+    <div class="note note-blue">Al confirmar se <strong>envía la notificación</strong> al domicilio electrónico con este texto y el <strong>PDF adjunto</strong> (mock), y el plan pasa a <strong>En riesgo</strong> con el contador de 10 días hábiles.</div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="window.__planIntimarNuevaDeuda('${id}')">← Volver a editar</button>
+      <button class="btn btn-danger" onclick="window.__confirmarIntimacion('${id}')">Notificar intimación</button>
+    </div>`);
+};
+window.__confirmarIntimacion = function(id) {
+  const plan = planPorId(id); if (!plan) return;
+  const d = state.__intimDraft || { monto: 0, fecha: HOY };
+  plan.deudaNueva = { monto: d.monto, fechaIntimacion: d.fecha, diasHabilesRestantes: 10 };
+  if (plan.estado !== "CADUCO") plan.estado = "EN_RIESGO";
+  state.notificacionesDRC.unshift({ id: "NDRC-" + (++__ndrcSeq), planId: id, tipo: "INTIMACION_NUEVA_DEUDA",
+    fecha: d.fecha, cuotaNro: null, monto: d.monto, estado: "EMITIDA",
+    mensaje: `Intimación por nueva deuda post-adhesión por ${money(d.monto)} (facturas de ${d.hospNombre}, notificadas el ${d.fechaNotifOriginal}). Plazo: 10 días hábiles.`,
+    adjuntos: [{ nombre: `intimacion_nueva_deuda_${plan.id}.pdf`, tipo: "pdf" }], nota: notaIntimacion(plan, d) });
+  state.__intimDraft = null;
+  closeModal(); render(); showToast("⚖ Intimación notificada a " + plan.denominacionOS);
+};
+
+/* ---- Declarar caducidad: motivos + fecha + resolución autocompletada + reconfirmación + notificación ---- */
+function notaCaducidad(plan, d) {
+  return `<div class="nota-modelo">
+    <p><strong>RESOLUCIÓN — Caducidad del plan (Régimen de Regularización RESO-2026-103-GDEBA-SAMO)</strong></p>
+    <p>La Plata, <span class="campo">${d.fecha}</span>.</p>
+    <p>La Dirección de Recuperación de Costos declara la <strong>caducidad</strong> del plan de
+    <span class="campo">${plan.denominacionOS}</span> (CUIT <span class="campo">${plan.cuit}</span>) por los siguientes motivos:</p>
+    <ul style="margin:6px 0 6px 18px;">${d.motivos.map(m => `<li><span class="campo">${m}</span></li>`).join('')}</ul>
+    <p>En consecuencia, la deuda regularizada vuelve a ser exigible por la vía que corresponda.</p>
+    <p>Notificación al domicilio electrónico constituido en el CUIT <span class="campo">${plan.cuit}</span>.</p>
+  </div>`;
+}
 window.__planDeclararCaducidad = function(id) {
   const plan = planPorId(id); if (!plan) return;
-  confirmarAccion({ titulo: "Declarar la caducidad del plan", clase: "btn-danger", textoBoton: "Sí, declarar caduco",
-    mensaje: `Vas a declarar CADUCO el plan de ${plan.denominacionOS}.`,
-    detalle: "La caducidad deja sin efecto el régimen de regularización: la deuda vuelve a ser exigible por la vía que corresponda. Es un acto administrativo.",
-    onOk: () => { plan.estado = "CADUCO"; closeModal(); render(); showToast("Plan de " + plan.denominacionOS + " declarado caduco"); } });
+  const d = state.__cadDraft || { motivos: [] };
+  openModal(`<h3>Declarar la caducidad del plan</h3>
+    <p class="subtle">${plan.denominacionOS} · Plan ${plan.id}</p>
+    <div class="note">Elegí los motivos y la fecha. Se genera la resolución y se notifica al domicilio electrónico (texto + PDF).</div>
+    <label>Motivos de la caducidad</label>
+    <div style="margin:4px 0;">${CAUSAS_CADUCIDAD.map(c => `<label class="cat-item" style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;font-weight:400;cursor:pointer;"><input type="checkbox" class="cad-motivo" value="${c}" ${(d.motivos || []).includes(c) ? 'checked' : ''}> <span>${c}</span></label>`).join('')}</div>
+    <label>Fecha de la declaración</label><input type="date" id="cad-fecha" value="${d.fecha || HOY}">
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-danger" onclick="window.__revisarCaducidad('${id}')">Generar resolución →</button>
+    </div>`);
+};
+window.__revisarCaducidad = function(id) {
+  const plan = planPorId(id); if (!plan) return;
+  const motivos = [...document.querySelectorAll('.cad-motivo:checked')].map(c => c.value);
+  if (!motivos.length) { showToast("⚠ Elegí al menos un motivo"); return; }
+  const d = { fecha: (document.getElementById('cad-fecha')?.value || HOY), motivos };
+  state.__cadDraft = d;
+  openModal(`<h3>Revisar y confirmar la caducidad</h3>
+    <p class="subtle">${plan.denominacionOS} · Plan ${plan.id}</p>
+    ${notaCaducidad(plan, d)}
+    <div class="note"><strong>Esta acción es irreversible.</strong> Al confirmar, el plan queda <strong>Caduco</strong> y se notifica la resolución (texto + PDF) al domicilio electrónico.</div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="window.__planDeclararCaducidad('${id}')">← Volver a editar</button>
+      <button class="btn btn-danger" onclick="window.__confirmarCaducidad('${id}')">Confirmar caducidad</button>
+    </div>`);
+};
+window.__confirmarCaducidad = function(id) {
+  const plan = planPorId(id); if (!plan) return;
+  const d = state.__cadDraft || { fecha: HOY, motivos: [] };
+  plan.estado = "CADUCO"; plan.caducidad = d;
+  state.notificacionesDRC.unshift({ id: "NDRC-" + (++__ndrcSeq), planId: id, tipo: "CADUCIDAD_PLAN",
+    fecha: d.fecha, cuotaNro: null, monto: null, estado: "EMITIDA",
+    mensaje: `Caducidad del plan declarada el ${d.fecha}. Motivos: ${d.motivos.join('; ')}.`,
+    adjuntos: [{ nombre: `resolucion_caducidad_${plan.id}.pdf`, tipo: "pdf" }], nota: notaCaducidad(plan, d) });
+  state.__cadDraft = null;
+  closeModal(); render(); showToast("Plan de " + plan.denominacionOS + " declarado caduco");
+};
+/* Visor de una notificación: la liquidación abre la factura de la cuota; la intimación y la caducidad
+   muestran el texto notificado + el PDF adjunto (mock). */
+window.__verNotif = function(notifId) {
+  const n = state.notificacionesDRC.find(x => x.id === notifId); if (!n) return;
+  if (n.tipo === "LIQUIDACION_CUOTA") { window.__planFacturaCuota(n.planId, n.cuotaNro); return; }
+  openModal(`<h3>${TIPO_DRC_LABEL[n.tipo]}</h3>
+    <p class="subtle">${nombrePlanOS(n.planId)} · ${n.fecha}</p>
+    ${n.nota ? n.nota : `<div class="note">${n.mensaje || 'Sin detalle.'}</div>`}
+    ${(n.adjuntos && n.adjuntos.length) ? `<label>Documento adjunto</label><div class="attachments">${n.adjuntos.map(a => `<span class="attachment-chip">📎 ${a.nombre || a}</span>`).join('')}</div>` : ''}
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cerrar</button>
+      <button class="btn btn-primary" onclick="showToast('📄 Documento descargado (simulado)')">⬇ Descargar PDF</button>
+    </div>`);
 };
 
 /* ===================== INFORMAR PAGOS (financiador) — pago de cuota en dos pasos ===================== */
@@ -6428,46 +6621,51 @@ function viewPlan_Min_Altas() {
   `;
 }
 window.__altaPlanFinanciador = function() {
-  const hospOpts = HOSPITALES.map(h => `<option value="${h.id}">${hospCorto(h.id)}</option>`).join('');
-  const facRow = (i) => `<div style="display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:6px;margin-bottom:6px;">
-      <input id="alta-fac-nro-${i}" placeholder="N° factura ${i}">
-      <select id="alta-fac-hosp-${i}">${hospOpts}</select>
-      <input id="alta-fac-monto-${i}" type="number" placeholder="Monto">
-    </div>`;
+  const d = state.__altaDraft || {};
+  const facs = d.facturas || [];
+  const hospOpts = (sel) => HOSPITALES.map(h => `<option value="${h.id}" ${sel === h.id ? 'selected' : ''}>${hospCorto(h.id)}</option>`).join('');
+  const facRow = (i) => { const f = facs[i - 1] || {}; return `<div style="display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:6px;margin-bottom:6px;">
+      <input id="alta-fac-nro-${i}" placeholder="N° factura ${i}" value="${f.nro || ''}">
+      <select id="alta-fac-hosp-${i}">${hospOpts(f.hosp)}</select>
+      <input id="alta-fac-monto-${i}" type="number" placeholder="Monto" value="${f.monto || ''}">
+    </div>`; };
+  const mod = d.modalidad || 'HASTA_18';
+  const modOpt = (v, l) => `<option value="${v}" ${mod === v ? 'selected' : ''}>${l}</option>`;
   openModal(`<h3>Dar de alta un financiador al plan</h3>
     <p class="subtle">Adhesión ya firmada por fuera del portal. Cargá el plan, sus facturas y el usuario administrador.</p>
     <div style="max-height:60vh;overflow:auto;padding-right:6px;">
     <div style="font-weight:600;margin:6px 0;">Datos del plan</div>
-    <label>Denominación de la obra social</label><input id="alta-os" placeholder="Ej: OSPACA — O.S. del Personal de la Alimentación">
-    <label>CUIT (domicilio electrónico constituido)</label><input id="alta-cuit" placeholder="Ej: 30-12345678-9">
-    <label>RNAS (opcional)</label><input id="alta-rnas" placeholder="Ej: RNAS 1-0800-0">
+    <label>Denominación de la obra social</label><input id="alta-os" placeholder="Ej: OSPACA — O.S. del Personal de la Alimentación" value="${d.os || ''}">
+    <label>CUIT (domicilio electrónico constituido)</label><input id="alta-cuit" placeholder="Ej: 30-12345678-9" value="${d.cuit || ''}">
+    <label>RNAS (opcional)</label><input id="alta-rnas" placeholder="Ej: RNAS 1-0800-0" value="${d.rnas || ''}">
     <label>Modalidad</label>
     <select id="alta-modalidad">
-      <option value="HASTA_18">Hasta 18 cuotas sin interés</option>
-      <option value="HASTA_24">Hasta 24 cuotas (4% anual)</option>
-      <option value="CONTADO">Contado (1 cuota)</option>
+      ${modOpt('HASTA_18', 'Hasta 18 cuotas sin interés')}
+      ${modOpt('HASTA_24', 'Hasta 24 cuotas (4% anual)')}
+      ${modOpt('CONTADO', 'Contado (1 cuota)')}
     </select>
-    <label>Cantidad de cuotas</label><input id="alta-ncuotas" type="number" placeholder="Ej: 12" value="12">
-    <label>Capital (deuda a regularizar)</label><input id="alta-capital" type="number" placeholder="Ej: 6000000">
-    <label>Intereses reconocidos (0 si es sin interés)</label><input id="alta-intereses" type="number" placeholder="0" value="0">
+    <label>Cantidad de cuotas</label><input id="alta-ncuotas" type="number" placeholder="Ej: 12" value="${d.ncuotas || '12'}">
+    <label>Capital (deuda a regularizar)</label><input id="alta-capital" type="number" placeholder="Ej: 6000000" value="${d.capital || ''}">
+    <label>Intereses reconocidos (0 si es sin interés)</label><input id="alta-intereses" type="number" placeholder="0" value="${d.intereses != null ? d.intereses : '0'}">
     <div class="note note-blue" style="margin:8px 0;">El <strong>monto de cuota</strong> se calcula solo: (capital + intereses) ÷ cantidad de cuotas.</div>
     <div style="font-weight:600;margin:10px 0 4px;">Facturas incluidas (planilla anexa)</div>
     ${facRow(1)}${facRow(2)}${facRow(3)}
     <div style="font-weight:600;margin:10px 0 4px;">Usuario administrador (apoderado / responsable)</div>
     <label>Nombre y apellido</label>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-      <input id="alta-adm-nombre" placeholder="Nombre"><input id="alta-adm-apellido" placeholder="Apellido">
+      <input id="alta-adm-nombre" placeholder="Nombre" value="${d.admNombre || ''}"><input id="alta-adm-apellido" placeholder="Apellido" value="${d.admApellido || ''}">
     </div>
-    <label>DNI</label><input id="alta-adm-dni" placeholder="Ej: 27.111.222">
-    <label>Correo electrónico</label><input id="alta-adm-mail" type="email" placeholder="Ej: apoderado@os.org.ar">
-    <label>Teléfono (opcional)</label><input id="alta-adm-tel" placeholder="Ej: 11-4000-0000">
-    <label>Cargo (opcional)</label><input id="alta-adm-cargo" placeholder="Ej: Apoderado">
+    <label>DNI</label><input id="alta-adm-dni" placeholder="Ej: 27.111.222" value="${d.admDni || ''}">
+    <label>Correo electrónico</label><input id="alta-adm-mail" type="email" placeholder="Ej: apoderado@os.org.ar" value="${d.admMail || ''}">
+    <label>Teléfono (opcional)</label><input id="alta-adm-tel" placeholder="Ej: 11-4000-0000" value="${d.admTel || ''}">
+    <label>Cargo (opcional)</label><input id="alta-adm-cargo" placeholder="Ej: Apoderado" value="${d.admCargo || ''}">
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="window.__confirmarAltaPlan()">Dar de alta al plan</button>
+      <button class="btn btn-primary" onclick="window.__confirmarAltaPlan()">Revisar y dar de alta →</button>
     </div>`);
 };
+// Paso de REVISIÓN: junta lo cargado, valida, lo guarda en un borrador y muestra el resumen para chequear.
 window.__confirmarAltaPlan = function() {
   const val = (id) => (document.getElementById(id)?.value || "").trim();
   const num = (id) => Number(document.getElementById(id)?.value) || 0;
@@ -6475,24 +6673,51 @@ window.__confirmarAltaPlan = function() {
   const capital = num('alta-capital'), intereses = num('alta-intereses');
   if (!nombre || !cuit || capital <= 0) { showToast("⚠ Completá al menos OS, CUIT y capital"); return; }
   const modalidad = val('alta-modalidad');
-  const nCuotas = modalidad === 'CONTADO' ? 1 : Math.max(1, parseInt(val('alta-ncuotas')) || 1);
+  const ncuotas = modalidad === 'CONTADO' ? 1 : Math.max(1, parseInt(val('alta-ncuotas')) || 1);
   const facturas = [];
   for (let i = 1; i <= 3; i++) { const nro = val('alta-fac-nro-' + i), monto = num('alta-fac-monto-' + i);
-    if (nro && monto > 0) facturas.push({ hospital: val('alta-fac-hosp-' + i), nroFactura: nro, fechaEmision: HOY, montoTotal: monto, saldoRegularizado: monto }); }
+    if (nro && monto > 0) facturas.push({ nro, hosp: val('alta-fac-hosp-' + i), monto }); }
+  const d = { os: nombre, cuit, rnas: val('alta-rnas'), modalidad, ncuotas, capital, intereses, facturas,
+    admNombre: val('alta-adm-nombre'), admApellido: val('alta-adm-apellido'), admDni: val('alta-adm-dni'),
+    admMail: val('alta-adm-mail'), admTel: val('alta-adm-tel'), admCargo: val('alta-adm-cargo') };
+  state.__altaDraft = d;
+  const cuota = Math.round((capital + intereses) / ncuotas);
+  openModal(`<h3>Revisá los datos antes de confirmar</h3>
+    <p class="subtle">Chequeá que esté todo bien. Si algo no está, volvé a editar.</p>
+    <div class="card" style="margin:8px 0;"><table><tbody>
+      <tr><td style="color:var(--muted);width:45%;">Obra social</td><td><strong>${nombre}</strong></td></tr>
+      <tr><td style="color:var(--muted);">CUIT</td><td>${cuit}</td></tr>
+      <tr><td style="color:var(--muted);">RNAS</td><td>${d.rnas || '—'}</td></tr>
+      <tr><td style="color:var(--muted);">Modalidad</td><td>${MODALIDAD_PLAN[modalidad]}</td></tr>
+      <tr><td style="color:var(--muted);">Cantidad de cuotas</td><td>${ncuotas}</td></tr>
+      <tr><td style="color:var(--muted);">Capital</td><td class="money">${money(capital)}</td></tr>
+      <tr><td style="color:var(--muted);">Intereses</td><td class="money">${intereses ? money(intereses) : 'Sin interés'}</td></tr>
+      <tr><td style="color:var(--muted);">Deuda total</td><td class="money" style="font-weight:600;">${money(capital + intereses)}</td></tr>
+      <tr><td style="color:var(--muted);">Monto de cuota</td><td class="money">${money(cuota)}</td></tr>
+      <tr><td style="color:var(--muted);">Facturas incluidas</td><td>${facturas.length ? facturas.map(f => `${f.nro} · ${hospCorto(f.hosp)} · ${money(f.monto)}`).join('<br>') : '<span style="color:var(--muted);">Ninguna cargada</span>'}</td></tr>
+      <tr><td style="color:var(--muted);">Usuario admin</td><td>${(d.admNombre || d.admApellido) ? (d.admNombre + ' ' + d.admApellido + ' — DNI ' + (d.admDni || '—') + ' — ' + (d.admMail || '—')) : '<span style="color:var(--muted);">Administrador (sin datos)</span>'}</td></tr>
+    </tbody></table></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="window.__altaPlanFinanciador()">← Volver a editar</button>
+      <button class="btn btn-primary" onclick="window.__ejecutarAltaPlan()">Confirmar alta</button>
+    </div>`);
+};
+// Ejecuta el alta con el borrador revisado: crea el plan, sus cuotas, sus facturas y el usuario admin.
+window.__ejecutarAltaPlan = function() {
+  const d = state.__altaDraft; if (!d) { closeModal(); return; }
   const planId = nuevoPlanId(), finId = nuevoFinIdPlan();
-  const plan = { id: planId, financiadorId: finId, denominacionOS: nombre, cuit, rnas: val('alta-rnas') || '—',
-    deudaTotalRegularizada: capital + intereses, capital, intereses, modalidad, fechaAdhesion: HOY,
-    nCuotas, cuotasPagas: 0, estado: "VIGENTE", domicilioElectronico: cuit, deudaNueva: null };
+  const plan = { id: planId, financiadorId: finId, denominacionOS: d.os, cuit: d.cuit, rnas: d.rnas || '—',
+    deudaTotalRegularizada: d.capital + d.intereses, capital: d.capital, intereses: d.intereses, modalidad: d.modalidad,
+    fechaAdhesion: HOY, nCuotas: d.ncuotas, cuotasPagas: 0, estado: "VIGENTE", domicilioElectronico: d.cuit, deudaNueva: null };
   plan.cuotas = generarCuotasPlan(plan);
   state.planesPago.push(plan);
-  FACTURAS_EN_PLAN[planId] = facturas;
-  // Alta del usuario administrador (queda activo: lo dio de alta el ministerio junto con la adhesión).
+  FACTURAS_EN_PLAN[planId] = d.facturas.map(f => ({ hospital: f.hosp, nroFactura: f.nro, fechaEmision: HOY, montoTotal: f.monto, saldoRegularizado: f.monto }));
   state.usuariosFin.push({ id: "USR-" + finId + "-1", financiador: finId, rol: "admin",
-    nombre: val('alta-adm-nombre') || "Administrador", apellido: val('alta-adm-apellido') || "",
-    dni: val('alta-adm-dni') || "—", mail: val('alta-adm-mail') || "—", telefono: val('alta-adm-tel') || "—",
-    cargo: val('alta-adm-cargo') || "Apoderado / responsable", cuit, estado: "activo", fechaSolicitud: HOY, fechaAlta: HOY, hospitales: null });
+    nombre: d.admNombre || "Administrador", apellido: d.admApellido || "", dni: d.admDni || "—", mail: d.admMail || "—",
+    telefono: d.admTel || "—", cargo: d.admCargo || "Apoderado / responsable", cuit: d.cuit, estado: "activo", fechaSolicitud: HOY, fechaAlta: HOY, hospitales: null });
+  state.__altaDraft = null;
   closeModal(); state.view = "plan_min_detalle"; state.planCtx = planId; render();
-  showToast("✓ Financiador dado de alta al plan: " + nombre);
+  showToast("✓ Financiador dado de alta al plan: " + d.os);
 };
 
 /* ---- Factura de una cuota (comprobante mock que se muestra desde la notificación de liquidación) ---- */
@@ -6531,6 +6756,7 @@ function wirePlanEvents() {
   document.querySelectorAll('[data-plan-intimar]').forEach(el => el.addEventListener('click', () => window.__planIntimarNuevaDeuda(el.dataset.planIntimar)));
   document.querySelectorAll('[data-plan-caducidad]').forEach(el => el.addEventListener('click', () => window.__planDeclararCaducidad(el.dataset.planCaducidad)));
   document.querySelectorAll('[data-plan-factura]').forEach(el => el.addEventListener('click', () => { const [id, nro] = el.dataset.planFactura.split(':'); window.__planFacturaCuota(id, nro); }));
+  document.querySelectorAll('[data-ver-notif]').forEach(el => el.addEventListener('click', () => window.__verNotif(el.dataset.verNotif)));
   document.querySelectorAll('[data-alta-plan]').forEach(el => el.addEventListener('click', () => window.__altaPlanFinanciador()));
   document.querySelectorAll('[data-plan-doc]').forEach(el => el.addEventListener('click', () => showToast(`📄 ${el.dataset.planDoc} descargado (simulado)`)));
 }
@@ -6626,7 +6852,11 @@ state.facturas.forEach(f => {
 /* 4. PLAN DE PAGO — copia mutable de los planes, cronograma de cada uno, y notificaciones de la DRC
    derivadas de las cuotas ya vencidas (una liquidación por cuota que ya le llegó al financiador). */
 state.planesPago = JSON.parse(JSON.stringify(PLANES_PAGO));
-state.planesPago.forEach(p => { p.cuotas = generarCuotasPlan(p); });
+state.planesPago.forEach(p => {
+  p.cuotas = generarCuotasPlan(p);
+  // Un plan que ya pagó todas sus cuotas está FINALIZADO (salvo que esté caduco).
+  if (p.estado !== "CADUCO" && planTerminado(p)) p.estado = "FINALIZADO";
+});
 state.notificacionesDRC = generarNotifsDRC();
 
 render();
