@@ -890,8 +890,26 @@ let state = {
   filtrosFactFin: { hospital: "TODOS", estado: "TODOS", situacion: "TODOS", q: "" },
   filtrosNotifFin: { hospital: "TODOS", estado: "TODOS", q: "", fecha: "TODOS", fechaFactura: "TODOS", vencimiento: "TODOS", estadoNotif: "TODOS" },
   // Filtros de las tablas de la Cola de notificación del Ministerio (aptas y retenidas).
-  filtrosCola: { financiador: "TODOS", hospital: "TODOS", fecha: "TODOS" },
+  // Cola del ministerio (aptas): buscador typeahead (q), CUIT del financiador, hospital y rango de fechas.
+  filtrosCola: { q: "", cuit: "", hospital: "TODOS", desde: "", hasta: "" },
   filtrosRet: { financiador: "TODOS", hospital: "TODOS", fecha: "TODOS" },
+  // Filtros de la Cola de notificación del Plan de Pago (facturas del plan, punto de venta 191). Sin hospital.
+  filtrosColaPlan: { q: "", cuit: "", desde: "", hasta: "" },
+  /* Indisponibilización de facturas (casos puntuales: emergencias, mala facturación). Una factura se
+     indisponibiliza UNA sola vez, por 30 días; después vuelve sola a "aptas". `facturasIndisponibles`
+     guarda las vigentes (por nº de factura); `indispUsadas` recuerda las que ya usaron su única vez. */
+  facturasIndisponibles: {},   // nro -> { desde, hasta, scope: "original"|"plan", financiador }
+  indispUsadas: {},            // nro -> true
+  // Selección (checkboxes) por listado, para el botón contextual de (in)disponibilizar.
+  selCola: [], selColaInd: [], selColaPlan: [], selColaPlanInd: [],
+  /* Usuarios del ministerio con su rol (perfil). El activo define qué puede hacer el rol Ministerio.
+     Se conmuta con "Ver como usuario" en el sidebar (igual que el financiador). */
+  usuariosMin: [
+    { id: "UMIN-1", nombre: "Laura", apellido: "Gómez", cargo: "Directora DRC", rol: "notificador", estado: "activo" },
+    { id: "UMIN-2", nombre: "Diego", apellido: "Ramírez", cargo: "Coordinador administrativo", rol: "administrador", estado: "activo" },
+    { id: "UMIN-3", nombre: "Sofía", apellido: "Ledesma", cargo: "Operadora de auditoría", rol: "operador", estado: "activo" },
+  ],
+  usuarioActivoMin: "UMIN-1",
   // Contadores de gestión de la auditoría central (métrica pedida en T.4 del documento de proceso).
   auditoria: { resueltas: 0, derivadas: 0 },
   /* Transferencias declaradas por el financiador que todavía NO fueron imputadas a facturas concretas.
@@ -974,6 +992,7 @@ const NAV = {
     { label: "Facturas notificadas", view: "notificadas" },
     { label: "Auditoría central", view: "auditoria" },
     { label: "Financiadores", view: "abm_financiadores" },
+    { label: "Usuarios del Ministerio", view: "min_usuarios", soloGestion: true },
   ],
   hospital: [
     { label: "Panel", view: "panel_hospital" },
@@ -1020,6 +1039,86 @@ const hospNombre = (id) => HOSPITALES.find(h => h.id === id)?.nombre || id;
 const hospCorto = (id) => hospNombre(id).replace("Hospital ", "").replace(" (La Plata)", " – La Plata").replace(" (Lanús)", " – Lanús").replace(" (Florencio Varela)", " – F. Varela");
 const finNombre = (id) => FINANCIADORES.find(f => f.id === id)?.nombre || id;
 const finTipo = (id) => FINANCIADORES.find(f => f.id === id)?.tipo || "";
+const finCuit = (id) => FINANCIADORES.find(f => f.id === id)?.cuit || "";
+
+/* ---- Indisponibilización de facturas (casos puntuales de la cola de notificación) ----
+   Una factura se puede indisponibilizar UNA sola vez, por 30 días; vencido el plazo vuelve sola a "aptas".
+   `esIndisponible` la considera vigente solo dentro de la ventana; `indispUsada` recuerda que ya la gastó. */
+const addDiasFecha = (fecha, n) => { const d = new Date(fecha + "T00:00:00"); d.setDate(d.getDate() + n); return d.toISOString().split("T")[0]; };
+const esIndisponible = (nro) => { const r = state.facturasIndisponibles[nro]; return !!r && r.hasta >= HOY; };
+const indispUsada = (nro) => !!state.indispUsadas[nro];
+function indisponibilizarFacturas(nros, scope, motivo) {
+  let n = 0;
+  nros.forEach(nro => {
+    if (indispUsada(nro) || esIndisponible(nro)) return;   // una sola vez, y no repetir si ya está vigente
+    state.facturasIndisponibles[nro] = { desde: HOY, hasta: addDiasFecha(HOY, 30), scope, motivo: motivo || "" };
+    state.indispUsadas[nro] = true; n++;
+  });
+  return n;
+}
+function habilitarFacturas(nros) { let n = 0; nros.forEach(nro => { if (state.facturasIndisponibles[nro]) { delete state.facturasIndisponibles[nro]; n++; } }); return n; }
+const facturasIndispDeScope = (scope) => Object.entries(state.facturasIndisponibles).filter(([nro, r]) => r.scope === scope && r.hasta >= HOY).map(([nro]) => nro);
+// Alterna un valor en un array de selección (checkboxes de las colas).
+const toggleEnArray = (arr, val) => { const i = arr.indexOf(val); if (i >= 0) arr.splice(i, 1); else arr.push(val); };
+/* Popup de indisponibilización: resumen (cuántas, de qué financiadores/hospitales), motivo obligatorio y
+   fecha del día no editable → reconfirmación → recién ahí se ejecuta (es una acción peligrosa). */
+function openModalIndisponibilizar(scope) {
+  if (!guardGestion()) return;
+  const nros = scope === "plan" ? state.selColaPlan : state.selCola;
+  const fuente = scope === "plan" ? state.facturasPlanCola : state.facturas;
+  const facs = fuente.filter(f => nros.includes(f.nro) && !esIndisponible(f.nro) && !indispUsada(f.nro));
+  if (!facs.length) { showToast("No hay facturas válidas (ya usaron su única indisponibilización o ya están fuera de la cola)"); return; }
+  const esPlan = scope === "plan";
+  const fins = [...new Set(facs.map(f => finNombre(f.financiador)))];
+  const hosps = esPlan ? [] : [...new Set(facs.map(f => hospCorto(f.hospital)))];
+  const monto = facs.reduce((s, f) => s + f.monto, 0);
+  openModal(`<h3>Indisponibilizar facturas</h3>
+    <p class="subtle">Quedan fuera de la cola de notificación por <strong>30 días</strong> (una sola vez por factura).</p>
+    <div style="display:grid;grid-template-columns:repeat(${esPlan ? 2 : 3},1fr);gap:12px;margin:10px 0;">
+      <div class="kpi"><div class="label">Facturas</div><div class="value">${facs.length}</div><div class="hint money">${money(monto)}</div></div>
+      <div class="kpi"><div class="label">${esPlan ? "Obras sociales" : "Financiadores"}</div><div class="value">${fins.length}</div></div>
+      ${esPlan ? "" : `<div class="kpi"><div class="label">Hospitales</div><div class="value">${hosps.length}</div></div>`}
+    </div>
+    <div class="note note-blue"><strong>${esPlan ? "Obras sociales" : "Financiadores"}:</strong> ${fins.join(", ")}${esPlan ? "" : `<br><strong>Hospitales:</strong> ${hosps.join(", ")}`}</div>
+    <label>Motivo de la indisponibilización <span style="color:var(--danger);">*</span></label>
+    <textarea id="indisp-motivo" rows="3" placeholder="Ej: error de facturación detectado; emergencia administrativa; factura en revisión…"></textarea>
+    <label>Fecha</label>
+    <input type="date" value="${HOY}" disabled title="Fecha del día — no editable" style="background:var(--surface-alt);color:var(--muted);cursor:not-allowed;">
+    <div style="font-size:12px;color:var(--muted);margin-top:4px;">Fecha del día — no editable.</div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-danger" onclick="window.__revisarIndisp('${scope}')">Indisponibilizar →</button>
+    </div>`);
+}
+window.__revisarIndisp = function(scope) {
+  const motivo = (document.getElementById('indisp-motivo')?.value || "").trim();
+  if (!motivo) { showToast("⚠ Indicá el motivo de la indisponibilización"); return; }
+  confirmarAccion({ titulo: "Confirmar indisponibilización", clase: "btn-danger", textoBoton: "Sí, indisponibilizar",
+    mensaje: "Las facturas seleccionadas quedarán FUERA de la cola de notificación por 30 días. Se consume la única indisponibilización disponible de cada factura.",
+    detalle: "Motivo: " + motivo,
+    onOk: () => {
+      const nros = scope === "plan" ? state.selColaPlan : state.selCola;
+      const n = indisponibilizarFacturas(nros, scope, motivo);
+      if (scope === "plan") state.selColaPlan = []; else state.selCola = [];
+      closeModal(); render(); showToast(n ? `⛔ ${n} factura(s) indisponibilizada(s) por 30 días` : "No se indisponibilizó ninguna");
+    } });
+};
+
+/* ---- Perfiles del usuario del ministerio ----
+   operador: solo ve y responde la auditoría central · administrador: gestión (alta/pausa financiadores,
+   alta al plan, usuarios, indisponibilizar facturas, caducidad, expedientes) MENOS notificar ·
+   notificador: todo, incluida la notificación (consolidada, intimaciones). */
+const usuarioMinActual = () => state.usuariosMin.find(u => u.id === state.usuarioActivoMin) || state.usuariosMin[0];
+const perfilMin = () => (usuarioMinActual() && usuarioMinActual().rol) || "notificador";
+const minEsOperador = () => perfilMin() === "operador";
+const minPuedeGestionar = () => perfilMin() === "administrador" || perfilMin() === "notificador";
+const minPuedeNotificar = () => perfilMin() === "notificador";
+const PERFIL_MIN_LABEL = { operador: "Operador", administrador: "Administrador", notificador: "Notificador" };
+// Aviso reutilizable cuando el perfil actual no alcanza para una acción.
+const notaPerfilMin = (txt) => `<div class="note note-blue" style="margin-top:8px;">🔒 <strong>Perfil ${PERFIL_MIN_LABEL[perfilMin()]}:</strong> ${txt}</div>`;
+// Guards de acción (defensa además de ocultar botones): gestión (admin+notif) y notificación (solo notif).
+function guardGestion() { if (!minPuedeGestionar()) { showToast(`🔒 Tu perfil (${PERFIL_MIN_LABEL[perfilMin()]}) no permite esta gestión`); return false; } return true; }
+function guardNotif() { if (!minPuedeNotificar()) { showToast("🔒 Solo el perfil Notificador puede notificar o intimar"); return false; } return true; }
 const chip = (e) => {
   const labels = { emitida:"Emitida", en_cola:"En cola", notificada:"Notificada", vista:"Vista", aceptada:"Aceptada", rechazada_parcial:"Rechazada parcial", rechazada_total:"Rechazada", esperando_auditoria:"Esperando auditoría", esperando_financiador:"Esperando financiador", esperando_hospital:"Esperando hospital", pago_efectuado:"Pago efectuado", pago_informado:"Pago informado", pago_parcial:"Pago parcial", pagada:"Pagada", morosa:"Morosa", intimada:"Intimada", judicializada:"Judicializada", cerrada:"Cerrada", cerrada_nc:"Cerrada por NC", por_vencer:"Por vencer" };
   const cls = { emitida:"chip-emitida", en_cola:"chip-en-cola", notificada:"chip-notificada", vista:"chip-vista", aceptada:"chip-aceptada", rechazada_parcial:"chip-parcial", rechazada_total:"chip-rechazada", esperando_auditoria:"chip-esperando-auditoria", esperando_financiador:"chip-esperando-financiador", esperando_hospital:"chip-esperando-hospital", pago_efectuado:"chip-pago-efectuado", pago_informado:"chip-pago-informado", pago_parcial:"chip-pago-parcial", pagada:"chip-pagada", morosa:"chip-morosa", intimada:"chip-intimada", judicializada:"chip-judicializada", cerrada:"chip-cerrada", cerrada_nc:"chip-cerrada-nc", por_vencer:"chip-por-vencer" };
@@ -1200,6 +1299,7 @@ const expedientesDelPar = (hospId, finId) => state.expedientes.filter(e => e.hos
 /* Intimación fehaciente de la auditoría sobre las morosas. Es lo que habilita el acumulador:
    una morosa sin intimar no suma para el umbral de JUS (definición 11/8). */
 function intimar(facturas) {
+  if (!guardNotif()) return;   // intimar (morosidad→legales) es acción de notificación → solo notificador
   facturas.forEach(f => {
     if (f.estado !== "morosa") return;
     f.estado = "intimada";
@@ -1440,11 +1540,23 @@ function renderSidebar() {
       </select>
     </div>`);
   }
+  /* Rol Ministerio: selector "Ver como usuario" para conmutar el perfil activo (operador / administrador /
+     notificador) y demostrar qué habilita cada uno. */
+  if (state.role === "ministerio") {
+    const uAct = usuarioMinActual();
+    html.push(`<div style="padding:2px 20px 10px;">
+      <div style="font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);font-weight:600;margin-bottom:4px;">Ver como usuario</div>
+      <select id="ver-como-usr-min" style="width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;background:#fff;">
+        ${state.usuariosMin.filter(u => u.estado === "activo").map(u => `<option value="${u.id}" ${uAct && uAct.id === u.id ? 'selected' : ''}>${u.nombre} ${u.apellido} · ${PERFIL_MIN_LABEL[u.rol]}</option>`).join('')}
+      </select>
+    </div>`);
+  }
   // PLAN DE PAGO — aviso al ministerio de pagos informados sin confirmar (badge rojo en la nav).
   const pagosPend = (state.role === "ministerio" && (enModoPlan() || enModoCombinado())) ? pagosInformadosPendientes() : 0;
   items.forEach(item => {
     if (item.separator) { html.push(`<div class="nav-etapa2-sep">${item.label}<span class="etapa2-hint">No se implementa en el primer lanzamiento</span></div>`); return; }
     if (item.soloAdmin && !esAdminFinActual()) return;
+    if (item.soloGestion && !minPuedeGestionar()) return;   // Usuarios del Ministerio: solo admin/notificador
     const activeCls = state.view === item.view || (item.sub && item.sub.some(s => s.view === state.view)) ? "active" : "";
     const et2Cls = item.etapa2 ? " nav-etapa2-item" : "";
     const parentBadge = (pagosPend > 0 && item.view === "plan_min_planes") ? `<span class="badge warn">${pagosPend}</span>` : "";
@@ -1477,6 +1589,14 @@ function renderSidebar() {
     state.usuarioActivoFin = verComo.value;
     // Si pasamos a un operador estando en Gestión de usuarios, esa vista deja de existir para él.
     if (state.view === "usuarios_financiador" && !esAdminFinActual()) state.view = "panel_financiador";
+    state.context = {};
+    render();
+  });
+  const verComoMin = sidebar.querySelector('#ver-como-usr-min');
+  if (verComoMin) verComoMin.addEventListener('change', () => {
+    state.usuarioActivoMin = verComoMin.value;
+    // Si el nuevo perfil no puede gestionar y estaba en una vista de gestión, lo devolvemos al panel.
+    if ((state.view === "min_usuarios") && !minPuedeGestionar()) state.view = "dashboard";
     state.context = {};
     render();
   });
@@ -2258,16 +2378,13 @@ function viewFinanciador_Panel() {
       <div><h1>Panel — IOMA</h1><div class="sub">Situación consolidada de facturación del Ministerio de Salud PBA</div></div>
       <div class="page-actions"><button class="btn btn-excel" onclick="exportPanelFin()">⬇ Descargar Excel</button></div>
     </div>
-    ${enModoCombinado() ? (tienePlan(usuarioFinActual()?.financiador || "F001")
-      ? `<div class="note note-blue" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
-      <div><strong>📋 Este financiador tiene un plan de regularización vigente.</strong> Su deuda vieja se paga por cuotas, aparte del circuito corriente de esta pantalla.</div>
-      <button class="btn btn-secondary btn-sm" data-goto="plan_fin_resumen">Ver mi plan de pago →</button>
-    </div>`
-      : `<div class="note"><strong>${finNombre(usuarioFinActual().financiador)} no está en el Plan de Pago.</strong> Ve <strong>solo el circuito de facturación corriente</strong> (no le aparece la sección Plan de Pagos). <em>Nota de demo: los datos de facturas que se muestran son ilustrativos, los de IOMA.</em></div>`) : ""}
+    ${enModoCombinado() && !tienePlan(usuarioFinActual()?.financiador || "F001")
+      ? `<div class="note"><strong>${finNombre(usuarioFinActual().financiador)} no está en el Plan de Pago.</strong> Ve <strong>solo el circuito de facturación corriente</strong> (no le aparece la sección Plan de Pagos). <em>Nota de demo: los datos de facturas que se muestran son ilustrativos, los de IOMA.</em></div>` : ""}
     ${notif && notif.sinRevisar > 0 ? `<div class="action-required-banner">
       <div><strong>📬 Recibiste una nueva notificación de facturas a pagar</strong> — ${notif.fecha}: ${notif.lote.length} factura(s) de ${notif.hospitales} hospital(es) por ${money(notif.monto)}. ${notif.sinRevisar} sin revisar.</div>
       <button class="btn btn-danger btn-sm" data-goto="notificaciones">Revisar →</button>
     </div>` : ""}
+    ${enModoCombinado() && tienePlan(usuarioFinActual()?.financiador || "F001") ? avisoNotifPlanFin() : ""}
     <div class="card" style="padding:14px 16px;">
       <div class="filter-bar" style="margin-bottom:0;">
         <strong style="font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted);">Ver</strong>
@@ -3607,34 +3724,51 @@ function viewMinisterio_DetalleActor(dim, id) {
 }
 
 function viewMinisterio_Cola() {
+  const puedeGest = minPuedeGestionar(), puedeNotif = minPuedeNotificar();
   const enCola = state.facturas.filter(f => f.estado === "en_cola");
-  // Aptas = financiador con estado "activo". Retenidas = financiador "en_pausa" (facturación pausada).
+  // Aptas = financiador "activo" y factura NO indisponibilizada. Retenidas = financiador "en_pausa".
   // Las de "sin_usuario" ni siquiera entran a la cola (ver comentario del modelo FINANCIADORES).
-  const aptas    = enCola.filter(f => finHabilitado(f.financiador));
+  const habil     = enCola.filter(f => finHabilitado(f.financiador));
+  const aptas     = habil.filter(f => !esIndisponible(f.nro));
+  const indisp    = habil.filter(f => esIndisponible(f.nro));
   const retenidas = enCola.filter(f => finEnPausa(f.financiador));
 
   const totalAptasMonto = aptas.reduce((s,f)=>s+f.monto,0);
   const totalRetMonto   = retenidas.reduce((s,f)=>s+f.monto,0);
   const finsActivos   = new Set(aptas.map(f=>f.financiador));
-  const finsEnPausa   = new Set(retenidas.map(f=>f.financiador));
   const hospIntervinientes = new Set(aptas.map(f=>f.hospital));
 
-  // Filtros aplicados a cada tabla
-  const fc = state.filtrosCola;
+  const fc = state.filtrosCola;      // { q, cuit, hospital, desde, hasta }
   const fr = state.filtrosRet;
-  const aplicar = (fs, fl) => fs
+  const q = (fc.q||"").trim().toLowerCase(), cuit = (fc.cuit||"").trim();
+  const conFiltros = q || cuit || fc.hospital !== "TODOS" || fc.desde || fc.hasta;
+  const aplicarAptas = (fs) => fs
+    .filter(f => !q || finNombre(f.financiador).toLowerCase().includes(q) || hospNombre(f.hospital).toLowerCase().includes(q) || f.nro.toLowerCase().includes(q))
+    .filter(f => !cuit || finCuit(f.financiador).includes(cuit))
+    .filter(f => fc.hospital === "TODOS" || f.hospital === fc.hospital)
+    .filter(f => !fc.desde || f.fechaEmision >= fc.desde)
+    .filter(f => !fc.hasta || f.fechaEmision <= fc.hasta)
+    .sort((a,b) => b.monto - a.monto);          // mayor a menor, para detectar inconsistencias
+  const aplicarRet = (fs, fl) => fs
     .filter(f => fl.financiador === "TODOS" || f.financiador === fl.financiador)
     .filter(f => fl.hospital === "TODOS" || f.hospital === fl.hospital)
-    .filter(f => fl.fecha === "TODOS" || f.fechaEmision === fl.fecha);
-  const aptasVis = aplicar(aptas, fc);
-  const retVis   = aplicar(retenidas, fr);
+    .filter(f => fl.fecha === "TODOS" || f.fechaEmision === fl.fecha)
+    .sort((a,b) => b.monto - a.monto);
+  const aptasVis = aplicarAptas(aptas);
+  const retVis   = aplicarRet(retenidas, fr);
+  const dlFin = [...new Set(habil.map(f=>f.financiador))];
 
-  // Opciones para los selects: solo los que aparecen en cada set (no ensuciar con 300)
-  const optsFin = (fs) => [...new Set(fs.map(f=>f.financiador))].sort().map(id => `<option value="${id}">${finNombre(id)}</option>`).join('');
-  const optsHosp = (fs) => [...new Set(fs.map(f=>f.hospital))].sort().map(id => `<option value="${id}">${hospNombre(id)}</option>`).join('');
-  const optsFecha = (fs) => [...new Set(fs.map(f=>f.fechaEmision))].sort().reverse().map(fe => `<option value="${fe}">${fe}</option>`).join('');
-
-  const filaFactura = (f) => `<tr>
+  const chkApta = (f) => puedeGest ? `<td style="text-align:center;"><input type="checkbox" data-sel-cola="${f.nro}" ${state.selCola.includes(f.nro)?'checked':''}></td>` : '';
+  const filaApta = (f) => `<tr>
+      ${chkApta(f)}
+      <td>${finNombre(f.financiador)}<div style="font-size:11px;color:var(--muted);">${finCuit(f.financiador)}</div></td>
+      <td>${hospCorto(f.hospital)}</td>
+      <td><code>${f.nro}</code></td>
+      <td>${f.fechaEmision}</td>
+      <td style="text-align:center;">${f.pacientes}</td>
+      <td class="money">${money(f.monto)}</td>
+    </tr>`;
+  const filaRet = (f) => `<tr>
       <td>${finNombre(f.financiador)}</td>
       <td>${hospCorto(f.hospital)}</td>
       <td><code>${f.nro}</code></td>
@@ -3642,18 +3776,31 @@ function viewMinisterio_Cola() {
       <td style="text-align:center;">${f.pacientes}</td>
       <td class="money">${money(f.monto)}</td>
     </tr>`;
-
+  const chkInd = (f) => puedeGest ? `<td style="text-align:center;"><input type="checkbox" data-sel-colaind="${f.nro}" ${state.selColaInd.includes(f.nro)?'checked':''}></td>` : '';
+  const filaInd = (f) => { const r = state.facturasIndisponibles[f.nro]||{}; return `<tr>
+      ${chkInd(f)}
+      <td>${finNombre(f.financiador)}</td>
+      <td>${hospCorto(f.hospital)}</td>
+      <td><code>${f.nro}</code></td>
+      <td class="money">${money(f.monto)}</td>
+      <td>${r.hasta||'—'}</td>
+      <td style="font-size:12px;color:var(--muted);">${r.motivo||'—'}</td>
+    </tr>`; };
+  const selN = state.selCola.length, selNi = state.selColaInd.length;
   const finsPausados = FINANCIADORES.filter(f => f.estado === "en_pausa");
+  const colA = puedeGest ? 7 : 6;
 
   return `<div class="page-header">
       <div><h1>Cola de notificación</h1><div class="sub">Facturas emitidas pendientes de notificación consolidada</div></div>
-      <button class="btn btn-primary" id="btn-notificar" ${aptas.length ? '' : 'disabled'}>Ejecutar notificación consolidada</button>
+      ${puedeNotif ? `<button class="btn btn-primary" id="btn-notificar" ${aptas.length ? '' : 'disabled'}>Ejecutar notificación consolidada</button>` : ''}
     </div>
     <div class="note"><strong>Cada financiador recibe una sola notificación consolidada.</strong> A partir de esa fecha corren los 60 días.</div>
     <div class="note note-blue"><strong>Las facturas de financiadores con facturación en pausa quedan retenidas</strong> y no se notifican. Para liberarlas hay que reactivar la facturación desde <a href="#" data-goto="abm_financiadores"><strong>Financiadores</strong></a>.</div>
+    ${!puedeNotif ? notaPerfilMin("no podés ejecutar la notificación consolidada; solo el perfil Notificador puede.") : ''}
     <div class="kpi-grid">
       <div class="kpi ${aptas.length?'action-required':''}"><div class="label">Aptas para notificar</div><div class="value ${aptas.length?'danger':''}">${aptas.length}</div><div class="hint money">${money(totalAptasMonto)}</div></div>
       <div class="kpi ${retenidas.length?'warning':''}"><div class="label">Retenidas</div><div class="value ${retenidas.length?'warn':''}">${retenidas.length}</div><div class="hint money">${money(totalRetMonto)}</div></div>
+      <div class="kpi ${indisp.length?'warning':''}"><div class="label">Indisponibilizadas</div><div class="value ${indisp.length?'warn':''}">${indisp.length}</div><div class="hint">fuera de la cola por 30 días</div></div>
       <div class="kpi"><div class="label">Financiadores a notificar</div><div class="value">${finsActivos.size}</div><div class="hint">${finsPausados.length} en pausa</div></div>
       <div class="kpi"><div class="label">Hospitales intervinientes</div><div class="value">${hospIntervinientes.size}</div><div class="hint">emisores de las aptas</div></div>
     </div>
@@ -3662,28 +3809,37 @@ function viewMinisterio_Cola() {
       <h3 class="card-title" style="padding:16px 20px 0;">Facturas aptas para notificar
         <span style="font-size:12px;font-weight:400;color:var(--muted);">${aptasVis.length} de ${aptas.length}</span>
       </h3>
-      <div class="filter-bar" style="padding:0 20px;">
-        <select data-filtro-cola="financiador">
-          <option value="TODOS" ${fc.financiador==="TODOS"?"selected":""}>Todos los financiadores</option>
-          ${[...new Set(aptas.map(f=>f.financiador))].sort().map(id => `<option value="${id}" ${fc.financiador===id?"selected":""}>${finNombre(id)}</option>`).join('')}
-        </select>
+      <div class="filter-bar" style="padding:0 20px;flex-wrap:wrap;gap:8px;">
+        <input list="cola-fin-dl" data-filtro-cola="q" placeholder="Buscar financiador, hospital o factura…" value="${fc.q||''}" style="min-width:220px;">
+        <datalist id="cola-fin-dl">${dlFin.map(id=>`<option value="${finNombre(id)}">`).join('')}${[...new Set(habil.map(f=>f.hospital))].map(id=>`<option value="${hospNombre(id)}">`).join('')}</datalist>
+        <input list="cola-cuit-dl" data-filtro-cola="cuit" placeholder="CUIT del financiador…" value="${fc.cuit||''}">
+        <datalist id="cola-cuit-dl">${dlFin.map(id=>`<option value="${finCuit(id)}">${finNombre(id)}</option>`).join('')}</datalist>
         <select data-filtro-cola="hospital">
           <option value="TODOS" ${fc.hospital==="TODOS"?"selected":""}>Todos los hospitales</option>
           ${[...new Set(aptas.map(f=>f.hospital))].sort().map(id => `<option value="${id}" ${fc.hospital===id?"selected":""}>${hospNombre(id)}</option>`).join('')}
         </select>
-        <select data-filtro-cola="fecha">
-          <option value="TODOS" ${fc.fecha==="TODOS"?"selected":""}>Toda fecha de factura</option>
-          ${[...new Set(aptas.map(f=>f.fechaEmision))].sort().reverse().map(fe => `<option value="${fe}" ${fc.fecha===fe?"selected":""}>${fe}</option>`).join('')}
-        </select>
-        ${(fc.financiador!=="TODOS"||fc.hospital!=="TODOS"||fc.fecha!=="TODOS") ? `<button class="btn btn-secondary btn-sm" data-filtro-cola-reset="1">Limpiar</button>` : ''}
+        <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:4px;">Desde <input type="date" data-filtro-cola="desde" value="${fc.desde||''}"></label>
+        <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:4px;">Hasta <input type="date" data-filtro-cola="hasta" value="${fc.hasta||''}"></label>
+        ${conFiltros ? `<button class="btn btn-secondary btn-sm" data-filtro-cola-reset="1">Limpiar</button>` : ''}
       </div>
+      ${puedeGest && selN ? `<div style="padding:0 20px 10px;"><button class="btn btn-danger btn-sm" data-indisp-cola="1">⛔ Indisponibilizar ${selN} factura(s) seleccionada(s)</button> <span style="font-size:12px;color:var(--muted);">Quedan fuera de la cola por 30 días (una sola vez, para casos puntuales).</span></div>` : ''}
       <table>
-        <thead><tr><th>Financiador</th><th>Hospital</th><th>Factura</th><th>Fecha factura</th><th style="text-align:center;">Pacientes</th><th class="money-header">Monto</th></tr></thead>
+        <thead><tr>${puedeGest ? `<th style="text-align:center;width:34px;"><input type="checkbox" data-selall-cola="1" ${aptasVis.length && aptasVis.every(f => state.selCola.includes(f.nro)) ? 'checked' : ''}></th>` : ''}<th>Financiador</th><th>Hospital</th><th>Factura</th><th>Fecha factura</th><th style="text-align:center;">Pacientes</th><th class="money-header">Monto</th></tr></thead>
         <tbody>${aptasVis.length === 0
-          ? '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Sin facturas aptas para estos filtros.</td></tr>'
-          : aptasVis.map(filaFactura).join('')}</tbody>
+          ? `<tr><td colspan="${colA}" style="text-align:center;padding:24px;color:var(--muted);">Sin facturas aptas para estos filtros.</td></tr>`
+          : aptasVis.map(filaApta).join('')}</tbody>
       </table>
     </div>
+
+    ${indisp.length ? `<div class="card" style="padding:0;">
+      <h3 class="card-title" style="padding:16px 20px 0;">Facturas indisponibilizadas <span style="font-size:12px;font-weight:400;color:var(--muted);">${indisp.length}</span></h3>
+      <div style="padding:0 20px;"><div class="note">Facturas puntuales <strong>fuera de la cola</strong> por 30 días (emergencias, mala facturación, etc.). Al habilitarlas vuelven a "aptas para notificar".</div></div>
+      ${puedeGest && selNi ? `<div style="padding:8px 20px 10px;"><button class="btn btn-primary btn-sm" data-habilitar-cola="1">✓ Habilitar ${selNi} factura(s) seleccionada(s)</button></div>` : '<div style="height:8px;"></div>'}
+      <table>
+        <thead><tr>${puedeGest ? `<th style="text-align:center;width:34px;"><input type="checkbox" data-selall-colaind="1" ${indisp.length && indisp.every(f => state.selColaInd.includes(f.nro)) ? 'checked' : ''}></th>` : ''}<th>Financiador</th><th>Hospital</th><th>Factura</th><th class="money-header">Monto</th><th>Indisponible hasta</th><th>Motivo</th></tr></thead>
+        <tbody>${indisp.map(filaInd).join('')}</tbody>
+      </table>
+    </div>` : ''}
 
     ${retenidas.length > 0 ? `<div class="card" style="padding:0;">
       <h3 class="card-title" style="padding:16px 20px 0;">Retenidas — facturación en pausa
@@ -3714,10 +3870,85 @@ function viewMinisterio_Cola() {
         <thead><tr><th>Financiador</th><th>Hospital</th><th>Factura</th><th>Fecha factura</th><th style="text-align:center;">Pacientes</th><th class="money-header">Monto</th></tr></thead>
         <tbody>${retVis.length === 0
           ? '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--muted);">Sin facturas retenidas para estos filtros.</td></tr>'
-          : retVis.map(filaFactura).join('')}</tbody>
+          : retVis.map(filaRet).join('')}</tbody>
       </table>
     </div>` : ''}`;
 }
+/* Usuarios del Ministerio: roster con su PERFIL (operador / administrador / notificador). Solo lo ven
+   admin y notificador (soloGestion en la nav). El alta pide designar el perfil. */
+const chipRolMin = (r) => `<span class="chip ${r === 'notificador' ? 'chip-aceptada' : r === 'administrador' ? 'chip-por-vencer' : 'chip-en-cola'}">${PERFIL_MIN_LABEL[r] || r}</span>`;
+function viewMinisterio_Usuarios() {
+  const puedeGest = minPuedeGestionar();
+  const us = state.usuariosMin;
+  const solicitudes = solicitudesUsuarioPendientes();
+  return `
+    <div class="page-header">
+      <div><h1>Usuarios del Ministerio</h1><div class="sub">Perfiles: operador · administrador · notificador</div></div>
+      ${puedeGest ? '<button class="btn btn-primary" data-alta-umin="1">+ Dar de alta usuario</button>' : ''}
+    </div>
+    <div class="note note-blue">Cada usuario tiene un <strong>perfil</strong> que define qué puede hacer:
+      <strong>Operador</strong> (solo ver y responder la auditoría central),
+      <strong>Administrador</strong> (gestión: financiadores, alta al plan de pago, usuarios, indisponibilizar facturas, caducidad/expedientes — <em>sin</em> notificar) y
+      <strong>Notificador</strong> (todo, incluida la notificación consolidada y las intimaciones).
+      El perfil activo se conmuta con <strong>"Ver como usuario"</strong> en el panel lateral.</div>
+    <div class="card">
+      <h3 class="card-title">Usuarios (${us.length})</h3>
+      <table>
+        <thead><tr><th>Usuario</th><th>Cargo</th><th style="text-align:center;">Perfil</th><th style="text-align:center;">Estado</th>${puedeGest ? '<th></th>' : ''}</tr></thead>
+        <tbody>${us.map(u => `<tr>
+          <td><strong>${u.nombre} ${u.apellido}</strong>${u.id === state.usuarioActivoMin ? ' <span style="font-size:11px;color:var(--muted);">(vos)</span>' : ''}</td>
+          <td style="font-size:12px;color:var(--muted);">${u.cargo || '—'}</td>
+          <td style="text-align:center;">${chipRolMin(u.rol)}</td>
+          <td style="text-align:center;">${u.estado === 'activo' ? '<span class="chip chip-aceptada">Activo</span>' : '<span class="chip chip-en-cola">Inhabilitado</span>'}</td>
+          ${puedeGest ? `<td style="text-align:right;"><button class="btn btn-secondary btn-sm" data-cambiar-rol-umin="${u.id}">Cambiar perfil</button></td>` : ''}
+        </tr>`).join('')}</tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h3 class="card-title">Pedidos de usuarios de financiadores</h3>
+      <div class="note note-blue">Las solicitudes de usuarios de las obras sociales / financiadores se aprueban desde <a data-goto="abm_financiadores" style="cursor:pointer;text-decoration:underline;color:var(--primary);">Financiadores</a> (bandeja de solicitudes). Hoy hay <strong>${solicitudes.length}</strong> pendiente(s).</div>
+    </div>
+  `;
+}
+const OPTS_ROL_MIN = (sel) => ["operador", "administrador", "notificador"].map(r => `<option value="${r}" ${sel === r ? 'selected' : ''}>${PERFIL_MIN_LABEL[r]}</option>`).join('');
+window.__altaUsuarioMin = function() {
+  if (!guardGestion()) return;
+  openModal(`<h3>Dar de alta usuario del Ministerio</h3>
+    <label>Nombre</label><input id="umin-nombre" placeholder="Nombre">
+    <label>Apellido</label><input id="umin-apellido" placeholder="Apellido">
+    <label>Cargo (opcional)</label><input id="umin-cargo" placeholder="Ej: Operador de auditoría">
+    <label>Perfil</label><select id="umin-rol">${OPTS_ROL_MIN("operador")}</select>
+    <div class="note note-blue">El perfil define qué podrá hacer (ver el detalle en Usuarios del Ministerio).</div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="window.__confirmarAltaUsuarioMin()">Dar de alta</button>
+    </div>`);
+};
+window.__confirmarAltaUsuarioMin = function() {
+  if (!guardGestion()) return;
+  const val = (id) => (document.getElementById(id)?.value || "").trim();
+  const nombre = val('umin-nombre'), apellido = val('umin-apellido');
+  if (!nombre || !apellido) { showToast("⚠ Completá nombre y apellido"); return; }
+  const rol = val('umin-rol') || "operador";
+  state.usuariosMin.push({ id: "UMIN-" + (state.usuariosMin.length + 1), nombre, apellido, cargo: val('umin-cargo') || "—", rol, estado: "activo" });
+  closeModal(); render(); showToast(`✓ Usuario ${nombre} ${apellido} dado de alta como ${PERFIL_MIN_LABEL[rol]}`);
+};
+window.__cambiarRolUmin = function(id) {
+  if (!guardGestion()) return;
+  const u = state.usuariosMin.find(x => x.id === id); if (!u) return;
+  openModal(`<h3>Cambiar perfil — ${u.nombre} ${u.apellido}</h3>
+    <label>Perfil</label><select id="umin-rol-edit">${OPTS_ROL_MIN(u.rol)}</select>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="window.__confirmarCambiarRolUmin('${id}')">Guardar</button>
+    </div>`);
+};
+window.__confirmarCambiarRolUmin = function(id) {
+  if (!guardGestion()) return;
+  const u = state.usuariosMin.find(x => x.id === id); if (!u) return;
+  u.rol = document.getElementById('umin-rol-edit')?.value || u.rol;
+  closeModal(); render(); showToast(`✓ Perfil de ${u.nombre} ${u.apellido}: ${PERFIL_MIN_LABEL[u.rol]}`);
+};
 /* ABM de financiadores: único punto donde se cambia el estado (sin_usuario / activo / en_pausa).
    Cada cambio pide DOBLE confirmación — es una acción visible que altera qué facturas se pueden
    notificar y qué facturas quedan retenidas. */
@@ -3738,8 +3969,10 @@ function viewMinisterio_ABMFinanciadores() {
   };
   const facsDelFin = (id) => state.facturas.filter(f => f.financiador === id).length;
   const solicitudes = solicitudesUsuarioPendientes();
+  const puedeGest = minPuedeGestionar();
 
   const accionesRow = (f) => {
+    if (!puedeGest) return '<span style="font-size:12px;color:var(--muted);">solo lectura</span>';
     if (f.estado === "sin_usuario")
       return `<button class="btn btn-primary btn-sm" data-alta-fin="${f.id}">Dar de alta + crear usuario</button>`;
     if (f.estado === "activo")
@@ -3777,8 +4010,8 @@ function viewMinisterio_ABMFinanciadores() {
           <td style="color:var(--muted);font-size:12px;">${u.mail}</td>
           <td style="color:var(--muted);">${u.fechaSolicitud}</td>
           <td style="text-align:right;white-space:nowrap;">
-            <button class="btn btn-primary btn-sm" data-aprobar-usr="${u.id}">Aprobar</button>
-            <button class="btn btn-danger btn-sm" data-rechazar-usr="${u.id}">Rechazar</button>
+            ${puedeGest ? `<button class="btn btn-primary btn-sm" data-aprobar-usr="${u.id}">Aprobar</button>
+            <button class="btn btn-danger btn-sm" data-rechazar-usr="${u.id}">Rechazar</button>` : '<span style="font-size:12px;color:var(--muted);">solo lectura</span>'}
           </td>
         </tr>`).join('')}</tbody>
       </table>
@@ -4169,7 +4402,6 @@ function render() {
   if (role !== "hospital" && view.indexOf("plan_") === 0) {
     if (role === "financiador") {
       if (view === "plan_fin_cronograma") html = viewPlan_Fin_Cronograma();
-      else if (view === "plan_fin_facturas") html = viewPlan_Fin_Facturas();
       else if (view === "plan_fin_docs") html = viewPlan_Fin_Docs();
       else if (view === "plan_fin_notif") html = viewPlan_Fin_Notif();
       else if (view === "plan_fin_pagos") html = viewPlan_Fin_Pagos();
@@ -4179,6 +4411,7 @@ function render() {
       else if (view === "plan_min_alertas") html = viewPlan_Min_Alertas();
       else if (view === "plan_min_altas") html = viewPlan_Min_Altas();
       else if (view === "plan_min_notif") html = viewPlan_Min_Notif();
+      else if (view === "plan_min_cola") html = viewPlan_Min_Cola();
       else html = viewPlan_Min_Planes();
     }
   } else if (planMode && role === "financiador") {
@@ -4188,6 +4421,7 @@ function render() {
   } else if (planMode && role === "ministerio") {
     // El ABM "Financiadores" del portal original también se muestra en modo plan puro (§ Usuarios).
     if (view === "abm_financiadores") html = viewMinisterio_ABMFinanciadores();
+    else if (view === "min_usuarios") html = viewMinisterio_Usuarios();
     else html = viewPlan_Min_Planes();
   } else if (role === "ministerio") {
     if (view === "dashboard") html = viewMinisterio_Dashboard();
@@ -4200,6 +4434,7 @@ function render() {
     else if (view === "min_detalle_fin") html = viewMinisterio_DetalleActor("financiador", state.context.actor);
     else if (view === "min_detalle_hosp") html = viewMinisterio_DetalleActor("hospital", state.context.actor);
     else if (view === "abm_financiadores") html = viewMinisterio_ABMFinanciadores();
+    else if (view === "min_usuarios") html = viewMinisterio_Usuarios();
   } else if (role === "hospital") {
     if (view === "panel_hospital") html = viewHospital_Panel();
     else if (view === "detalle_financiador") html = viewHospital_DetalleFinanciador(state.context.financiador);
@@ -4319,6 +4554,10 @@ function wireEvents() {
   // "Ver financiadores a reactivar": abre el modal-lista con acción por fila.
   document.querySelectorAll('[data-ver-reactivar]').forEach(el => el.addEventListener('click', () => openModalReactivar()));
 
+  // Usuarios del Ministerio: alta con perfil + cambiar perfil.
+  document.querySelectorAll('[data-alta-umin]').forEach(el => el.addEventListener('click', () => window.__altaUsuarioMin()));
+  document.querySelectorAll('[data-cambiar-rol-umin]').forEach(el => el.addEventListener('click', () => window.__cambiarRolUmin(el.dataset.cambiarRolUmin)));
+
   /* ---- Gestión de usuarios: financiador (admin) y ministerio ---- */
   document.querySelectorAll('[data-ver-usuarios]').forEach(el => el.addEventListener('click', () => window.openModalUsuariosFin(el.dataset.verUsuarios)));
   document.querySelectorAll('[data-aprobar-usr]').forEach(el => el.addEventListener('click', () => window.__resolverSolicitud(el.dataset.aprobarUsr, "aprobar")));
@@ -4335,17 +4574,24 @@ function wireEvents() {
   const abmR = document.querySelector('[data-filtro-abm-reset]');
   if (abmR) abmR.addEventListener('click', () => { state.filtroABMFin = { estado: "TODOS", q: "" }; render(); });
 
-  /* ---- Filtros de la Cola de notificación (aptas y retenidas) ---- */
-  document.querySelectorAll('[data-filtro-cola]').forEach(el => el.addEventListener('change', () => {
-    state.filtrosCola[el.dataset.filtroCola] = el.value; render();
-  }));
+  /* ---- Filtros de la Cola de notificación (aptas: typeahead + rango; retenidas) ---- */
+  wireFiltros('[data-filtro-cola]', 'filtroCola', 'filtrosCola');
   const fcR = document.querySelector('[data-filtro-cola-reset]');
-  if (fcR) fcR.addEventListener('click', () => { state.filtrosCola = { financiador: "TODOS", hospital: "TODOS", fecha: "TODOS" }; render(); });
+  if (fcR) fcR.addEventListener('click', () => { state.filtrosCola = { q: "", cuit: "", hospital: "TODOS", desde: "", hasta: "" }; render(); });
   document.querySelectorAll('[data-filtro-ret]').forEach(el => el.addEventListener('change', () => {
     state.filtrosRet[el.dataset.filtroRet] = el.value; render();
   }));
   const frR = document.querySelector('[data-filtro-ret-reset]');
   if (frR) frR.addEventListener('click', () => { state.filtrosRet = { financiador: "TODOS", hospital: "TODOS", fecha: "TODOS" }; render(); });
+  // Selección + (in)disponibilizar en la cola original.
+  document.querySelectorAll('[data-sel-cola]').forEach(el => el.addEventListener('change', () => { toggleEnArray(state.selCola, el.dataset.selCola); renderKeepScroll(); }));
+  const saC = document.querySelector('[data-selall-cola]');
+  if (saC) saC.addEventListener('change', () => { const nros = [...document.querySelectorAll('[data-sel-cola]')].map(c => c.dataset.selCola); state.selCola = saC.checked ? nros : []; renderKeepScroll(); });
+  document.querySelectorAll('[data-sel-colaind]').forEach(el => el.addEventListener('change', () => { toggleEnArray(state.selColaInd, el.dataset.selColaind); renderKeepScroll(); }));
+  const saCi = document.querySelector('[data-selall-colaind]');
+  if (saCi) saCi.addEventListener('change', () => { const nros = [...document.querySelectorAll('[data-sel-colaind]')].map(c => c.dataset.selColaind); state.selColaInd = saCi.checked ? nros : []; renderKeepScroll(); });
+  const bIC = document.querySelector('[data-indisp-cola]'); if (bIC) bIC.addEventListener('click', () => openModalIndisponibilizar("original"));
+  const bHC = document.querySelector('[data-habilitar-cola]'); if (bHC) bHC.addEventListener('click', () => { const n = habilitarFacturas(state.selColaInd); state.selColaInd = []; render(); showToast(n ? `✓ ${n} factura(s) habilitada(s) — vuelven a aptas` : "Nada que habilitar"); });
   // Toda acción sobre la factura pasa por una confirmación explícita.
   const factActual = () => state.facturas.find(x => x.nro === state.context.factura);
   const bA = $("#btn-aceptar-total"); if (bA) bA.addEventListener('click', () => {
@@ -4667,7 +4913,7 @@ function closeModal() { $("#modal-backdrop").classList.remove("open"); }
 window.closeModal = closeModal;
 
 function openModalNotificar() {
-  const enCola = state.facturas.filter(f => f.estado === "en_cola" && finHabilitado(f.financiador));
+  const enCola = state.facturas.filter(f => f.estado === "en_cola" && finHabilitado(f.financiador) && !esIndisponible(f.nro));
   const retenidas = state.facturas.filter(f => f.estado === "en_cola" && finEnPausa(f.financiador));
   const fin = new Set(enCola.map(f => f.financiador));
   const monto = enCola.reduce((s,f)=>s+f.monto,0);
@@ -4687,8 +4933,9 @@ function openModalNotificar() {
     <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar envío</button><button class="btn btn-primary" onclick="confirmarNotif()">Confirmar envío</button></div>`);
 }
 window.confirmarNotif = function() {
-  // Solo se notifican las facturas de financiadores habilitados; el resto sigue retenido en la cola.
-  state.facturas.forEach(f => { if (f.estado === "en_cola" && finHabilitado(f.financiador)) { f.estado = "notificada"; f.fecha = HOY; } });
+  if (!guardNotif()) return;
+  // Solo se notifican las facturas de financiadores habilitados y NO indisponibilizadas; el resto sigue en la cola.
+  state.facturas.forEach(f => { if (f.estado === "en_cola" && finHabilitado(f.financiador) && !esIndisponible(f.nro)) { f.estado = "notificada"; f.fecha = HOY; } });
   closeModal(); render(); showToast("✓ Notificación consolidada ejecutada — arranca el reloj de 60 días");
 };
 
@@ -4731,6 +4978,7 @@ window.openModalReactivar = openModalReactivar;
    Doble confirmación: primero un modal con la consecuencia; al aceptar, otro chico "¿Confirmás?".
    Si venía del modal-lista de reactivar, al terminar el modal se reabre con los que quedan. */
 window.__cambiarEstadoFin = function(finId, accion) {
+  if (!guardGestion()) return;
   const fin = FINANCIADORES.find(x => x.id === finId); if (!fin) return;
   const cfg = {
     alta: { titulo: `Dar de alta a ${fin.nombre}`, textoBoton: "Sí, dar de alta",
@@ -4783,6 +5031,7 @@ window.__cambiarEstadoFin = function(finId, accion) {
    del financiador y al DNI de la persona responsable. Ese usuario es el único que después podrá
    solicitar más usuarios. Se mantiene la doble confirmación del ABM. */
 window.__altaFinanciador = function(finId) {
+  if (!guardGestion()) return;
   const fin = FINANCIADORES.find(x => x.id === finId); if (!fin) return;
   openModal(`<h3>Dar de alta a ${fin.nombre}</h3>
     <p class="subtle">${fin.nombre} (${fin.tipo}) pasa a <strong>facturación activa</strong>. Se crea el <strong>usuario administrador</strong> (apoderado / responsable), atado al CUIT del financiador y al DNI de la persona.</p>
@@ -4822,6 +5071,7 @@ window.__confirmarAltaFinanciador = function(finId) {
 
 /* ---- APROBAR / RECHAZAR SOLICITUDES DE USUARIO (ministerio) ---- */
 window.__resolverSolicitud = function(userId, decision) {
+  if (!guardGestion()) return;
   const u = state.usuariosFin.find(x => x.id === userId); if (!u) return;
   if (decision === "aprobar") {
     confirmarAccion({ titulo: "Aprobar usuario", textoBoton: "Sí, aprobar", clase: "btn-primary",
@@ -4890,6 +5140,7 @@ window.openModalUsuariosFin = function(finId) {
   rewire();
 };
 window.__inhabilitarUsuarioMin = function(userId) {
+  if (!guardGestion()) return;
   const u = state.usuariosFin.find(x => x.id === userId); if (!u) return;
   confirmarAccion({ titulo: `Inhabilitar a ${u.nombre} ${u.apellido}`, textoBoton: "Sí, inhabilitar", clase: "btn-danger",
     mensaje: `Vas a inhabilitar el acceso de ${u.nombre} ${u.apellido} (${finNombre(u.financiador)}).`,
@@ -4899,6 +5150,7 @@ window.__inhabilitarUsuarioMin = function(userId) {
       closeModal(); render(); showToast(`${u.nombre} ${u.apellido} inhabilitado`); } });
 };
 window.__rehabilitarUsuarioMin = function(userId) {
+  if (!guardGestion()) return;
   const u = state.usuariosFin.find(x => x.id === userId); if (!u) return;
   u.estado = "activo"; if (!u.fechaAlta) u.fechaAlta = HOY;
   closeModal(); render(); showToast(`✓ ${u.nombre} ${u.apellido} rehabilitado`);
@@ -5609,6 +5861,7 @@ function notaModelo({ hospital, financiador, facturas, monto, fecha, id }) {
 }
 
 function openModalPaqueteJudicial(hospId, finId) {
+  if (!guardGestion()) return;   // generar expediente = acto administrativo → admin y notificador
   const facts = intimadasDelPar(hospId, finId);
   const monto = facts.reduce((s, f) => s + saldoPendiente(f), 0);
   if (monto < UMBRAL_MONTO) { showToast(`⚠ El par no alcanza ${UMBRAL_JUS} JUS`); return; }
@@ -5907,6 +6160,25 @@ function generarNotifsDRC() {
   return out.sort((a, b) => a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0);
 }
 
+/* Facturas del PLAN DE PAGO pendientes de notificación consolidada. Se identifican por PUNTO DE VENTA
+   191 — establecimiento único "Ministerio de Salud PBA – SAMO". Es UNA factura por financiador por mes
+   (no por hospital ni por prestación: no llevan hospital ni pacientes). La notificación consolidada
+   (desde la Cola del plan) las pasa a "notificada". */
+function generarFacturasPlanCola() {
+  const out = []; let seq = 1001;
+  const periodos = [{ p: "2026-06", f: "2026-06-30" }, { p: "2026-07", f: "2026-07-31" }, { p: "2026-08", f: "2026-08-31" }];
+  state.planesPago.forEach((plan, pi) => {
+    if (!planActivo(plan)) return;              // solo planes al día o en riesgo emiten facturas nuevas
+    periodos.forEach((pr, i) => {
+      const s = (pi * 7 + i * 13);
+      const monto = 800000 + ((s * 53) % 30) * 50000;   // montos variados y "redondos"
+      out.push({ nro: "0191-" + String(seq++).padStart(8, "0"), financiador: plan.financiadorId,
+        periodo: pr.p, fechaEmision: pr.f, monto, estado: "en_cola" });
+    });
+  });
+  return out;
+}
+
 /* Genera el cronograma de cuotas de un plan: día 10 de cada mes desde el mes siguiente a la adhesión.
    Estado derivado: las primeras `cuotasPagas` quedan PAGA; del resto, las de vencimiento pasado son
    VENCIDA y las futuras PENDIENTE. La última cuota absorbe el redondeo. */
@@ -5974,20 +6246,21 @@ const NAV_PLAN = {
   ministerio: [
     { label: "Plan de Pagos", view: "plan_min_planes", sub: [
       { label: "Gestión de planes", view: "plan_min_planes" },
+      { label: "Cola de notificación Plan de Pago", view: "plan_min_cola" },
       { label: "Alertas", view: "plan_min_alertas" },
     ]},
-    { label: "Notificaciones", view: "plan_min_notif" },
+    { label: "Notificaciones Plan de Pago", view: "plan_min_notif" },
     // Usuarios: se usa el ABM "Financiadores" del portal original (misma pantalla en los 3 modos, sin
     // duplicar). El alta AL PLAN queda como una sección propia y acotada (solo el flujo de incorporación).
     { label: "Financiadores", view: "abm_financiadores" },
     { label: "Alta financiador a plan", view: "plan_min_altas" },
+    { label: "Usuarios del Ministerio", view: "min_usuarios", soloGestion: true },
   ],
   financiador: [
     { label: "Plan de Pagos", view: "plan_fin_resumen", sub: [
       { label: "Mi plan", view: "plan_fin_resumen" },
       { label: "Notificaciones Plan de pagos", view: "plan_fin_notif" },
       { label: "Cronograma de cuotas", view: "plan_fin_cronograma" },
-      { label: "Facturas incluidas", view: "plan_fin_facturas" },
       { label: "Documentos", view: "plan_fin_docs" },
     ]},
     { label: "Informar pagos", view: "plan_fin_pagos" },
@@ -6004,16 +6277,16 @@ const PLAN_SUB_FIN = { label: "Plan de Pagos", view: "plan_fin_resumen", sub: [
   { label: "Mi plan", view: "plan_fin_resumen" },
   { label: "Notificaciones Plan de pagos", view: "plan_fin_notif" },
   { label: "Cronograma de cuotas", view: "plan_fin_cronograma" },
-  { label: "Facturas incluidas", view: "plan_fin_facturas" },
   { label: "Informar pago plan", view: "plan_fin_pagos" },
   { label: "Documentos", view: "plan_fin_docs" },
 ]};
 /* En combinado el ABM "Financiadores" ya viene en NAV.ministerio, así que acá NO se repite: la sección
-   del plan solo agrega el alta al régimen, además de gestión/alertas/notificaciones DRC. */
+   del plan solo agrega el alta al régimen, además de gestión/cola/alertas/notificaciones. */
 const PLAN_SUB_MIN = { label: "Plan de Pagos", view: "plan_min_planes", sub: [
   { label: "Gestión de planes", view: "plan_min_planes" },
+  { label: "Cola de notificación Plan de Pago", view: "plan_min_cola" },
   { label: "Alertas", view: "plan_min_alertas" },
-  { label: "Notificaciones DRC", view: "plan_min_notif" },
+  { label: "Notificaciones Plan de Pago", view: "plan_min_notif" },
   { label: "Alta financiador a plan", view: "plan_min_altas" },
 ]};
 /* Navegación efectiva según el modo:
@@ -6101,6 +6374,19 @@ function viewPlan_Fin_SinPlan() {
   return `<div class="page-header"><div><h1>Plan de Pagos</h1><div class="sub">Régimen de Regularización de Deudas</div></div></div>
     <div class="card"><div class="note">Este financiador no tiene un plan de regularización activo cargado en el portal.</div></div>`;
 }
+/* Alerta roja (como la de notificaciones del circuito corriente) cuando el financiador recibió una
+   notificación del Plan de Pago con cuota(s) a pagar. Sin cantidad de hospitales (el plan no los lleva).
+   Se usa en "Mi plan" y en el Panel del financiador (combinado). */
+function avisoNotifPlanFin() {
+  const plan = planDelFinanciador(); if (!plan) return "";
+  const cuotasPagar = cuotasDe(plan).filter(c => (c.estado === "PENDIENTE" || c.estado === "VENCIDA") && cuotaNotificada(plan.id, c.nro));
+  if (!cuotasPagar.length) return "";
+  const monto = cuotasPagar.reduce((s, c) => s + c.total, 0);
+  return `<div class="action-required-banner">
+    <div><strong>📬 Recibiste una notificación del Plan de Pago con cuota(s) a pagar</strong> — ${cuotasPagar.length} cuota(s) por ${money(monto)}.</div>
+    <button class="btn btn-danger btn-sm" data-goto="plan_fin_notif">Ver notificación →</button>
+  </div>`;
+}
 function viewPlan_Fin_Resumen() {
   const plan = planDelFinanciador(); if (!plan) return viewPlan_Fin_SinPlan();
   const prox = proximaCuota(plan); const pagas = cuotasPagasDe(plan).length;
@@ -6109,6 +6395,7 @@ function viewPlan_Fin_Resumen() {
       <div><h1>Mi plan — ${plan.denominacionOS}</h1><div class="sub">Régimen de Regularización de Deudas · RESO-2026-103-GDEBA-SAMO</div></div>
       <div class="page-actions">${chipPlan(plan.estado)}</div>
     </div>
+    ${avisoNotifPlanFin()}
     ${enModoCombinado() ? `<div class="note"><strong>Vista combinada.</strong> Este financiador está en el plan de regularización <em>y además</em> opera el circuito de facturación corriente. Acá ves <strong>solo su plan</strong> (deuda vieja regularizada en cuotas); sus facturas corrientes siguen en las secciones habituales (Facturas a revisar, Conciliación, Informar pagos).</div>` : ''}
     <div class="note note-blue">Las facturas de este plan están <strong>congeladas</strong>: no corre el reloj de 60 días ni la morosidad del circuito corriente sobre ellas. El plan avanza por <strong>cuotas con vencimiento el día 10</strong> de cada mes.</div>
     <div class="kpi-grid">
@@ -6133,7 +6420,7 @@ function viewPlan_Fin_Resumen() {
       </table>
       <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn btn-secondary btn-sm" data-goto="plan_fin_cronograma">Ver cronograma de cuotas →</button>
-        <button class="btn btn-secondary btn-sm" data-goto="plan_fin_facturas">Ver facturas incluidas →</button>
+        <button class="btn btn-secondary btn-sm" data-goto="plan_fin_docs">Ver documentación →</button>
       </div>
     </div>
     ${viewPlanRiesgo(plan)}
@@ -6147,29 +6434,6 @@ function viewPlan_Fin_Cronograma() {
       <h3 class="card-title">Cuotas del plan — vencimiento el día 10 de cada mes</h3>
       ${viewPlanCronogramaTabla(plan)}
       <div class="note note-blue" style="margin-top:12px;">La <strong>próxima cuota</strong> aparece destacada. El Ministerio (DRC) notifica la liquidación de cada cuota al domicilio electrónico el día 10; la verás en <a data-goto="plan_fin_notif" style="cursor:pointer;text-decoration:underline;color:var(--primary);">Notificaciones</a>.</div>
-    </div>
-  `;
-}
-function viewPlan_Fin_Facturas() {
-  const plan = planDelFinanciador(); if (!plan) return viewPlan_Fin_SinPlan();
-  const fs = FACTURAS_EN_PLAN[plan.id] || [];
-  const total = fs.reduce((s, f) => s + f.montoTotal, 0);
-  return `
-    <div class="page-header"><div><h1>Facturas incluidas en el plan</h1><div class="sub">${plan.denominacionOS} · planilla anexa</div></div></div>
-    <div class="note"><strong>Facturas congeladas.</strong> Estas facturas se regularizan por el cronograma de cuotas del plan: <strong>no corre el reloj de 60 días</strong> ni la morosidad del circuito corriente sobre ellas.</div>
-    <div class="card">
-      <h3 class="card-title">Planilla anexa — ${fs.length} factura(s) por ${money(total)}</h3>
-      <table>
-        <thead><tr><th>Hospital</th><th>N° factura</th><th>Fecha</th><th class="money-header">Monto</th><th class="money-header">Saldo regularizado</th><th style="text-align:center;">Situación</th></tr></thead>
-        <tbody>${fs.map(f => `<tr>
-          <td>${hospCorto(f.hospital)}</td>
-          <td style="font-family:monospace;">${f.nroFactura}</td>
-          <td>${f.fechaEmision}</td>
-          <td class="money">${money(f.montoTotal)}</td>
-          <td class="money" style="font-weight:600;">${money(f.saldoRegularizado)}</td>
-          <td style="text-align:center;"><span class="chip chip-plan-pend">Congelada</span></td>
-        </tr>`).join('')}</tbody>
-      </table>
     </div>
   `;
 }
@@ -6211,7 +6475,7 @@ function viewPlan_Fin_Notif() {
           <td>${n.tipo === 'INTIMACION_NUEVA_DEUDA' ? '⚖ ' : n.tipo === 'CADUCIDAD_PLAN' ? '⛔ ' : '📨 '}${TIPO_DRC_LABEL[n.tipo]}</td>
           <td>${n.cuotaNro ? 'N° ' + n.cuotaNro : '—'}</td>
           <td class="money">${n.monto ? money(n.monto) : '—'}</td>
-          <td style="text-align:center;">${c ? chipCuota(c.estado) : '<span class="chip chip-plan-pend">Emitida</span>'}</td>
+          <td style="text-align:center;">${n.tipo === 'LIQUIDACION_CUOTA' ? (c ? chipCuota(c.estado) : '<span class="chip chip-plan-pend">Emitida</span>') : '—'}</td>
           <td style="text-align:right;"><button class="btn btn-secondary btn-sm" data-ver-notif="${n.id}">${n.tipo === 'LIQUIDACION_CUOTA' ? '📄 Ver factura' : '📄 Ver'}</button></td>
         </tr>`; }).join('')}</tbody>
       </table>` : '<div class="note">No hay notificaciones de la DRC para este plan.</div>'}
@@ -6236,8 +6500,6 @@ function viewPlan_Min_Planes() {
       <div><strong>📥 Tenés ${pagosInformadosPendientes()} pago(s) informado(s) esperando confirmación</strong> — el financiador informó pagos de cuotas y hay que confirmarlos.</div>
       <button class="btn btn-danger btn-sm" data-goto="plan_min_alertas">Ver y confirmar →</button>
     </div>` : ''}
-    ${enModoCombinado() ? `<div class="note"><strong>Vista combinada.</strong> Conviven las dos operatorias: el circuito de facturación corriente (Panel, Cola, Auditoría, Morosidad…) <em>y</em> el Régimen de Regularización. Los financiadores adheridos aparecen acá; los que no están en el plan operan solo el circuito corriente.</div>` : ''}
-    <div class="note note-blue">Alcance subjetivo del régimen: <strong>obras sociales nacionales</strong> (Ley 23.660, art. 1 inc. a y e). En modo Plan de Pago, prepagas y ART no aplican.</div>
     <div class="note"><strong>Cómo leer los montos:</strong> <em>Deuda total del plan</em> = capital + intereses = todo lo que se comprometió a pagar. <em>Pagado</em> = cuotas ya cobradas. <em>Saldo</em> = lo que todavía falta cobrar. El % debajo de cada valor indica cuánto representa del total.</div>
     <div class="kpi-grid">
       <div class="kpi"><div class="label">Planes firmados</div><div class="value">${firmados}</div><div class="hint">todos los cargados en la plataforma</div></div>
@@ -6276,6 +6538,7 @@ function viewPlan_Min_Detalle(planId) {
   const plan = planPorId(planId);
   if (!plan) return `<div class="page-header"><div><h1>Detalle del plan</h1></div></div><div class="card"><div class="note">Plan no encontrado. <button class="btn btn-secondary btn-sm" data-plan-volver="1">← Volver</button></div></div>`;
   const prox = proximaCuota(plan); const pagas = cuotasPagasDe(plan).length;
+  const puedeGest = minPuedeGestionar(), puedeNotif = minPuedeNotificar();
   return `
     <div class="page-header">
       <div><h1>${plan.denominacionOS}</h1><div class="sub">Plan ${plan.id} · ${MODALIDAD_PLAN[plan.modalidad]} · adhesión ${plan.fechaAdhesion}</div></div>
@@ -6291,11 +6554,13 @@ function viewPlan_Min_Detalle(planId) {
     <div class="card">
       <h3 class="card-title">Acciones de la DRC</h3>
       ${planActivo(plan) ? `<div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn btn-primary btn-sm" data-plan-liquidar="${plan.id}">📨 Notificar / liquidar cuota del día 10</button>
-        <button class="btn btn-danger btn-sm" data-plan-intimar="${plan.id}">⚖ Intimar por nueva deuda</button>
-        <button class="btn btn-danger btn-sm" data-plan-caducidad="${plan.id}">Declarar caducidad</button>
-      </div>`
-      : `<div class="note">El plan está <strong>${ESTADO_PLAN_LABEL[plan.estado]}</strong>: no hay acciones de notificación disponibles (solo se puede notificar/liquidar, intimar o declarar caducidad sobre planes al día o en riesgo).</div>`}
+        ${puedeNotif ? `<button class="btn btn-danger btn-sm" data-plan-intimar="${plan.id}">⚖ Intimar por nueva deuda</button>` : ''}
+        ${puedeGest ? `<button class="btn btn-danger btn-sm" data-plan-caducidad="${plan.id}">Declarar caducidad</button>` : ''}
+      </div>
+      ${!puedeNotif ? notaPerfilMin("intimar por nueva deuda es acción de notificación; solo el Notificador puede.") : ''}
+      ${!puedeGest ? notaPerfilMin("no podés declarar caducidad ni confirmar pagos; solo lectura de la auditoría.") : ''}
+      <div class="note note-blue" style="margin-top:10px;">La notificación de las facturas del plan (punto de venta 191) se hace de forma consolidada desde <a data-goto="plan_min_cola" style="cursor:pointer;text-decoration:underline;color:var(--primary);">Cola de notificación Plan de Pago</a>.</div>`
+      : `<div class="note">El plan está <strong>${ESTADO_PLAN_LABEL[plan.estado]}</strong>: no hay acciones disponibles (solo se puede intimar o declarar caducidad sobre planes al día o en riesgo).</div>`}
     </div>
     ${viewNuevasDeudasIntimadas(plan)}
     ${cuotasInformadas(plan).length ? `<div class="card" style="border:1px solid var(--warn);">
@@ -6308,7 +6573,7 @@ function viewPlan_Min_Detalle(planId) {
           <td class="money" style="font-weight:600;">${money(inf.monto != null ? inf.monto : c.total)}</td>
           <td style="font-size:12px;"><code>${inf.comprobante || '—'}</code>${(inf.adjuntos && inf.adjuntos.length) ? `<div class="attachments" style="margin-top:4px;">${inf.adjuntos.map(a => `<span class="attachment-chip">📎 ${a.nombre || a}</span>`).join('')}</div>` : ''}</td>
           <td>${c.fechaInformada || '—'}</td>
-          <td style="text-align:right;"><button class="btn btn-success btn-sm" data-plan-confirmar-cuota="${plan.id}:${c.nro}">✓ Confirmar pago</button></td>
+          <td style="text-align:right;">${puedeGest ? `<button class="btn btn-success btn-sm" data-plan-confirmar-cuota="${plan.id}:${c.nro}">✓ Confirmar pago</button>` : '<span style="font-size:12px;color:var(--muted);">—</span>'}</td>
         </tr>`; }).join('')}</tbody>
       </table>
     </div>` : ''}
@@ -6335,7 +6600,7 @@ function viewPlan_Min_Alertas() {
           <td class="money" style="font-weight:600;">${money(inf.monto != null ? inf.monto : cuota.total)}</td>
           <td style="font-size:12px;"><code>${inf.comprobante || '—'}</code>${(inf.adjuntos && inf.adjuntos.length) ? `<div class="attachments" style="margin-top:4px;">${inf.adjuntos.map(a => `<span class="attachment-chip">📎 ${a.nombre || a}</span>`).join('')}</div>` : ''}</td>
           <td>${cuota.fechaInformada || '—'}</td>
-          <td style="text-align:right;"><button class="btn btn-success btn-sm" data-plan-confirmar-cuota="${plan.id}:${cuota.nro}">✓ Confirmar pago</button></td>
+          <td style="text-align:right;">${minPuedeGestionar() ? `<button class="btn btn-success btn-sm" data-plan-confirmar-cuota="${plan.id}:${cuota.nro}">✓ Confirmar pago</button>` : '<span style="font-size:12px;color:var(--muted);">—</span>'}</td>
         </tr>`; }).join('')}</tbody>
       </table>` : '<div class="note note-blue">No hay pagos informados pendientes de confirmación.</div>'}
     </div>
@@ -6370,10 +6635,121 @@ function viewPlan_Min_Alertas() {
     </div>
   `;
 }
+/* Cola de notificación del PLAN DE PAGO: facturas del plan (punto de venta 191) pendientes de la
+   notificación consolidada. Es el equivalente a la Cola del portal original, pero acotado al plan —
+   sin "Retenidas" ni "Hospitales intervinientes" (esos no aplican al régimen). */
+function viewPlan_Min_Cola() {
+  const puedeGest = minPuedeGestionar(), puedeNotif = minPuedeNotificar();
+  const todas = (state.facturasPlanCola || []);
+  const aptas = todas.filter(f => f.estado === "en_cola" && !esIndisponible(f.nro));
+  const indisp = todas.filter(f => f.estado === "en_cola" && esIndisponible(f.nro));
+  const totalMonto = aptas.reduce((s, f) => s + f.monto, 0);
+  const fins = new Set(aptas.map(f => f.financiador));
+  const fc = state.filtrosColaPlan;
+  const q = (fc.q || "").trim().toLowerCase(), cuit = (fc.cuit || "").trim();
+  const conFiltros = q || cuit || fc.desde || fc.hasta;
+  const aplicar = (arr) => arr
+    .filter(f => !q || finNombre(f.financiador).toLowerCase().includes(q) || f.nro.toLowerCase().includes(q))
+    .filter(f => !cuit || finCuit(f.financiador).includes(cuit))
+    .filter(f => !fc.desde || f.fechaEmision >= fc.desde)
+    .filter(f => !fc.hasta || f.fechaEmision <= fc.hasta)
+    .sort((a, b) => b.monto - a.monto);   // mayor a menor, para detectar inconsistencias
+  const aptasVis = aplicar(aptas);
+  const selN = state.selColaPlan.length, selNi = state.selColaPlanInd.length;
+  const dlFin = [...new Set(todas.map(f => f.financiador))];
+  const chkApta = (f) => puedeGest ? `<td style="text-align:center;"><input type="checkbox" data-sel-colaplan="${f.nro}" ${state.selColaPlan.includes(f.nro) ? 'checked' : ''}></td>` : '';
+  const filaApta = (f) => `<tr>
+      ${chkApta(f)}
+      <td><strong>${finNombre(f.financiador)}</strong><div style="font-size:11px;color:var(--muted);">${finCuit(f.financiador)}</div></td>
+      <td>${f.periodo || '—'}</td>
+      <td><code>${f.nro}</code></td>
+      <td>${f.fechaEmision}</td>
+      <td class="money">${money(f.monto)}</td>
+    </tr>`;
+  const chkInd = (f) => puedeGest ? `<td style="text-align:center;"><input type="checkbox" data-sel-colaplanind="${f.nro}" ${state.selColaPlanInd.includes(f.nro) ? 'checked' : ''}></td>` : '';
+  const filaInd = (f) => { const r = state.facturasIndisponibles[f.nro] || {}; return `<tr>
+      ${chkInd(f)}
+      <td><strong>${finNombre(f.financiador)}</strong></td>
+      <td>${f.periodo || '—'}</td>
+      <td><code>${f.nro}</code></td>
+      <td class="money">${money(f.monto)}</td>
+      <td>${r.hasta || '—'}</td>
+      <td style="font-size:12px;color:var(--muted);">${r.motivo || '—'}</td>
+    </tr>`; };
+  const colspanA = puedeGest ? 6 : 5, colspanI = puedeGest ? 6 : 5;
+  return `<div class="page-header">
+      <div><h1>Cola de notificación Plan de Pago</h1><div class="sub">Establecimiento único: Ministerio de Salud PBA – SAMO · punto de venta 191</div></div>
+      ${puedeNotif ? `<button class="btn btn-primary" id="btn-notificar-plan" ${aptas.length ? '' : 'disabled'}>Ejecutar notificación consolidada</button>` : ''}
+    </div>
+    <div class="note"><strong>Una factura por financiador por mes.</strong> Son las facturas del <strong>plan de pago</strong> (punto de venta 191); las del circuito corriente van a la <strong>Cola de notificación</strong> del portal original.</div>
+    ${!puedeNotif ? notaPerfilMin("no podés ejecutar la notificación consolidada; solo el perfil Notificador puede.") : ''}
+    <div class="kpi-grid">
+      <div class="kpi ${aptas.length ? 'action-required' : ''}"><div class="label">Aptas para notificar</div><div class="value ${aptas.length ? 'danger' : ''}">${aptas.length}</div><div class="hint money">${money(totalMonto)}</div></div>
+      <div class="kpi"><div class="label">Obras sociales a notificar</div><div class="value">${fins.size}</div><div class="hint">una comunicación c/u</div></div>
+      <div class="kpi ${indisp.length ? 'warning' : ''}"><div class="label">Facturas indisponibilizadas</div><div class="value ${indisp.length ? 'warn' : ''}">${indisp.length}</div><div class="hint">temporalmente fuera de la cola</div></div>
+    </div>
+    <div class="card" style="padding:0;">
+      <h3 class="card-title" style="padding:16px 20px 0;">Facturas del plan aptas para notificar
+        <span style="font-size:12px;font-weight:400;color:var(--muted);">${aptasVis.length} de ${aptas.length}</span>
+      </h3>
+      <div class="filter-bar" style="padding:0 20px;flex-wrap:wrap;gap:8px;">
+        <input list="colaplan-fin-dl" data-filtro-cola-plan="q" placeholder="Buscar obra social o factura…" value="${fc.q || ''}" style="min-width:200px;">
+        <datalist id="colaplan-fin-dl">${dlFin.map(id => `<option value="${finNombre(id)}">`).join('')}</datalist>
+        <input list="colaplan-cuit-dl" data-filtro-cola-plan="cuit" placeholder="CUIT del financiador…" value="${fc.cuit || ''}">
+        <datalist id="colaplan-cuit-dl">${dlFin.map(id => `<option value="${finCuit(id)}">${finNombre(id)}</option>`).join('')}</datalist>
+        <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:4px;">Desde <input type="date" data-filtro-cola-plan="desde" value="${fc.desde || ''}"></label>
+        <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:4px;">Hasta <input type="date" data-filtro-cola-plan="hasta" value="${fc.hasta || ''}"></label>
+        ${conFiltros ? `<button class="btn btn-secondary btn-sm" data-filtro-cola-plan-reset="1">Limpiar</button>` : ''}
+      </div>
+      ${puedeGest && selN ? `<div style="padding:0 20px 10px;"><button class="btn btn-danger btn-sm" data-indisp-plan="1">⛔ Indisponibilizar ${selN} factura(s) seleccionada(s)</button> <span style="font-size:12px;color:var(--muted);">Quedan fuera de la cola por 30 días (una sola vez).</span></div>` : ''}
+      <table>
+        <thead><tr>${puedeGest ? `<th style="text-align:center;width:34px;"><input type="checkbox" data-selall-colaplan="1" ${aptasVis.length && aptasVis.every(f => state.selColaPlan.includes(f.nro)) ? 'checked' : ''}></th>` : ''}<th>Obra social</th><th>Período</th><th>Factura</th><th>Fecha factura</th><th class="money-header">Monto</th></tr></thead>
+        <tbody>${aptasVis.length === 0
+          ? `<tr><td colspan="${colspanA}" style="text-align:center;padding:24px;color:var(--muted);">No hay facturas del plan pendientes de notificar para estos filtros.</td></tr>`
+          : aptasVis.map(filaApta).join('')}</tbody>
+      </table>
+    </div>
+    ${indisp.length ? `<div class="card" style="padding:0;">
+      <h3 class="card-title" style="padding:16px 20px 0;">Facturas indisponibilizadas <span style="font-size:12px;font-weight:400;color:var(--muted);">${indisp.length}</span></h3>
+      <div style="padding:0 20px;"><div class="note">Estas facturas están <strong>fuera de la cola</strong> por 30 días (casos puntuales: emergencia, mala facturación). Al habilitarlas vuelven a "aptas para notificar".</div></div>
+      ${puedeGest && selNi ? `<div style="padding:8px 20px 10px;"><button class="btn btn-primary btn-sm" data-habilitar-plan="1">✓ Habilitar ${selNi} factura(s) seleccionada(s)</button></div>` : '<div style="height:8px;"></div>'}
+      <table>
+        <thead><tr>${puedeGest ? `<th style="text-align:center;width:34px;"><input type="checkbox" data-selall-colaplanind="1" ${indisp.length && indisp.every(f => state.selColaPlanInd.includes(f.nro)) ? 'checked' : ''}></th>` : ''}<th>Obra social</th><th>Período</th><th>Factura</th><th class="money-header">Monto</th><th>Indisponible hasta</th><th>Motivo</th></tr></thead>
+        <tbody>${indisp.map(filaInd).join('')}</tbody>
+      </table>
+    </div>` : ''}`;
+}
+window.__confirmarNotifPlan = function() {
+  if (!guardNotif()) return;
+  // Solo se notifican las aptas (no las indisponibilizadas).
+  (state.facturasPlanCola || []).forEach(f => { if (f.estado === "en_cola" && !esIndisponible(f.nro)) { f.estado = "notificada"; f.fechaNotif = HOY; } });
+  closeModal(); render(); showToast("✓ Notificación consolidada del Plan de Pago ejecutada");
+};
+window.__habilitarPlan = function() {
+  const n = habilitarFacturas(state.selColaPlanInd); state.selColaPlanInd = [];
+  render(); showToast(n ? `✓ ${n} factura(s) habilitada(s) — vuelven a aptas` : "Nada que habilitar");
+};
+function openModalNotificarPlan() {
+  const aptas = (state.facturasPlanCola || []).filter(f => f.estado === "en_cola");
+  const fins = new Set(aptas.map(f => f.financiador));
+  const monto = aptas.reduce((s, f) => s + f.monto, 0);
+  openModal(`<h3>Ejecutar notificación consolidada — Plan de Pago</h3>
+    <p>Vas a notificar las facturas del plan (punto de venta 191) al día de hoy:</p>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:12px 0 16px;">
+      <div class="kpi"><div class="label">Facturas</div><div class="value">${aptas.length}</div></div>
+      <div class="kpi"><div class="label">Obras sociales</div><div class="value">${fins.size}</div><div class="hint">una comunicación c/u</div></div>
+      <div class="kpi"><div class="label">Monto total</div><div class="value money" style="font-size:18px;">${money(monto)}</div></div>
+    </div>
+    <div class="note">Se notifica al domicilio electrónico constituido en el CUIT de cada obra social adherida.</div>
+    <label>Fecha de notificación</label>
+    <input type="date" value="${HOY}" disabled title="La fecha de la notificación es siempre la del día actual y no se puede modificar." style="background:var(--surface-alt);color:var(--muted);cursor:not-allowed;">
+    <div style="font-size:12px;color:var(--muted);margin-top:4px;">Fecha del día — no editable.</div>
+    <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar envío</button><button class="btn btn-primary" onclick="window.__confirmarNotifPlan()">Confirmar envío</button></div>`);
+}
 function viewPlan_Min_Notif() {
   const ns = state.notificacionesDRC;
   return `
-    <div class="page-header"><div><h1>Notificaciones</h1><div class="sub">Bandeja de notificaciones emitidas por la DRC a las OS del plan</div></div></div>
+    <div class="page-header"><div><h1>Notificaciones Plan de Pago</h1><div class="sub">Bandeja de notificaciones emitidas por la DRC a las OS del plan</div></div></div>
     <div class="note note-blue">Notificaciones que la DRC emite al domicilio electrónico de las obras sociales adheridas: liquidaciones de la cuota del día 10 e intimaciones por nueva deuda. Se generan desde el detalle de cada plan.</div>
     <div class="card">
       <h3 class="card-title">Notificaciones emitidas — ${ns.length}</h3>
@@ -6385,7 +6761,7 @@ function viewPlan_Min_Notif() {
           <td>${n.tipo === 'INTIMACION_NUEVA_DEUDA' ? '⚖ ' : n.tipo === 'CADUCIDAD_PLAN' ? '⛔ ' : '📨 '}${TIPO_DRC_LABEL[n.tipo]}</td>
           <td>${n.cuotaNro ? 'N° ' + n.cuotaNro : '—'}</td>
           <td class="money">${n.monto ? money(n.monto) : '—'}</td>
-          <td style="text-align:center;">${c ? chipCuota(c.estado) : '<span class="chip chip-plan-pend">Emitida</span>'}</td>
+          <td style="text-align:center;">${n.tipo === 'LIQUIDACION_CUOTA' ? (c ? chipCuota(c.estado) : '<span class="chip chip-plan-pend">Emitida</span>') : '—'}</td>
           <td style="text-align:right;"><button class="btn btn-secondary btn-sm" data-ver-notif="${n.id}">Ver</button></td>
         </tr>`; }).join('')}</tbody>
       </table>` : '<div class="note">Todavía no se emitieron notificaciones.</div>'}
@@ -6408,6 +6784,7 @@ window.__planLiquidarCuota = function(id) {
 /* Paso 2 del pago: la DRC confirma un pago que el financiador informó (cuota INFORMADA → PAGA).
    Si no se pasa `nro`, confirma la cuota informada más antigua. */
 window.__planConfirmarPagoCuota = function(id, nro) {
+  if (!guardGestion()) return;
   const plan = planPorId(id); if (!plan) return;
   const informadas = cuotasInformadas(plan);
   const c = nro ? cuotasDe(plan).find(x => x.nro === Number(nro)) : informadas[0];
@@ -6441,6 +6818,7 @@ function notaIntimacion(plan, d) {
   </div>`;
 }
 window.__planIntimarNuevaDeuda = function(id) {
+  if (!guardNotif()) return;   // intimar es acción de notificación → solo notificador
   const plan = planPorId(id); if (!plan) return;
   const d = state.__intimDraft || {};
   openModal(`<h3>Intimar por nueva deuda</h3>
@@ -6511,6 +6889,7 @@ function notaCaducidad(plan, d) {
   </div>`;
 }
 window.__planDeclararCaducidad = function(id) {
+  if (!guardGestion()) return;   // caducidad = acto administrativo → admin y notificador
   const plan = planPorId(id); if (!plan) return;
   const d = state.__cadDraft || { motivos: [] };
   openModal(`<h3>Declarar la caducidad del plan</h3>
@@ -6649,13 +7028,12 @@ function viewPlan_Min_Altas() {
   return `
     <div class="page-header">
       <div><h1>Alta de financiador a plan de pagos</h1><div class="sub">Incorporar al portal una obra social ya adherida al Régimen de Regularización</div></div>
-      <button class="btn btn-primary" data-alta-plan="1">+ Dar de alta financiador al plan</button>
     </div>
     <div class="note note-blue"><strong>La adhesión se firma por fuera del portal</strong> (convenio, personería, domicilio electrónico). Acá el ministerio <strong>incorpora al portal</strong> un financiador ya adherido: carga el plan, las facturas incluidas y da de alta el usuario administrador. Esa información es la que después ve el financiador en su vista de Plan de Pago.</div>
     <div class="card">
       <h3 class="card-title">Incorporar una obra social al plan</h3>
       <p style="color:var(--muted);font-size:13px;margin:0 0 12px;">El listado completo de obras sociales ya adheridas está en <a data-goto="plan_min_planes" style="cursor:pointer;text-decoration:underline;color:var(--primary);">Gestión de planes</a>. La gestión de usuarios y del padrón de financiadores, en <a data-goto="abm_financiadores" style="cursor:pointer;text-decoration:underline;color:var(--primary);">Financiadores</a>.</p>
-      <button class="btn btn-primary" data-alta-plan="1">+ Dar de alta financiador al plan</button>
+      ${minPuedeGestionar() ? '<button class="btn btn-primary" data-alta-plan="1">+ Dar de alta financiador al plan</button>' : notaPerfilMin("no podés dar de alta financiadores al plan; requiere perfil Administrador o Notificador.")}
       <div class="note" style="margin-top:12px;">Ya hay <strong>${planes.length}</strong> obra(s) social(es) incorporada(s) al régimen.</div>
     </div>
   `;
@@ -6691,7 +7069,7 @@ window.__altaModalidadChange = function() {
   inp.value = mx; inp.disabled = (sel.value === 'CONTADO');
 };
 // Arranca un alta NUEVA desde cero (limpia el borrador y la planilla importada de un alta anterior).
-window.__nuevaAltaPlan = function() { state.__altaDraft = null; state.__altaFacturasImport = null; window.__altaPlanFinanciador(); };
+window.__nuevaAltaPlan = function() { if (!guardGestion()) return; state.__altaDraft = null; state.__altaFacturasImport = null; window.__altaPlanFinanciador(); };
 window.__altaPlanFinanciador = function() {
   const d = state.__altaDraft || {};
   // Las facturas provienen del Excel importado (no se cargan a mano). Se preservan al volver a editar.
@@ -6717,11 +7095,14 @@ window.__altaPlanFinanciador = function() {
     <label>Capital (deuda a regularizar)</label><input id="alta-capital" type="number" placeholder="Ej: 6000000" value="${d.capital || ''}">
     <label>Intereses reconocidos (0 si es sin interés)</label><input id="alta-intereses" type="number" placeholder="0" value="${d.intereses != null ? d.intereses : '0'}">
     <div class="note note-blue" style="margin:8px 0;">El <strong>monto de cuota</strong> se calcula solo: (capital + intereses) ÷ cantidad de cuotas.</div>
-    <div style="font-weight:600;margin:10px 0 4px;">Facturas incluidas (planilla anexa por Excel)</div>
-    <div class="note">Las facturas se cargan desde un <strong>Excel</strong>. El archivo debe tener las columnas <strong>N° de factura · Hospital · Monto · Fecha de factura</strong>.</div>
-    <input type="file" id="alta-fac-excel" accept=".xlsx,.xls,.csv" style="margin:6px 0;">
+    <div style="font-weight:600;margin:10px 0 4px;">Documentación del alta (3 documentos)</div>
+    <div class="note">Adjuntá los <strong>3 documentos</strong> del régimen (los mismos que después descarga el financiador desde <em>Documentos</em>): <strong>Convenio de regularización</strong>, <strong>Planilla anexa de facturas</strong> (Excel) e <strong>Informe de deuda</strong>. La planilla debe tener las columnas <strong>N° de factura · Hospital · Monto · Fecha de factura</strong>.</div>
+    <label>1) Convenio de regularización</label><input type="file" id="alta-doc-convenio" accept=".pdf" style="margin-bottom:6px;">
+    <label>2) Planilla anexa de facturas (Excel)</label>
+    <input type="file" id="alta-doc-planilla" accept=".xlsx,.xls,.csv" style="margin-bottom:4px;">
     <div><button class="btn btn-secondary btn-sm" onclick="window.__altaImportarExcel()">⬆ Importar planilla (simulado)</button></div>
     <div id="alta-fac-preview">${altaFacPreviewHTML(facs)}</div>
+    <label style="margin-top:8px;">3) Informe de deuda</label><input type="file" id="alta-doc-informe" accept=".pdf" style="margin-bottom:6px;">
     <div style="font-weight:600;margin:12px 0 4px;">Usuario administrador (apoderado / responsable)</div>
     <label>Nombre y apellido</label>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
@@ -6836,6 +7217,19 @@ function wirePlanEvents() {
   document.querySelectorAll('[data-ver-notif]').forEach(el => el.addEventListener('click', () => window.__verNotif(el.dataset.verNotif)));
   document.querySelectorAll('[data-alta-plan]').forEach(el => el.addEventListener('click', () => window.__nuevaAltaPlan()));
   document.querySelectorAll('[data-plan-doc]').forEach(el => el.addEventListener('click', () => showToast(`📄 ${el.dataset.planDoc} descargado (simulado)`)));
+  // Cola de notificación del Plan de Pago: botón consolidado + filtros (typeahead + rango) + selección.
+  const bNP = document.getElementById('btn-notificar-plan'); if (bNP) bNP.addEventListener('click', () => openModalNotificarPlan());
+  wireFiltros('[data-filtro-cola-plan]', 'filtroColaPlan', 'filtrosColaPlan');
+  const fcpR = document.querySelector('[data-filtro-cola-plan-reset]');
+  if (fcpR) fcpR.addEventListener('click', () => { state.filtrosColaPlan = { q: "", cuit: "", desde: "", hasta: "" }; render(); });
+  document.querySelectorAll('[data-sel-colaplan]').forEach(el => el.addEventListener('change', () => { toggleEnArray(state.selColaPlan, el.dataset.selColaplan); renderKeepScroll(); }));
+  const saCP = document.querySelector('[data-selall-colaplan]');
+  if (saCP) saCP.addEventListener('change', () => { const nros = [...document.querySelectorAll('[data-sel-colaplan]')].map(c => c.dataset.selColaplan); state.selColaPlan = saCP.checked ? nros : []; renderKeepScroll(); });
+  document.querySelectorAll('[data-sel-colaplanind]').forEach(el => el.addEventListener('change', () => { toggleEnArray(state.selColaPlanInd, el.dataset.selColaplanind); renderKeepScroll(); }));
+  const saCPi = document.querySelector('[data-selall-colaplanind]');
+  if (saCPi) saCPi.addEventListener('change', () => { const nros = [...document.querySelectorAll('[data-sel-colaplanind]')].map(c => c.dataset.selColaplanind); state.selColaPlanInd = saCPi.checked ? nros : []; renderKeepScroll(); });
+  const bIP = document.querySelector('[data-indisp-plan]'); if (bIP) bIP.addEventListener('click', () => openModalIndisponibilizar("plan"));
+  const bHP = document.querySelector('[data-habilitar-plan]'); if (bHP) bHP.addEventListener('click', () => window.__habilitarPlan());
 }
 
 /* ===================== INICIALIZACIÓN ===================== */
@@ -6935,6 +7329,8 @@ state.planesPago.forEach(p => {
   if (p.estado !== "CADUCO" && planTerminado(p)) p.estado = "FINALIZADO";
 });
 state.notificacionesDRC = generarNotifsDRC();
+// Facturas del plan (punto de venta 191) pendientes de notificación consolidada.
+state.facturasPlanCola = generarFacturasPlanCola();
 
 render();
 </script>
