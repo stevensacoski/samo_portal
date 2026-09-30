@@ -6063,7 +6063,7 @@ const CAUSAS_CADUCIDAD = [
 /* Estados de la cuota. INFORMADA = el financiador informó el pago y espera la confirmación de la DRC
    (pago en dos pasos): PENDIENTE/VENCIDA → (financiador informa) INFORMADA → (DRC confirma) PAGA. */
 const ESTADO_CUOTA_LABEL = { PENDIENTE: "Pendiente", INFORMADA: "Pago informado", PAGA: "Paga", VENCIDA: "Vencida" };
-const TIPO_DRC_LABEL = { LIQUIDACION_CUOTA: "Liquidación de cuota", INTIMACION_NUEVA_DEUDA: "Intimación por nueva deuda", CADUCIDAD_PLAN: "Caducidad del plan" };
+const TIPO_DRC_LABEL = { LIQUIDACION_CUOTA: "Liquidación de cuota", INTIMACION_NUEVA_DEUDA: "Intimación por nueva deuda", CONFIRMACION_PAGO_NUEVA_DEUDA: "Pago de deuda intimada confirmado", CADUCIDAD_PLAN: "Caducidad del plan" };
 const chipPlan = (e) => `<span class="chip ${({VIGENTE:'chip-plan-vigente',EN_RIESGO:'chip-plan-riesgo',FINALIZADO:'chip-plan-fin',CADUCO:'chip-plan-caduco'})[e] || 'chip-plan-pend'}">${ESTADO_PLAN_LABEL[e] || e}</span>`;
 const chipCuota = (e) => `<span class="chip ${({PENDIENTE:'chip-plan-pend',INFORMADA:'chip-por-vencer',PAGA:'chip-plan-paga',VENCIDA:'chip-plan-venc'})[e] || 'chip-plan-pend'}">${ESTADO_CUOTA_LABEL[e] || e}</span>`;
 
@@ -6136,6 +6136,8 @@ const FACTURAS_EN_PLAN = {
    su monto y N° de cuota; más una intimación por cada plan con nueva deuda. Así la bandeja refleja el
    historial real de cada plan y no una semilla suelta. */
 let __ndrcSeq = 0;
+let __dnSeq = 0;
+const nuevoIdDeudaNueva = () => "DN-" + (++__dnSeq);   // id único de cada deuda nueva intimada
 function generarNotifsDRC() {
   const out = [];
   state.planesPago.forEach(p => {
@@ -6151,10 +6153,11 @@ function generarNotifsDRC() {
           estado: (c.estado === "PAGA" || c.estado === "INFORMADA") ? "LEIDA" : "EMITIDA" });
       }
     });
-    if (p.deudaNueva) {
+    nuevasDeudasDe(p).forEach(dn => {
       out.push({ id: "NDRC-" + (++__ndrcSeq), planId: p.id, tipo: "INTIMACION_NUEVA_DEUDA",
-        fecha: p.deudaNueva.fechaIntimacion, cuotaNro: null, monto: p.deudaNueva.monto, estado: "EMITIDA" });
-    }
+        fecha: dn.fechaIntimacion, cuotaNro: null, monto: dn.monto,
+        estado: dn.estado === "PAGA" ? "LEIDA" : "EMITIDA" });
+    });
   });
   // Más recientes arriba.
   return out.sort((a, b) => a.fecha < b.fecha ? 1 : a.fecha > b.fecha ? -1 : 0);
@@ -6194,7 +6197,7 @@ function generarCuotasPlan(plan) {
     let estado = "PENDIENTE", fechaPago = null;
     if (i < plan.cuotasPagas) { estado = "PAGA"; const fp = new Date(v); fp.setDate(fp.getDate() - 3); fechaPago = fp.toISOString().split("T")[0]; }
     else if (venc < HOY) estado = "VENCIDA";
-    cuotas.push({ planId: plan.id, nro: i + 1, vencimiento: venc, capital, interes, total: capital + interes, estado, fechaPago });
+    cuotas.push({ planId: plan.id, nro: i + 1, vencimiento: venc, capital, interes, total: capital + interes, estado, fechaPago, montoPagado: estado === "PAGA" ? capital + interes : 0 });
   }
   return cuotas;
 }
@@ -6214,8 +6217,10 @@ const cuotasInformables = (plan) => cuotasDe(plan).filter(c => c.estado === "PEN
    Un plan CADUCO o FINALIZADO no tiene próximo vencimiento. */
 const labelSinProx = (plan) => plan && plan.estado === "CADUCO" ? "Plan caduco" : (plan && plan.estado === "FINALIZADO" ? "Plan finalizado" : "—");
 const proximaCuota = (plan) => (plan && (plan.estado === "CADUCO" || plan.estado === "FINALIZADO")) ? null : cuotasDe(plan).find(c => c.estado === "PENDIENTE");
-// Monto ya cobrado (cuotas pagas) y saldo del plan que todavía falta pagar.
-const montoPagadoPlan = (plan) => cuotasPagasDe(plan).reduce((s, c) => s + c.total, 0);
+// Saldo pendiente de UNA cuota: su total menos lo ya imputado (habilita pagos parciales de cuota).
+const saldoCuota = (c) => Math.max(0, (c.total || 0) - (c.montoPagado || 0));
+// Monto ya cobrado (incluye pagos parciales de cuota, no solo cuotas pagas enteras) y saldo del plan.
+const montoPagadoPlan = (plan) => cuotasDe(plan).reduce((s, c) => s + (c.montoPagado || 0), 0);
 const saldoPlan = (plan) => (plan.deudaTotalRegularizada || 0) - montoPagadoPlan(plan);
 // Un plan está "activo" (se le puede notificar/liquidar) si está vigente o en riesgo — no si finalizó o caducó.
 const planActivo = (plan) => plan && (plan.estado === "VIGENTE" || plan.estado === "EN_RIESGO");
@@ -6317,37 +6322,43 @@ function syncModeToggle() {
 function viewPlanCronogramaTabla(plan) {
   const prox = proximaCuota(plan);
   return `<table>
-    <thead><tr><th>Cuota</th><th>Vencimiento</th><th class="money-header">Capital</th><th class="money-header">Interés</th><th class="money-header">Total</th><th style="text-align:center;">Estado</th><th>Fecha de pago</th></tr></thead>
+    <thead><tr><th>Cuota</th><th>Vencimiento</th><th class="money-header">Capital</th><th class="money-header">Interés</th><th class="money-header">Total</th><th class="money-header">Saldo</th><th style="text-align:center;">Estado</th><th>Fecha de pago</th></tr></thead>
     <tbody>${cuotasDe(plan).map(c => `<tr class="${prox && c.nro === prox.nro ? 'cuota-prox' : ''}">
       <td><strong>N° ${c.nro}</strong>${prox && c.nro === prox.nro ? ' <span class="chip chip-por-vencer">Próxima</span>' : ''}</td>
       <td>${c.vencimiento}</td>
       <td class="money">${money(c.capital)}</td>
       <td class="money">${c.interes ? money(c.interes) : '—'}</td>
       <td class="money" style="font-weight:600;">${money(c.total)}</td>
+      <td class="money" style="font-weight:600;color:${saldoCuota(c) <= 0 ? 'var(--success)' : 'var(--muted)'};">${money(saldoCuota(c))}</td>
       <td style="text-align:center;">${chipCuota(c.estado)}</td>
       <td>${c.fechaPago || '—'}</td>
     </tr>`).join('')}</tbody>
   </table>`;
 }
 /* ---- Bloque compartido: nuevas deudas intimadas (deuda post-adhesión que notificó la DRC) ----
-   Modelo liviano: hoy un plan lleva a lo sumo una `deudaNueva`; se expone como lista para poder crecer.
+   La deuda nueva es una LISTA (`plan.deudasNuevas`): la DRC puede intimar varias y confirmar el pago de
+   cada una por separado. Cada deuda lleva `id` y `estado` (PENDIENTE / PAGA). Sin esto, una intimación
+   quedaba pegada al plan sin forma de saldarla → el plan nunca salía de riesgo y terminaba caduco.
    Se usa en la vista del financiador (Informar pagos) y en el detalle del ministerio. */
-const nuevasDeudasDe = (plan) => (plan && plan.deudaNueva) ? [plan.deudaNueva] : [];
+const nuevasDeudasDe = (plan) => (plan && plan.deudasNuevas) ? plan.deudasNuevas : [];
+const deudasNuevasPendientes = (plan) => nuevasDeudasDe(plan).filter(d => d.estado !== "PAGA");
+const tieneDeudaNuevaPendiente = (plan) => deudasNuevasPendientes(plan).length > 0;
 function viewNuevasDeudasIntimadas(plan) {
   const dns = nuevasDeudasDe(plan);
   return `<div class="card">
     <h3 class="card-title">Nuevas deudas intimadas</h3>
     <div class="note note-blue">Deuda <strong>generada con posterioridad a la adhesión</strong> que la DRC intimó al domicilio electrónico. Corre un plazo de <strong>10 días hábiles</strong> desde la intimación para regularizar; vencido sin respuesta puede declararse la caducidad del plan (no automática).</div>
     ${dns.length ? `<table>
-      <thead><tr><th>Fecha intimación</th><th style="text-align:center;">Días restantes</th><th>Hospital</th><th>N° factura</th><th>Fecha factura</th><th class="money-header">Monto</th></tr></thead>
-      <tbody>${dns.map(d => `<tr>
+      <thead><tr><th>Fecha intimación</th><th style="text-align:center;">Estado</th><th style="text-align:center;">Días restantes</th><th>Hospital</th><th>N° factura</th><th>Fecha factura</th><th class="money-header">Monto</th></tr></thead>
+      <tbody>${dns.map(d => { const paga = d.estado === "PAGA"; return `<tr${paga ? ' style="opacity:.6;"' : ''}>
         <td>${d.fechaIntimacion || '—'}</td>
-        <td style="text-align:center;"><span class="chip ${(d.diasHabilesRestantes <= 3) ? 'chip-plan-venc' : 'chip-plan-riesgo'}">${d.diasHabilesRestantes} días háb.</span></td>
+        <td style="text-align:center;">${paga ? `<span class="chip chip-plan-fin">Paga</span>` : `<span class="chip chip-plan-riesgo">Pendiente</span>`}</td>
+        <td style="text-align:center;">${paga ? `<span style="color:var(--muted);">— ${d.fechaPago ? 'pagó ' + d.fechaPago : ''}</span>` : `<span class="chip ${(d.diasHabilesRestantes <= 3) ? 'chip-plan-venc' : 'chip-plan-riesgo'}">${d.diasHabilesRestantes} días háb.</span>`}</td>
         <td>${d.hospNombre || (d.hospId ? hospCorto(d.hospId) : '—')}</td>
         <td style="font-family:monospace;">${d.nroFactura || '—'}</td>
         <td>${d.fechaFactura || '—'}</td>
         <td class="money" style="font-weight:600;">${money(d.monto)}</td>
-      </tr>`).join('')}</tbody>
+      </tr>`; }).join('')}</tbody>
     </table>` : '<div class="note">No hay nuevas deudas intimadas.</div>'}
   </div>`;
 }
@@ -6356,13 +6367,15 @@ function viewPlanRiesgo(plan) {
   const imp = cuotasImpagas(plan).length;
   const faltan = faltanParaCaducidad(plan);
   const diasAuto = diasParaCaducidadAuto(plan);
-  const dn = plan.deudaNueva;
+  const dns = deudasNuevasPendientes(plan);
+  const dnMonto = dns.reduce((s, d) => s + d.monto, 0);
+  const dnDias = dns.length ? Math.min(...dns.map(d => d.diasHabilesRestantes)) : null;
   return `<div class="card">
     <h3 class="card-title">Contadores de riesgo <span style="font-weight:400;color:var(--muted);font-size:12px;">(informativos)</span></h3>
     <div class="kpi-grid">
       <div class="kpi ${imp > 0 ? 'warning' : ''}"><div class="label">Cuotas impagas acumuladas</div><div class="value ${imp > 0 ? 'warn' : ''}">${imp}</div><div class="hint">de ${plan.nCuotas} cuotas</div></div>
       <div class="kpi ${faltan <= 1 ? 'action-required' : ''}"><div class="label">Faltan para caducidad automática</div><div class="value ${faltan <= 1 ? 'danger' : ''}">${faltan}</div><div class="hint">${diasAuto !== null ? (diasAuto >= 0 ? `o ${diasAuto} días desde últ. venc.` : 'plazo de 45 días vencido') : '3 cuotas / 45 días'}</div></div>
-      ${dn ? `<div class="kpi action-required"><div class="label">Nueva deuda intimada</div><div class="value money danger">${money(dn.monto)}</div><div class="hint">${dn.diasHabilesRestantes} días hábiles restantes</div></div>` : `<div class="kpi good"><div class="label">Nueva deuda post-adhesión</div><div class="value success">—</div><div class="hint">sin intimaciones</div></div>`}
+      ${dns.length ? `<div class="kpi action-required"><div class="label">Nueva deuda intimada</div><div class="value money danger">${money(dnMonto)}</div><div class="hint">${dns.length} intimación(es) · ${dnDias} días hábiles restantes</div></div>` : `<div class="kpi good"><div class="label">Nueva deuda post-adhesión</div><div class="value success">—</div><div class="hint">sin intimaciones pendientes</div></div>`}
     </div>
     <div class="note"><strong>Caducidad automática:</strong> falta de pago del contado, o <strong>3 cuotas impagas</strong> pasados 45 días corridos desde el vencimiento de la última.
     <strong>Caducidad no automática (nueva deuda):</strong> intimación al domicilio electrónico y <strong>10 días hábiles</strong> para regularizar.</div>
@@ -6404,6 +6417,7 @@ function viewPlan_Fin_Resumen() {
       <div class="kpi"><div class="label">Saldo pendiente</div><div class="value money">${money(saldoPlan(plan))}</div><div class="hint">lo que falta pagar</div></div>
       <div class="kpi ${prox ? 'warning' : 'good'}"><div class="label">Próximo vencimiento</div><div class="value ${prox ? 'warn' : 'success'}" style="font-size:20px;">${prox ? prox.vencimiento : labelSinProx(plan)}</div><div class="hint">${prox ? money(prox.total) : (plan.estado === 'CADUCO' ? 'plan caduco — sin cronograma vigente' : 'todas las cuotas pagas')}</div></div>
     </div>
+    ${viewPlanRiesgo(plan)}
     <div class="card">
       <h3 class="card-title">Datos del plan</h3>
       <table>
@@ -6423,7 +6437,6 @@ function viewPlan_Fin_Resumen() {
         <button class="btn btn-secondary btn-sm" data-goto="plan_fin_docs">Ver documentación →</button>
       </div>
     </div>
-    ${viewPlanRiesgo(plan)}
   `;
 }
 function viewPlan_Fin_Cronograma() {
@@ -6472,7 +6485,7 @@ function viewPlan_Fin_Notif() {
         <thead><tr><th>Fecha</th><th>Tipo</th><th>Cuota</th><th class="money-header">Monto</th><th style="text-align:center;">Estado de la cuota</th><th></th></tr></thead>
         <tbody>${ns.map(n => { const c = cuotaDeNotif(n); return `<tr>
           <td>${n.fecha}</td>
-          <td>${n.tipo === 'INTIMACION_NUEVA_DEUDA' ? '⚖ ' : n.tipo === 'CADUCIDAD_PLAN' ? '⛔ ' : '📨 '}${TIPO_DRC_LABEL[n.tipo]}</td>
+          <td>${n.tipo === 'INTIMACION_NUEVA_DEUDA' ? '⚖ ' : n.tipo === 'CONFIRMACION_PAGO_NUEVA_DEUDA' ? '✓ ' : n.tipo === 'CADUCIDAD_PLAN' ? '⛔ ' : '📨 '}${TIPO_DRC_LABEL[n.tipo]}</td>
           <td>${n.cuotaNro ? 'N° ' + n.cuotaNro : '—'}</td>
           <td class="money">${n.monto ? money(n.monto) : '—'}</td>
           <td style="text-align:center;">${n.tipo === 'LIQUIDACION_CUOTA' ? (c ? chipCuota(c.estado) : '<span class="chip chip-plan-pend">Emitida</span>') : '—'}</td>
@@ -6530,7 +6543,7 @@ function viewPlan_Min_Planes() {
           <td><button class="btn btn-secondary btn-sm" data-plan-ver="${p.id}">Ver →</button></td>
         </tr>`; }).join('')}</tbody>
       </table>
-      <div class="note note-blue" style="margin-top:12px;"><strong>Click en una fila</strong> para ver el detalle del plan y las acciones de la DRC (liquidar cuota, confirmar pago informado, intimar, declarar caducidad).</div>
+      <div class="note note-blue" style="margin-top:12px;"><strong>Click en una fila</strong> para ver el detalle del plan y las acciones de la DRC (revisar pago informado, intimar, declarar caducidad).</div>
     </div>
   `;
 }
@@ -6555,6 +6568,7 @@ function viewPlan_Min_Detalle(planId) {
       <h3 class="card-title">Acciones de la DRC</h3>
       ${planActivo(plan) ? `<div style="display:flex;gap:8px;flex-wrap:wrap;">
         ${puedeNotif ? `<button class="btn btn-danger btn-sm" data-plan-intimar="${plan.id}">⚖ Intimar por nueva deuda</button>` : ''}
+        ${puedeGest && deudasNuevasPendientes(plan).length ? `<button class="btn btn-success btn-sm" data-plan-confirmar-deuda="${plan.id}">✓ Confirmar pago de deuda intimada</button>` : ''}
         ${puedeGest ? `<button class="btn btn-danger btn-sm" data-plan-caducidad="${plan.id}">Declarar caducidad</button>` : ''}
       </div>
       ${!puedeNotif ? notaPerfilMin("intimar por nueva deuda es acción de notificación; solo el Notificador puede.") : ''}
@@ -6565,15 +6579,15 @@ function viewPlan_Min_Detalle(planId) {
     ${viewNuevasDeudasIntimadas(plan)}
     ${cuotasInformadas(plan).length ? `<div class="card" style="border:1px solid var(--warn);">
       <h3 class="card-title">📥 Pagos informados por el financiador — a confirmar (${cuotasInformadas(plan).length})</h3>
-      <div class="note">El financiador informó estos pagos y adjuntó el comprobante. Revisalo y <strong>confirmá cada uno</strong> para que la cuota quede paga.</div>
+      <div class="note">El financiador informó estos pagos y adjuntó el comprobante. <strong>Revisá cada uno</strong> y decidí si lo imputás como pago total o parcial.</div>
       <table>
-        <thead><tr><th>Cuota</th><th>Vencimiento</th><th class="money-header">Monto informado</th><th>Comprobante</th><th>Informado el</th><th style="text-align:right;">Acción</th></tr></thead>
+        <thead><tr><th>Cuota</th><th>Vencimiento</th><th class="money-header">Monto de la cuota</th><th>Comprobante</th><th>Informado el</th><th style="text-align:right;">Acción</th></tr></thead>
         <tbody>${cuotasInformadas(plan).map(c => { const inf = c.informado || {}; return `<tr>
           <td><strong>N° ${c.nro}</strong></td><td>${c.vencimiento}</td>
-          <td class="money" style="font-weight:600;">${money(inf.monto != null ? inf.monto : c.total)}</td>
+          <td class="money" style="font-weight:600;">${money(c.total)}${c.montoPagado > 0 ? `<div style="font-size:11px;color:var(--muted);">saldo ${money(saldoCuota(c))}</div>` : ''}</td>
           <td style="font-size:12px;"><code>${inf.comprobante || '—'}</code>${(inf.adjuntos && inf.adjuntos.length) ? `<div class="attachments" style="margin-top:4px;">${inf.adjuntos.map(a => `<span class="attachment-chip">📎 ${a.nombre || a}</span>`).join('')}</div>` : ''}</td>
           <td>${c.fechaInformada || '—'}</td>
-          <td style="text-align:right;">${puedeGest ? `<button class="btn btn-success btn-sm" data-plan-confirmar-cuota="${plan.id}:${c.nro}">✓ Confirmar pago</button>` : '<span style="font-size:12px;color:var(--muted);">—</span>'}</td>
+          <td style="text-align:right;">${puedeGest ? `<button class="btn btn-secondary btn-sm" data-plan-revisar-cuota="${plan.id}:${c.nro}">Revisar pago →</button>` : '<span style="font-size:12px;color:var(--muted);">—</span>'}</td>
         </tr>`; }).join('')}</tbody>
       </table>
     </div>` : ''}
@@ -6586,21 +6600,21 @@ function viewPlan_Min_Detalle(planId) {
 }
 function viewPlan_Min_Alertas() {
   const enRiesgo = planesTodos().filter(p => p.estado === "EN_RIESGO");
-  const conDeudaNueva = planesTodos().filter(p => p.deudaNueva);
+  const conDeudaNueva = planesTodos().filter(p => deudasNuevasPendientes(p).length);
   const cercaCaducidad = planesTodos().filter(p => p.estado !== "CADUCO" && cuotasImpagas(p).length >= 2);
   return `
     <div class="page-header"><div><h1>Alertas</h1><div class="sub">Planes que requieren seguimiento de la DRC</div></div></div>
     <div class="card" style="${pagosInformadosPendientes() > 0 ? 'border:1px solid var(--warn);' : ''}">
       <h3 class="card-title">📥 Pagos informados por el financiador — a confirmar (${pagosInformadosPendientes()})</h3>
       ${pagosInformadosPendientes() > 0 ? `<table>
-        <thead><tr><th>Obra social</th><th>Cuota</th><th class="money-header">Monto informado</th><th>Comprobante</th><th>Informado el</th><th style="text-align:right;">Acción</th></tr></thead>
+        <thead><tr><th>Obra social</th><th>Cuota</th><th class="money-header">Monto de la cuota</th><th>Comprobante</th><th>Informado el</th><th style="text-align:right;">Acción</th></tr></thead>
         <tbody>${cuotasInformadasTodas().map(({ plan, cuota }) => { const inf = cuota.informado || {}; return `<tr>
           <td><strong>${plan.denominacionOS}</strong></td>
           <td>N° ${cuota.nro}</td>
-          <td class="money" style="font-weight:600;">${money(inf.monto != null ? inf.monto : cuota.total)}</td>
+          <td class="money" style="font-weight:600;">${money(cuota.total)}${cuota.montoPagado > 0 ? `<div style="font-size:11px;color:var(--muted);">saldo ${money(saldoCuota(cuota))}</div>` : ''}</td>
           <td style="font-size:12px;"><code>${inf.comprobante || '—'}</code>${(inf.adjuntos && inf.adjuntos.length) ? `<div class="attachments" style="margin-top:4px;">${inf.adjuntos.map(a => `<span class="attachment-chip">📎 ${a.nombre || a}</span>`).join('')}</div>` : ''}</td>
           <td>${cuota.fechaInformada || '—'}</td>
-          <td style="text-align:right;">${minPuedeGestionar() ? `<button class="btn btn-success btn-sm" data-plan-confirmar-cuota="${plan.id}:${cuota.nro}">✓ Confirmar pago</button>` : '<span style="font-size:12px;color:var(--muted);">—</span>'}</td>
+          <td style="text-align:right;">${minPuedeGestionar() ? `<button class="btn btn-secondary btn-sm" data-plan-revisar-cuota="${plan.id}:${cuota.nro}">Revisar pago →</button>` : '<span style="font-size:12px;color:var(--muted);">—</span>'}</td>
         </tr>`; }).join('')}</tbody>
       </table>` : '<div class="note note-blue">No hay pagos informados pendientes de confirmación.</div>'}
     </div>
@@ -6621,7 +6635,7 @@ function viewPlan_Min_Alertas() {
       <h3 class="card-title">Planes con nueva deuda intimada pendiente</h3>
       ${conDeudaNueva.length ? `<table>
         <thead><tr><th>Obra social</th><th>Intimación</th><th style="text-align:center;">Días háb. restantes</th><th>Hospital</th><th>N° factura</th><th>Fecha factura</th><th class="money-header">Nueva deuda</th><th></th></tr></thead>
-        <tbody>${conDeudaNueva.map(p => { const dn = p.deudaNueva; return `<tr class="clickable" data-plan-ver="${p.id}">
+        <tbody>${conDeudaNueva.flatMap(p => deudasNuevasPendientes(p).map(dn => `<tr class="clickable" data-plan-ver="${p.id}">
           <td><strong>${p.denominacionOS}</strong></td>
           <td>${dn.fechaIntimacion}</td>
           <td style="text-align:center;"><span class="chip ${dn.diasHabilesRestantes <= 3 ? 'chip-plan-venc' : 'chip-plan-riesgo'}">${dn.diasHabilesRestantes}</span></td>
@@ -6630,7 +6644,7 @@ function viewPlan_Min_Alertas() {
           <td>${dn.fechaFactura || '—'}</td>
           <td class="money" style="font-weight:600;">${money(dn.monto)}</td>
           <td><button class="btn btn-secondary btn-sm" data-plan-ver="${p.id}">Ver →</button></td>
-        </tr>`; }).join('')}</tbody>
+        </tr>`)).join('')}</tbody>
       </table>` : '<div class="note note-blue">No hay intimaciones por nueva deuda pendientes.</div>'}
     </div>
   `;
@@ -6758,7 +6772,7 @@ function viewPlan_Min_Notif() {
         <tbody>${ns.map(n => { const c = cuotaDeNotif(n); return `<tr>
           <td>${n.fecha}</td>
           <td><strong>${nombrePlanOS(n.planId)}</strong></td>
-          <td>${n.tipo === 'INTIMACION_NUEVA_DEUDA' ? '⚖ ' : n.tipo === 'CADUCIDAD_PLAN' ? '⛔ ' : '📨 '}${TIPO_DRC_LABEL[n.tipo]}</td>
+          <td>${n.tipo === 'INTIMACION_NUEVA_DEUDA' ? '⚖ ' : n.tipo === 'CONFIRMACION_PAGO_NUEVA_DEUDA' ? '✓ ' : n.tipo === 'CADUCIDAD_PLAN' ? '⛔ ' : '📨 '}${TIPO_DRC_LABEL[n.tipo]}</td>
           <td>${n.cuotaNro ? 'N° ' + n.cuotaNro : '—'}</td>
           <td class="money">${n.monto ? money(n.monto) : '—'}</td>
           <td style="text-align:center;">${n.tipo === 'LIQUIDACION_CUOTA' ? (c ? chipCuota(c.estado) : '<span class="chip chip-plan-pend">Emitida</span>') : '—'}</td>
@@ -6781,23 +6795,84 @@ window.__planLiquidarCuota = function(id) {
       closeModal(); render(); showToast("✓ Liquidación notificada a " + plan.denominacionOS);
     } });
 };
-/* Paso 2 del pago: la DRC confirma un pago que el financiador informó (cuota INFORMADA → PAGA).
-   Si no se pasa `nro`, confirma la cuota informada más antigua. */
-window.__planConfirmarPagoCuota = function(id, nro) {
+/* Recalcula el estado del plan tras imputar un pago de cuota (finalizado / en riesgo / vigente). */
+function __recalcEstadoPlan(plan) {
+  if (plan.estado === "CADUCO") return;
+  plan.cuotasPagas = cuotasPagasDe(plan).length;
+  plan.estado = planTerminado(plan) ? "FINALIZADO" : ((tieneDeudaNuevaPendiente(plan) || cuotasImpagas(plan).length) ? "EN_RIESGO" : "VIGENTE");
+}
+/* Paso 2 del pago: la DRC REVISA un pago que el financiador informó (cuota INFORMADA). No decide el monto
+   el financiador: acá la DRC ve el comprobante y elige imputarlo como pago TOTAL (salda la cuota) o PARCIAL
+   (imputa una parte; el saldo queda pendiente y el financiador podrá volver a informar). Ambas piden
+   reconfirmación antes de imputar. */
+window.__planRevisarPagoCuota = function(id, nro) {
   if (!guardGestion()) return;
   const plan = planPorId(id); if (!plan) return;
-  const informadas = cuotasInformadas(plan);
-  const c = nro ? cuotasDe(plan).find(x => x.nro === Number(nro)) : informadas[0];
-  if (!c) { showToast("No hay pagos informados para confirmar"); return; }
-  confirmarAccion({ titulo: "Confirmar el pago informado", clase: "btn-success", textoBoton: "Sí, confirmar pago",
-    mensaje: `Confirmar el pago de la cuota N° ${c.nro} de ${plan.denominacionOS} por ${money(c.total)}.`,
-    detalle: "El financiador informó este pago. Al confirmarlo, la cuota queda <strong>Paga</strong>. Si el plan no tiene otras cuotas vencidas ni nueva deuda intimada, vuelve a estado Vigente.",
+  const c = nro ? cuotasDe(plan).find(x => x.nro === Number(nro)) : cuotasInformadas(plan)[0];
+  if (!c) { showToast("No hay pagos informados para revisar"); return; }
+  const inf = c.informado || {}; const saldo = saldoCuota(c);
+  openModal(`<h3>Revisar pago — Cuota N° ${c.nro}</h3>
+    <p class="subtle">${plan.denominacionOS} · vencimiento ${c.vencimiento}</p>
+    <div class="note note-blue">El financiador informó esta transferencia. Revisá el comprobante y decidí cómo imputarla.</div>
+    <table style="margin:8px 0;"><tbody>
+      <tr><td style="width:48%;color:var(--muted);">Fecha en que informó el pago</td><td><strong>${c.fechaInformada || '—'}</strong></td></tr>
+      <tr><td style="color:var(--muted);">Fecha de la transferencia</td><td><strong>${inf.fecha || '—'}</strong></td></tr>
+      <tr><td style="color:var(--muted);">Referencia / comprobante</td><td><code>${inf.comprobante || '—'}</code></td></tr>
+      <tr><td style="color:var(--muted);">Comprobante adjunto</td><td>${(inf.adjuntos && inf.adjuntos.length) ? inf.adjuntos.map(a => `<span class="attachment-chip">📎 ${a.nombre || a}</span>`).join(' ') : '—'}</td></tr>
+      <tr><td style="color:var(--muted);">Monto de la cuota</td><td class="money" style="font-weight:600;">${money(c.total)}</td></tr>
+      <tr><td style="color:var(--muted);">Saldo pendiente de la cuota</td><td class="money" style="font-weight:700;color:var(--danger);">${money(saldo)}</td></tr>
+    </tbody></table>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="window.__planPagoParcialCuota('${id}','${nro}')">Pago parcial</button>
+      <button class="btn btn-success" onclick="window.__planPagoTotalCuota('${id}','${nro}')">Pago total</button>
+    </div>`);
+};
+// Pago TOTAL: imputa el saldo pendiente completo de la cuota → queda Paga (saldo $0). Con reconfirmación.
+window.__planPagoTotalCuota = function(id, nro) {
+  const plan = planPorId(id); if (!plan) return;
+  const c = cuotasDe(plan).find(x => x.nro === Number(nro)); if (!c) return;
+  confirmarAccion({ titulo: "Imputar pago total", clase: "btn-success", textoBoton: "Sí, imputar pago total",
+    mensaje: `Imputar el pago TOTAL de la cuota N° ${c.nro} de ${plan.denominacionOS} por ${money(saldoCuota(c))}.`,
+    detalle: "La cuota queda <strong>Paga</strong> con saldo $0. Si el plan no tiene otras cuotas vencidas ni nueva deuda intimada, vuelve a estado Vigente.",
     onOk: () => {
-      c.estado = "PAGA"; c.fechaPago = HOY; plan.cuotasPagas = cuotasPagasDe(plan).length;
-      if (plan.estado !== "CADUCO") {
-        plan.estado = planTerminado(plan) ? "FINALIZADO" : (plan.deudaNueva ? "EN_RIESGO" : (cuotasImpagas(plan).length ? "EN_RIESGO" : "VIGENTE"));
-      }
-      closeModal(); render(); showToast(planTerminado(plan) ? "✓ Última cuota confirmada — plan finalizado" : "✓ Pago de cuota confirmado");
+      c.montoPagado = c.total; c.estado = "PAGA"; c.fechaPago = HOY; c.informado = null; c.fechaInformada = null;
+      __recalcEstadoPlan(plan);
+      closeModal(); render(); showToast(planTerminado(plan) ? "✓ Última cuota paga — plan finalizado" : "✓ Pago total imputado");
+    } });
+};
+// Pago PARCIAL: la DRC ingresa el monto abonado; se resta del saldo. La cuota vuelve a ser informable. Con reconfirmación.
+window.__planPagoParcialCuota = function(id, nro) {
+  const plan = planPorId(id); if (!plan) return;
+  const c = cuotasDe(plan).find(x => x.nro === Number(nro)); if (!c) return;
+  const saldo = saldoCuota(c);
+  openModal(`<h3>Pago parcial — Cuota N° ${c.nro}</h3>
+    <p class="subtle">${plan.denominacionOS} · vencimiento ${c.vencimiento}</p>
+    <div class="note note-blue">Ingresá el monto <strong>efectivamente abonado</strong>. Se resta del saldo de la cuota; el resto queda pendiente y el financiador podrá volver a informar el pago del saldo.</div>
+    <label>Monto abonado</label><input type="number" id="parcial-monto" placeholder="0">
+    <div style="font-size:12px;color:var(--muted);margin-top:4px;">Saldo actual de la cuota: <strong>${money(saldo)}</strong></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="window.__planRevisarPagoCuota('${id}','${nro}')">← Volver</button>
+      <button class="btn btn-primary" onclick="window.__confirmarPagoParcialCuota('${id}','${nro}')">Continuar →</button>
+    </div>`);
+};
+window.__confirmarPagoParcialCuota = function(id, nro) {
+  const plan = planPorId(id); if (!plan) return;
+  const c = cuotasDe(plan).find(x => x.nro === Number(nro)); if (!c) return;
+  const saldo = saldoCuota(c);
+  const monto = Math.max(0, Number(document.getElementById('parcial-monto')?.value) || 0);
+  if (monto <= 0) { showToast("⚠ Indicá el monto abonado"); return; }
+  if (monto > saldo) { showToast("⚠ El monto no puede superar el saldo de la cuota"); return; }
+  confirmarAccion({ titulo: "Imputar pago parcial", clase: "btn-primary", textoBoton: "Sí, imputar pago parcial",
+    mensaje: `Imputar un pago PARCIAL de ${money(monto)} a la cuota N° ${c.nro} de ${plan.denominacionOS}.`,
+    detalle: `El saldo de la cuota pasa a <strong>${money(saldo - monto)}</strong>. La cuota queda pendiente y el financiador podrá volver a informar el pago del saldo.`,
+    onOk: () => {
+      c.montoPagado = (c.montoPagado || 0) + monto;
+      if (saldoCuota(c) <= 0) { c.estado = "PAGA"; c.fechaPago = HOY; }
+      else { c.estado = c.vencimiento < HOY ? "VENCIDA" : "PENDIENTE"; c.fechaPago = null; }  // vuelve a ser informable
+      c.informado = null; c.fechaInformada = null;
+      __recalcEstadoPlan(plan);
+      closeModal(); render(); showToast(`✓ Pago parcial imputado — saldo de la cuota: ${money(saldoCuota(c))}`);
     } });
 };
 /* ---- Intimación por nueva deuda: form con datos + nota autocompletada + notificación (texto + PDF) ----
@@ -6864,9 +6939,11 @@ window.__revisarIntimacion = function(id) {
 window.__confirmarIntimacion = function(id) {
   const plan = planPorId(id); if (!plan) return;
   const d = state.__intimDraft || { monto: 0, fecha: HOY };
-  plan.deudaNueva = { monto: d.monto, fechaIntimacion: d.fecha, diasHabilesRestantes: 10,
+  plan.deudasNuevas = plan.deudasNuevas || [];
+  plan.deudasNuevas.push({ id: nuevoIdDeudaNueva(), estado: "PENDIENTE",
+    monto: d.monto, fechaIntimacion: d.fecha, diasHabilesRestantes: 10,
     hospId: d.hospId || null, hospNombre: d.hospNombre, hospCuit: d.hospCuit,
-    nroFactura: d.nroFactura, fechaFactura: d.fechaFactura };
+    nroFactura: d.nroFactura, fechaFactura: d.fechaFactura });
   if (plan.estado !== "CADUCO") plan.estado = "EN_RIESGO";
   state.notificacionesDRC.unshift({ id: "NDRC-" + (++__ndrcSeq), planId: id, tipo: "INTIMACION_NUEVA_DEUDA",
     fecha: d.fecha, cuotaNro: null, monto: d.monto, estado: "EMITIDA",
@@ -6874,6 +6951,47 @@ window.__confirmarIntimacion = function(id) {
     adjuntos: [{ nombre: `intimacion_nueva_deuda_${plan.id}.pdf`, tipo: "pdf" }], nota: notaIntimacion(plan, d) });
   state.__intimDraft = null;
   closeModal(); render(); showToast("⚖ Intimación notificada a " + plan.denominacionOS);
+};
+
+/* ---- Confirmar pago de deuda intimada: la contracara de intimar ----
+   Sin esto una intimación quedaba pegada al plan sin forma de saldarla: el plan nunca salía de "en riesgo"
+   y terminaba en caducidad. Acá la DRC despliega las intimaciones pendientes y tilda cuáles cobró. Las
+   marcadas quedan PAGA; si no queda ninguna pendiente (ni cuotas impagas) el plan vuelve a Vigente. */
+window.__planConfirmarPagoDeuda = function(id) {
+  if (!guardGestion()) return;   // confirmar pago = gestión → admin y notificador
+  const plan = planPorId(id); if (!plan) return;
+  const dns = deudasNuevasPendientes(plan);
+  if (!dns.length) { showToast("No hay deuda intimada pendiente"); return; }
+  openModal(`<h3>Confirmar pago de deuda intimada</h3>
+    <p class="subtle">${plan.denominacionOS} · Plan ${plan.id}</p>
+    <div class="note note-blue">Tildá las intimaciones cuyo pago recibiste. Las marcadas quedan <strong>saldadas</strong> y salen del contador de riesgo. Si no queda ninguna pendiente ni cuotas impagas, el plan vuelve a <strong>Vigente</strong>.</div>
+    <div style="margin:6px 0;">${dns.map(d => `<label class="cat-item" style="display:flex;gap:8px;align-items:flex-start;padding:8px 0;font-weight:400;cursor:pointer;border-bottom:1px solid var(--border);">
+      <input type="checkbox" class="dn-pago" value="${d.id}" checked>
+      <span><strong>${money(d.monto)}</strong> — factura <code>${d.nroFactura || '—'}</code> de ${d.hospNombre || '—'}<br>
+      <span style="font-size:12px;color:var(--muted);">Intimada el ${d.fechaIntimacion || '—'} · ${d.diasHabilesRestantes} días háb. restantes</span></span>
+    </label>`).join('')}</div>
+    <label style="margin-top:8px;">Fecha del pago</label><input type="date" id="dn-fecha-pago" value="${HOY}">
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-success" onclick="window.__confirmarPagoDeuda('${id}')">✓ Confirmar pago(s)</button>
+    </div>`);
+};
+window.__confirmarPagoDeuda = function(id) {
+  const plan = planPorId(id); if (!plan) return;
+  const ids = [...document.querySelectorAll('.dn-pago:checked')].map(c => c.value);
+  if (!ids.length) { showToast("⚠ Elegí al menos una intimación"); return; }
+  const fecha = (document.getElementById('dn-fecha-pago')?.value || HOY);
+  let total = 0;
+  (plan.deudasNuevas || []).forEach(d => { if (ids.includes(d.id)) { d.estado = "PAGA"; d.fechaPago = fecha; total += d.monto; } });
+  // El plan sale de riesgo si ya no quedan deudas nuevas pendientes ni cuotas impagas.
+  if (plan.estado !== "CADUCO") {
+    plan.estado = planTerminado(plan) ? "FINALIZADO" : ((tieneDeudaNuevaPendiente(plan) || cuotasImpagas(plan).length) ? "EN_RIESGO" : "VIGENTE");
+  }
+  // Aviso fehaciente al financiador de que la deuda intimada quedó saldada.
+  state.notificacionesDRC.unshift({ id: "NDRC-" + (++__ndrcSeq), planId: id, tipo: "CONFIRMACION_PAGO_NUEVA_DEUDA",
+    fecha, cuotaNro: null, monto: total, estado: "EMITIDA",
+    mensaje: `Se registró el pago de ${ids.length} intimación(es) por nueva deuda, por un total de ${money(total)}. La deuda intimada queda saldada.` });
+  closeModal(); render(); showToast(`✓ Pago de deuda intimada confirmado (${money(total)})`);
 };
 
 /* ---- Declarar caducidad: motivos + fecha + resolución autocompletada + reconfirmación + notificación ---- */
@@ -6963,11 +7081,12 @@ function viewPlan_Fin_Pagos() {
     <div class="card">
       <h3 class="card-title">Cuotas del plan — ${cuotasPagasDe(plan).length} de ${plan.nCuotas} pagas</h3>
       ${cuotas.length ? `<table>
-        <thead><tr><th>Cuota</th><th>Vencimiento</th><th class="money-header">Total</th><th style="text-align:center;">Estado</th><th>Fecha de pago</th><th style="text-align:right;">Acción</th></tr></thead>
+        <thead><tr><th>Cuota</th><th>Vencimiento</th><th class="money-header">Total</th><th class="money-header">Saldo</th><th style="text-align:center;">Estado</th><th>Fecha de pago</th><th style="text-align:right;">Acción</th></tr></thead>
         <tbody>${cuotas.map(c => { const notif = cuotaNotificada(plan.id, c.nro); const dispo = c.estado === "PAGA" || c.estado === "INFORMADA" || notif; return `<tr${dispo ? '' : ' style="opacity:0.55;"'}>
           <td><strong>N° ${c.nro}</strong></td>
           <td>${c.vencimiento}</td>
           <td class="money" style="font-weight:600;">${money(c.total)}</td>
+          <td class="money" style="font-weight:600;color:${saldoCuota(c) <= 0 ? 'var(--success)' : 'var(--muted)'};">${money(saldoCuota(c))}</td>
           <td style="text-align:center;">${chipCuota(c.estado)}</td>
           <td>${c.fechaPago || '—'}</td>
           <td style="text-align:right;">${c.estado === "PAGA"
@@ -6975,7 +7094,7 @@ function viewPlan_Fin_Pagos() {
             : c.estado === "INFORMADA"
               ? '<span style="font-size:12px;color:var(--warn);">Informado — esperando confirmación de la DRC</span>'
               : (notif
-                ? `<button class="btn btn-primary btn-sm" data-plan-informar="${plan.id}:${c.nro}">Informar e imputar pago</button>`
+                ? `<button class="btn btn-primary btn-sm" data-plan-informar="${plan.id}:${c.nro}">Informar pago</button>`
                 : '<span style="font-size:12px;color:var(--muted);">No disponible — aún no notificada</span>')}</td>
         </tr>`; }).join('')}</tbody>
       </table>` : '<div class="note">Este plan no tiene cuotas cargadas.</div>'}
@@ -6990,9 +7109,8 @@ window.__planInformarPagoCuota = function(planId, nro) {
   const plan = planPorId(planId); if (!plan) return;
   const c = cuotasDe(plan).find(x => x.nro === Number(nro)); if (!c) return;
   openModal(`<h3>Informar pago — Cuota N° ${c.nro}</h3>
-    <p class="subtle">${plan.denominacionOS} · vencimiento ${c.vencimiento}</p>
-    <div class="note">Declarás la transferencia realizada. La cuota queda como <strong>Pago informado</strong>; la DRC confirma la recepción y recién ahí queda <strong>Paga</strong>.</div>
-    <label>Monto pagado</label><input type="number" id="cuota-pago-monto" value="${c.total}">
+    <p class="subtle">${plan.denominacionOS} · vencimiento ${c.vencimiento} · cuota ${money(c.total)}${c.montoPagado > 0 ? ` · saldo ${money(saldoCuota(c))}` : ''}</p>
+    <div class="note">Declarás la transferencia realizada. La cuota queda como <strong>Pago informado</strong>; la DRC lo revisa y define si lo imputa como pago total o parcial. <strong>El monto lo determina la DRC al revisar</strong>, no se declara acá.</div>
     <label>Fecha de la transferencia</label><input type="date" id="cuota-pago-fecha" value="${HOY}">
     <label>Referencia / comprobante</label><input id="cuota-pago-ref" placeholder="TRF-…">
     <label>Adjuntar comprobante de la transferencia</label>
@@ -7005,13 +7123,12 @@ window.__planInformarPagoCuota = function(planId, nro) {
 window.__confirmarInformarPagoCuota = function(planId, nro) {
   const plan = planPorId(planId); if (!plan) return;
   const c = cuotasDe(plan).find(x => x.nro === Number(nro)); if (!c) return;
-  const monto = Math.max(0, Number(document.getElementById('cuota-pago-monto')?.value) || 0);
-  if (monto <= 0) { showToast("⚠ Indicá el monto pagado"); return; }
   const ref = (document.getElementById('cuota-pago-ref')?.value || "").trim() || "TRF-" + Math.floor(100000 + Math.random() * 899999);
   c.estado = "INFORMADA"; c.fechaInformada = HOY;
-  c.informado = { monto, fecha: document.getElementById('cuota-pago-fecha')?.value || HOY, comprobante: ref,
+  // Sin monto: el financiador solo aporta fecha de transferencia, referencia y comprobante. La DRC decide el monto.
+  c.informado = { fecha: document.getElementById('cuota-pago-fecha')?.value || HOY, comprobante: ref,
     adjuntos: adjuntosDelUploader('cuota-pago-docs', `comprobante_${ref}.pdf`) };
-  closeModal(); render(); showToast(`✓ Pago de la cuota N° ${c.nro} informado — esperando confirmación de la DRC`);
+  closeModal(); render(); showToast(`✓ Pago de la cuota N° ${c.nro} informado — esperando revisión de la DRC`);
 };
 
 /* ===================== ALTA FINANCIADOR A PLAN DE PAGOS (ministerio) ===================== */
@@ -7166,7 +7283,7 @@ window.__ejecutarAltaPlan = function() {
   const planId = nuevoPlanId(), finId = nuevoFinIdPlan();
   const plan = { id: planId, financiadorId: finId, denominacionOS: d.os, cuit: d.cuit, rnas: d.rnas || '—',
     deudaTotalRegularizada: d.capital + d.intereses, capital: d.capital, intereses: d.intereses, modalidad: d.modalidad,
-    fechaAdhesion: HOY, nCuotas: d.ncuotas, cuotasPagas: 0, estado: "VIGENTE", domicilioElectronico: d.cuit, deudaNueva: null };
+    fechaAdhesion: HOY, nCuotas: d.ncuotas, cuotasPagas: 0, estado: "VIGENTE", domicilioElectronico: d.cuit, deudasNuevas: [] };
   plan.cuotas = generarCuotasPlan(plan);
   state.planesPago.push(plan);
   FACTURAS_EN_PLAN[planId] = (d.facturas || []).map(f => ({ hospital: f.hosp, nroFactura: f.nro, fechaEmision: f.fecha || HOY, montoTotal: f.monto, saldoRegularizado: f.monto }));
@@ -7209,9 +7326,10 @@ function wirePlanEvents() {
   document.querySelectorAll('[data-plan-ver]').forEach(el => el.addEventListener('click', () => { state.view = "plan_min_detalle"; state.planCtx = el.dataset.planVer; render(); }));
   document.querySelectorAll('[data-plan-volver]').forEach(el => el.addEventListener('click', () => { state.view = "plan_min_planes"; state.planCtx = null; render(); }));
   document.querySelectorAll('[data-plan-liquidar]').forEach(el => el.addEventListener('click', () => window.__planLiquidarCuota(el.dataset.planLiquidar)));
-  document.querySelectorAll('[data-plan-confirmar-cuota]').forEach(el => el.addEventListener('click', () => { const [id, nro] = el.dataset.planConfirmarCuota.split(':'); window.__planConfirmarPagoCuota(id, nro); }));
+  document.querySelectorAll('[data-plan-revisar-cuota]').forEach(el => el.addEventListener('click', () => { const [id, nro] = el.dataset.planRevisarCuota.split(':'); window.__planRevisarPagoCuota(id, nro); }));
   document.querySelectorAll('[data-plan-informar]').forEach(el => el.addEventListener('click', () => { const [id, nro] = el.dataset.planInformar.split(':'); window.__planInformarPagoCuota(id, nro); }));
   document.querySelectorAll('[data-plan-intimar]').forEach(el => el.addEventListener('click', () => window.__planIntimarNuevaDeuda(el.dataset.planIntimar)));
+  document.querySelectorAll('[data-plan-confirmar-deuda]').forEach(el => el.addEventListener('click', () => window.__planConfirmarPagoDeuda(el.dataset.planConfirmarDeuda)));
   document.querySelectorAll('[data-plan-caducidad]').forEach(el => el.addEventListener('click', () => window.__planDeclararCaducidad(el.dataset.planCaducidad)));
   document.querySelectorAll('[data-plan-factura]').forEach(el => el.addEventListener('click', () => { const [id, nro] = el.dataset.planFactura.split(':'); window.__planFacturaCuota(id, nro); }));
   document.querySelectorAll('[data-ver-notif]').forEach(el => el.addEventListener('click', () => window.__verNotif(el.dataset.verNotif)));
@@ -7325,6 +7443,10 @@ state.facturas.forEach(f => {
 state.planesPago = JSON.parse(JSON.stringify(PLANES_PAGO));
 state.planesPago.forEach(p => {
   p.cuotas = generarCuotasPlan(p);
+  // Migración: la `deudaNueva` del mock (objeto único) pasa a la LISTA `deudasNuevas`, con id y estado,
+  // para poder intimar varias y confirmar el pago de cada una (ver nuevasDeudasDe).
+  p.deudasNuevas = p.deudaNueva ? [Object.assign({ id: nuevoIdDeudaNueva(), estado: "PENDIENTE" }, p.deudaNueva)] : [];
+  delete p.deudaNueva;
   // Un plan que ya pagó todas sus cuotas está FINALIZADO (salvo que esté caduco).
   if (p.estado !== "CADUCO" && planTerminado(p)) p.estado = "FINALIZADO";
 });
