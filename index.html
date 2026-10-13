@@ -411,6 +411,36 @@ const FINANCIADORES = [
   { id: "F016", nombre: "Federada Salud", tipo: "Prepaga", estado: "sin_usuario", alta: null, cuit: null },
   { id: "F018", nombre: "Accord Salud", tipo: "Prepaga", estado: "sin_usuario", alta: null, cuit: null },
 ];
+/* Taxonomía de tipo de financiador CODIFICADA (como el padrón real de SAMO: cada financiador lleva un
+   código de categoría, no texto libre). Los códigos y nombres espejan los del portal real
+   (01 INSSJYP, 02 OS.SS. NACIONALES, 03 IOMA, 04 OS.SS. PROVINCIALES, 06 ART, 07 PREPAGAS, 08 EMPRESAS,
+   09 MUTUALES, 10 PODERES). Se asigna `tipoCod` a cada financiador a partir de su nombre/tipo libre;
+   el display pasa a ser "NN NOMBRE" y el texto libre queda solo como respaldo. */
+const TIPO_FIN = {
+  "01": "INSSJYP",
+  "02": "OS.SS. NACIONALES",
+  "03": "IOMA",
+  "04": "OS.SS. PROVINCIALES",
+  "06": "ART",
+  "07": "PREPAGAS",
+  "08": "EMPRESAS",
+  "09": "MUTUALES",
+  "10": "PODERES",
+};
+function codTipoDe(f) {
+  const n = (f.nombre || "").toUpperCase();
+  if (n.includes("PAMI")) return "01";
+  if (n.includes("IOMA")) return "03";
+  if (n.includes("OBSBA")) return "04";
+  const t = (f.tipo || "").toLowerCase();
+  if (t.includes("provincial")) return "04";
+  if (t.includes("prepaga")) return "07";
+  if (t.includes("mutual")) return "09";
+  return "02";                                  // Obra Social Nacional / Sindical → OS.SS. NACIONALES
+}
+FINANCIADORES.forEach(f => { if (!f.tipoCod) f.tipoCod = codTipoDe(f); });
+// Etiqueta codificada "NN NOMBRE" (reemplaza el texto libre en la UI).
+const tipoFinLabel = (f) => `${f.tipoCod} ${TIPO_FIN[f.tipoCod] || f.tipo || ''}`.trim();
 const finEstado = (id) => FINANCIADORES.find(f => f.id === id)?.estado || "sin_usuario";
 // `finHabilitado` = apto para notificar. Solo los activos lo son. En pausa y sin usuario NO.
 const finHabilitado = (id) => finEstado(id) === "activo";
@@ -918,7 +948,8 @@ let state = {
   ],
   // Filtros del panel del financiador (hospital + temporalidad) y de su listado de facturas.
   filtrosPanelFin: { hospital: "TODOS", periodo: "TODOS" },
-  filtrosFactFin: { hospital: "TODOS", estado: "TODOS", situacion: "TODOS", q: "" },
+  // `lado` = de qué lado está la pelota (mío / ministerio-hospital); `banda` = franja temporal del reloj de 60.
+  filtrosFactFin: { hospital: "TODOS", estado: "TODOS", lado: "TODOS", banda: "TODOS", q: "" },
   filtrosNotifFin: { hospital: "TODOS", estado: "TODOS", q: "", fecha: "TODOS", fechaFactura: "TODOS", vencimiento: "TODOS", estadoNotif: "TODOS" },
   // Filtros de las tablas de la Cola de notificación del Ministerio (aptas y retenidas).
   // Cola del ministerio (aptas): buscador typeahead (q), CUIT del financiador, hospital y rango de fechas.
@@ -1001,6 +1032,24 @@ let state = {
   // Vive solo en memoria, como todo el prototipo (F5 lo resetea al default).
   ruteoObjeciones: Object.fromEntries(HOSPITALES.map(h => [h.id, "ministerio"])),
   filtrosHosp: { q: "" },
+  // Última sincronización simulada con SAMO (sistema de facturación). Solo informativa (demo).
+  ultimaSincroSamo: null,
+  /* Registro de CUITs habilitados para acceder al portal, con su rol (SSO). Espeja la pantalla
+     "Administración de CUITs" del portal real: un CUIT se autentica, pero no accede a nada hasta que
+     tiene rol asignado y está habilitado. En el prototipo es un registro de demo (el switcher del topbar
+     sigue conmutando el rol libremente; esto documenta el modelo de acceso real). */
+  cuitsRegistro: [
+    { cuit: "20-33813990-0", rol: "ministerio",   habilitado: true,  descripcion: "DRC — Dirección de Recuperación de Costos" },
+    { cuit: "20-33813991-1", rol: "ministerio",   habilitado: true,  descripcion: "Auditoría central" },
+    { cuit: "30-62345678-9", rol: "financiador",  habilitado: true,  descripcion: "IOMA (persona jurídica)" },
+    { cuit: "30-64567890-1", rol: "financiador",  habilitado: true,  descripcion: "PAMI (persona jurídica)" },
+    { cuit: "30-54876543-2", rol: "financiador",  habilitado: true,  descripcion: "OSDE (persona jurídica)" },
+    { cuit: "27-30111222-3", rol: null,           habilitado: false, descripcion: "Alta pendiente — sin rol asignado" },
+  ],
+  // Filtro de la vista Administración de CUITs.
+  filtrosCuit: { q: "", rol: "TODOS" },
+  // Facturas del plan (PV 191) emitidas por SAMO pero TODAVÍA SIN VINCULAR a una cuota (ver §vincular).
+  facturasPlanSinVincular: [],
   planesPago: [], notificacionesDRC: [], planCtx: null
 };
 // Objeciones cargadas sobre prestaciones concretas de una factura.
@@ -1022,6 +1071,7 @@ const NAV = {
     { label: "Cola de notificación", view: "cola" },
     { label: "Facturas notificadas", view: "notificadas" },
     { label: "Auditoría central", view: "auditoria" },
+    { label: "Administración de CUITs", view: "cuits" },
     { label: "Financiadores", view: "abm_financiadores" },
     { label: "Hospitales", view: "hospitales" },
     { label: "Usuarios del Ministerio", view: "min_usuarios", soloGestion: true },
@@ -1046,6 +1096,7 @@ const NAV = {
       { label: "Esperan mi respuesta", view: "conc_esperan_yo" },
       { label: "Esperando resolución", view: "conc_esperan_hosp" },
     ]},
+    { label: "Resumen de objeciones", view: "resumen_objeciones" },
     { label: "Historial", view: "historial_financiador" },
     // Solo la ve el usuario admin: se filtra en renderSidebar según esAdminFinActual().
     { label: "Gestión de usuarios", view: "usuarios_financiador", soloAdmin: true },
@@ -1070,7 +1121,8 @@ const money = (n) => "$ " + n.toLocaleString("es-AR", { minimumFractionDigits: 0
 const hospNombre = (id) => HOSPITALES.find(h => h.id === id)?.nombre || id;
 const hospCorto = (id) => hospNombre(id).replace("Hospital ", "").replace(" (La Plata)", " – La Plata").replace(" (Lanús)", " – Lanús").replace(" (Florencio Varela)", " – F. Varela");
 const finNombre = (id) => FINANCIADORES.find(f => f.id === id)?.nombre || id;
-const finTipo = (id) => FINANCIADORES.find(f => f.id === id)?.tipo || "";
+// Tipo del financiador, ahora CODIFICADO ("NN NOMBRE") en vez del texto libre (ver TIPO_FIN).
+const finTipo = (id) => { const f = FINANCIADORES.find(x => x.id === id); return f ? tipoFinLabel(f) : ""; };
 const finCuit = (id) => FINANCIADORES.find(f => f.id === id)?.cuit || "";
 
 /* ---- Indisponibilización de facturas (casos puntuales de la cola de notificación) ----
@@ -2797,20 +2849,38 @@ function facturasFinFiltradas() {
     .filter(f => puedeVerHospitalFin(f.hospital))
     .filter(f => fl.hospital === "TODOS" || f.hospital === fl.hospital)
     .filter(f => fl.estado === "TODOS" || grupoDe(f.estado) === fl.estado)
-    .filter(f => fl.situacion === "TODOS" || situacionFactura(f) === fl.situacion)
+    .filter(f => fl.lado === "TODOS" || ladoFactFin(f) === fl.lado)
+    .filter(f => fl.banda === "TODOS" || bandaFactFin(f) === fl.banda)
     .filter(f => !q || f.nro.toLowerCase().includes(q) || hospNombre(f.hospital).toLowerCase().includes(q))
     .sort((a, b) => diasRestantes(a.fecha) - diasRestantes(b.fecha));
 }
 const LABEL_SITUACION = { TODOS: "Todas", por_vencer: "Por vencer (<15 días)", vencidas: "Vencidas (morosas)", vigente: "En plazo", cerrada: "Cerradas" };
+/* Filtros nuevos de "Facturas a revisar" (alineación con el portal real — §13):
+   - `lado`: de qué lado está la pelota. "mio" = me toca actuar a mí (revisar, pagar o responder);
+     "ellos" = está en manos del ministerio o del hospital (esperando_auditoria / esperando_hospital).
+   - `banda`: franja del reloj de 60 días desde la notificación (días transcurridos):
+     0–15 = ventana para objetar (§0.3) · 15–45 = plazo de pago · 45–60 = por vencer · 60+ = vencida. */
+const FACT_CERRADA = ["cerrada", "cerrada_nc", "pagada", "rechazada_total"];
+const ladoFactFin = (f) => (f.estado === "esperando_auditoria" || f.estado === "esperando_hospital") ? "ellos" : "mio";
+function bandaFactFin(f) {
+  if (FACT_CERRADA.includes(f.estado)) return "cerrada";
+  const transcurridos = 60 - diasRestantes(f.fecha);
+  if (transcurridos <= 15) return "obj";
+  if (transcurridos <= 45) return "pago";
+  if (transcurridos <= 60) return "venc";
+  return "vencida";
+}
+const LABEL_LADO = { TODOS: "Toda situación", mio: "De mi lado", ellos: "Ministerio / hospital" };
+const LABEL_BANDA = { TODOS: "Toda situación temporal", obj: "0–15 objetar", pago: "15–45 plazo de pago", venc: "45–60 por vencer", vencida: "60+ vencidas", cerrada: "Cerrada" };
 
 function viewFinanciador_Facturas() {
   const fl = state.filtrosFactFin;
   const sort = state.sortFactFin;
   const facts = ordenarFacturas(facturasFinFiltradas(), sort);
-  const hayFiltro = fl.hospital !== "TODOS" || fl.estado !== "TODOS" || fl.situacion !== "TODOS" || fl.q;
+  const hayFiltro = fl.hospital !== "TODOS" || fl.estado !== "TODOS" || fl.lado !== "TODOS" || fl.banda !== "TODOS" || fl.q;
   return `
     <div class="page-header">
-      <div><h1>Facturas a revisar</h1><div class="sub">${facts.length} factura(s) en vista${fl.situacion !== "TODOS" ? ` — ${LABEL_SITUACION[fl.situacion]}` : ''} · ${money(facts.reduce((s,f)=>s+saldoPendiente(f),0))} de saldo</div></div>
+      <div><h1>Facturas a revisar</h1><div class="sub">${facts.length} factura(s) en vista${fl.banda !== "TODOS" ? ` — ${LABEL_BANDA[fl.banda]}` : ''} · ${money(facts.reduce((s,f)=>s+saldoPendiente(f),0))} de saldo</div></div>
       <button class="btn btn-excel" onclick="exportFacturasFin()">⬇ Excel</button>
     </div>
     ${notaRestriccionHospitales()}
@@ -2818,8 +2888,11 @@ function viewFinanciador_Facturas() {
       <div class="filter-bar" style="margin-bottom:0;">
         ${selectHospitales(fl.hospital, 'data-filtro-fact="hospital"', hospitalesFin().filter(puedeVerHospitalFin))}
         ${selectGrupos(fl.estado, 'data-filtro-fact="estado"')}
-        <select data-filtro-fact="situacion">
-          ${Object.entries(LABEL_SITUACION).map(([k, v]) => `<option value="${k}" ${fl.situacion === k ? 'selected' : ''}>${k === "TODOS" ? "Todas las situaciones temporales" : v}</option>`).join('')}
+        <select data-filtro-fact="lado" title="De qué lado está la pelota">
+          ${Object.entries(LABEL_LADO).map(([k, v]) => `<option value="${k}" ${fl.lado === k ? 'selected' : ''}>${v}</option>`).join('')}
+        </select>
+        <select data-filtro-fact="banda" title="Franja del reloj de 60 días desde la notificación">
+          ${Object.entries(LABEL_BANDA).map(([k, v]) => `<option value="${k}" ${fl.banda === k ? 'selected' : ''}>${v}</option>`).join('')}
         </select>
         <input data-filtro-fact="q" value="${fl.q}" placeholder="Buscar por N° o hospital…" style="min-width:200px;">
         ${hayFiltro ? `<button class="btn btn-secondary btn-sm" data-filtro-fact-reset="1">Limpiar</button>` : ''}
@@ -3251,6 +3324,13 @@ window.confirmarObjecionItems = function(nro) {
   if (!categoria) { showToast("⚠ Elegí el motivo de la objeción"); return; }
   const detalle = $("#obj-detalle").value.trim() || "(sin detalle)";
   const adjuntos = adjuntosDelUploader('obj-uploader', `respaldo_objecion_${nro}.pdf`);
+  // RUTEO DE OBJECIONES (cableado): según cómo esté configurado el hospital en la vista Hospitales, la
+  // objeción entra por la auditoría central (default) o va DIRECTO al hospital. Define el estado inicial
+  // del planteo: "directo" → derivado_hospital (la factura queda esperando_hospital); si no → en_auditoria.
+  const via = objecionesVia(f.hospital);
+  const directo = via === "directo";
+  const estadoDestino = directo ? "derivado_hospital" : "en_auditoria";
+  const destinoTxt = directo ? "directo al hospital" : "la auditoría central";
   // Una objeción POR PACIENTE. Se agrupan las prestaciones seleccionadas por paciente y, para cada uno,
   // se crea una objeción nueva o se suma el motivo a la que ya tenga abierta.
   const porPac = {}; items.forEach(i => { (porPac[i.paciente] = porPac[i.paciente] || []).push(i); });
@@ -3262,31 +3342,36 @@ window.confirmarObjecionItems = function(nro) {
     if (existente) {
       existente.motivos.push(motivo);
       existente.adjuntos = [...(existente.adjuntos || []), ...adjuntos];
-      const volvio = existente.estado !== "en_auditoria";
-      existente.estado = "en_auditoria";
+      const volvio = existente.estado !== estadoDestino;
+      existente.estado = estadoDestino;
       sincronizarObjecion(existente);
       anotarPlanteo(f, existente, { who: "financiador", nombre: "IOMA", tipo: "Motivo agregado a la objeción", categoria,
-        texto: `Agregamos un motivo (${categoria}) a la objeción de ${pac}${volvio ? " — vuelve a la auditoría central" : ""}.`,
+        texto: `Agregamos un motivo (${categoria}) a la objeción de ${pac}${volvio ? ` — ${directo ? "vuelve al hospital" : "vuelve a la auditoría central"}` : ""}.`,
         detalles: detMot, adjuntos });
       sumadas++;
     } else {
       const nuevo = { id: "OBJ-" + (objecionesDe(f).length + 1), uid: nuevoUidObjecion(), paciente: pac,
-        motivos: [motivo], fecha: HOY, estado: "en_auditoria", adjuntos: [...adjuntos], respuestas: [] };
+        motivos: [motivo], fecha: HOY, estado: estadoDestino, adjuntos: [...adjuntos], respuestas: [] };
       sincronizarObjecion(nuevo);
       f.objeciones = [...objecionesDe(f), nuevo];
       nuevo.respuestas.push({ who: "financiador", nombre: "IOMA", when: HOY, inicial: true, tipo: "Objeción planteada", texto: `${categoria}: ${detalle}`, adjuntos });
+      // Si el hospital está configurado para recibir directo, se deja constancia de que NO pasó por auditoría.
+      if (directo) nuevo.respuestas.push({ who: "sistema", nombre: "Ruteo", when: HOY, tipo: "Enviada directo al hospital",
+        texto: `Este hospital está configurado para recibir las objeciones directo (sin pasar por la auditoría central).` });
       if (!state.threads[nro]) state.threads[nro] = [];
       state.threads[nro].push({ who: "financiador", nombre: "IOMA", when: "hoy",
-        text: `[${nuevo.id}] Objetamos ${its.length} prestación(es) de ${pac} por ${money(motivo.monto)}.`,
+        text: `[${nuevo.id}] Objetamos ${its.length} prestación(es) de ${pac} por ${money(motivo.monto)}${directo ? " — enviada directo al hospital" : ""}.`,
         accion: { tipo: "Objeción por paciente", categorias: [categoria], detalles: detMot }, adjuntos });
       creadas++;
     }
   });
-  f.estado = "esperando_auditoria";
-  recalcularEstadoFactura(f);
+  // Se entra al circuito de conciliación: fijar el estado destino para que recalcularEstadoFactura
+  // (que solo gobierna si la factura ya está en conciliación) lo confirme a partir de los planteos.
+  f.estado = directo ? "esperando_hospital" : "esperando_auditoria";
+  recalcularEstadoFactura(f);               // deriva esperando_hospital (directo) o esperando_auditoria
   state.selItems = [];
   closeModal(); render();
-  showToast(`✎ ${creadas} objeción(es) nueva(s)${sumadas ? ` · ${sumadas} ampliada(s)` : ''} — a la auditoría central`);
+  showToast(`✎ ${creadas} objeción(es) nueva(s)${sumadas ? ` · ${sumadas} ampliada(s)` : ''} — a ${destinoTxt}`);
 };
 
 /* Las tres acciones globales del financiador ("aceptar descargo" / "pedir info" / "mantener rechazo")
@@ -3444,6 +3529,82 @@ window.__bajaUsuarioFin = function(userId) {
       // Si estábamos impersonando a ese usuario, volvemos al admin.
       if (state.usuarioActivoFin === userId) state.usuarioActivoFin = (adminDeFin("F001") || {}).id;
       render(); showToast(`${u.nombre} ${u.apellido} dado de baja`); } });
+};
+
+/* Resumen de objeciones (financiador) — alineación con el portal real (§13). Tablero CONSOLIDADO de todas
+   las objeciones del financiador cruzando facturas, espejo de la Auditoría central del ministerio pero desde
+   el lado del financiador. Tres tablas: en auditoría del ministerio · seguimiento (quién frena) · conciliadas.
+   No se aplica la restricción por hospital (§5.10 la acota a Facturas a revisar + Conciliación). */
+function viewFinanciador_ResumenObjeciones() {
+  const mis = state.facturas.filter(f => f.financiador === "F001" && objecionesDe(f).length);
+  const enAud = mis.filter(f => f.estado === "esperando_auditoria");
+  const derivHosp = mis.filter(f => f.estado === "esperando_hospital");
+  const espYo = mis.filter(f => f.estado === "esperando_financiador");
+  const conciliadas = mis.filter(f => planteosAbiertos(f).length === 0);
+  const debate = (f) => montoEnDebate(f) || f.montoDebate || 0;
+  const montoObj = (f) => objecionesDe(f).reduce((s, o) => s + (o.monto || 0), 0);
+  const cierreDe = (f) => { const t = state.threads[f.nro] || []; return t.length ? (t[t.length - 1].when || '—') : '—'; };
+  const sum = (arr, fn) => arr.reduce((s, f) => s + fn(f), 0);
+  const filaOpen = (f) => `<tr class="clickable" data-open-fact-fin="${f.nro}">`;
+  const filaSeg = (f, pelota) => { const t = state.threads[f.nro] || []; const last = t[t.length - 1];
+    return `${filaOpen(f)}<td><code>${f.nro}</code></td><td>${hospCorto(f.hospital)}</td>
+      <td style="text-align:center;">${objecionesDe(f).length}</td>
+      <td class="money" style="color:var(--warn);font-weight:600;">${money(debate(f))}</td>
+      <td>${pelota}</td>
+      <td style="font-size:12px;color:var(--muted);">${last ? last.nombre + ' — ' + last.when : '—'}</td>
+      <td style="color:${diasRestantes(f.fecha) < 15 ? 'var(--danger)' : 'var(--muted)'};font-weight:600;">${diasRestantes(f.fecha)}</td></tr>`; };
+  return `<div class="page-header">
+      <div><h1>Resumen de objeciones</h1><div class="sub">Todas tus objeciones: en auditoría, en seguimiento y conciliadas</div></div>
+      <button class="btn btn-excel" onclick="exportFinObjeciones()">⬇ Excel</button>
+    </div>
+    ${notaRestriccionHospitales()}
+    <div class="note">El plazo de 60 días desde la notificación <strong>no se detiene</strong> mientras la objeción está en auditoría.</div>
+    <div class="kpi-grid">
+      <div class="kpi ${enAud.length ? 'warning' : ''}"><div class="label">En auditoría del ministerio</div><div class="value ${enAud.length ? 'warn' : ''}">${enAud.length}</div><div class="hint money">${money(sum(enAud, montoObj))}</div></div>
+      <div class="kpi ${derivHosp.length ? 'warning' : ''}"><div class="label">Derivadas al hospital</div><div class="value ${derivHosp.length ? 'warn' : ''}">${derivHosp.length}</div><div class="hint money">${money(sum(derivHosp, debate))}</div></div>
+      <div class="kpi ${espYo.length ? 'action-required' : ''}"><div class="label">Esperan mi respuesta</div><div class="value ${espYo.length ? 'danger' : ''}">${espYo.length}</div><div class="hint money">${money(sum(espYo, debate))}</div></div>
+      <div class="kpi"><div class="label">Objeciones conciliadas</div><div class="value">${conciliadas.length}</div><div class="hint">cerradas con acuerdo, NC, desestimadas o sin acuerdo</div></div>
+    </div>
+    <div class="card">
+      <h3 class="card-title">En auditoría del ministerio</h3>
+      ${enAud.length === 0 ? `<div style="color:var(--muted);padding:24px;text-align:center;">No tenés objeciones en auditoría del ministerio.</div>` : `
+      <table>
+        <thead><tr><th>Factura</th><th>Hospital</th><th style="text-align:center;">Objeciones</th><th class="money-header">Monto objetado</th><th>Días al venc.</th><th></th></tr></thead>
+        <tbody>${enAud.map(f => `${filaOpen(f)}<td><code>${f.nro}</code></td><td>${hospCorto(f.hospital)}</td>
+          <td style="text-align:center;">${objecionesDe(f).length}</td>
+          <td class="money" style="color:var(--warn);font-weight:600;">${money(montoObj(f))}</td>
+          <td style="color:${diasRestantes(f.fecha) < 15 ? 'var(--danger)' : 'var(--muted)'};font-weight:600;">${diasRestantes(f.fecha)}</td>
+          <td style="text-align:right;"><button class="btn btn-secondary btn-sm" data-open-fact-fin="${f.nro}">Ver →</button></td></tr>`).join('')}</tbody>
+      </table>`}
+    </div>
+    <div class="card" style="padding:0;">
+      <div class="group-header"><strong>Seguimiento</strong> <span style="color:var(--muted);font-weight:400;">— conciliaciones ya encaminadas, para ver quién está frenando el circuito</span></div>
+      <table>
+        <thead><tr><th>Factura</th><th>Hospital</th><th style="text-align:center;">Objeciones</th><th class="money-header">En debate</th><th>Pelota en</th><th>Últ. mensaje</th><th>Días</th></tr></thead>
+        <tbody>${[...espYo.map(f => filaSeg(f, '<span class="chip chip-esperando-financiador">Vos (responder)</span>')),
+                  ...derivHosp.map(f => filaSeg(f, '<span class="chip chip-esperando-hospital">Hospital</span>'))].join('')
+                  || '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">Sin conciliaciones en seguimiento.</td></tr>'}</tbody>
+      </table>
+    </div>
+    <div class="card" style="padding:0;">
+      <div class="group-header"><strong>Objeciones conciliadas</strong> <span style="color:var(--muted);font-weight:400;">— facturas cuyas objeciones ya cerraron todas, con o sin acuerdo</span></div>
+      <table>
+        <thead><tr><th>Factura</th><th>Hospital</th><th style="text-align:center;">Objeciones</th><th class="money-header">Monto objetado</th><th>Fecha de cierre</th></tr></thead>
+        <tbody>${conciliadas.length === 0 ? '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--muted);">Sin objeciones conciliadas.</td></tr>'
+          : conciliadas.map(f => `${filaOpen(f)}<td><code>${f.nro}</code></td><td>${hospCorto(f.hospital)}</td>
+            <td style="text-align:center;">${objecionesDe(f).length}</td>
+            <td class="money">${money(montoObj(f))}</td><td style="color:var(--muted);">${cierreDe(f)}</td></tr>`).join('')}</tbody>
+      </table>
+    </div>`;
+}
+window.exportFinObjeciones = function() {
+  const mis = state.facturas.filter(f => f.financiador === "F001" && objecionesDe(f).length);
+  const donde = { esperando_auditoria: "Auditoría del ministerio", esperando_hospital: "Hospital", esperando_financiador: "Esperan mi respuesta" };
+  const rows = [["Factura", "Hospital", "Objeciones", "Monto objetado", "En debate", "Situación / pelota en", "Días al venc."]];
+  mis.forEach(f => rows.push([f.nro, hospNombre(f.hospital), objecionesDe(f).length,
+    objecionesDe(f).reduce((s, o) => s + (o.monto || 0), 0), montoEnDebate(f) || f.montoDebate || 0,
+    planteosAbiertos(f).length === 0 ? "Conciliada" : (donde[f.estado] || f.estado), diasRestantes(f.fecha)]));
+  exportCSV("resumen_objeciones.csv", rows);
 };
 
 function viewFinanciador_InformarPagos() {
@@ -3671,7 +3832,7 @@ function viewMinisterio_Dashboard() {
             const d = porFin[f.id] || { count:0, deuda:0, aceptado:0, espFin:0, espHosp:0, porVencer:0, morosas:0 };
             const chipEstado = f.estado === "en_pausa" ? ' <span class="chip chip-por-vencer" title="Facturación en pausa — sus facturas quedan retenidas">En pausa</span>' : '';
             return `<tr class="clickable" data-min-fin="${f.id}">
-              <td><strong>${f.nombre}</strong> <span style="color:var(--muted);font-size:11px;">${f.tipo}</span>${chipEstado}</td>
+              <td><strong>${f.nombre}</strong> <span style="color:var(--muted);font-size:11px;">${tipoFinLabel(f)}</span>${chipEstado}</td>
               <td style="text-align:center;">${d.count}</td>
               <td class="money">${money(d.deuda)}</td>
               <td class="money" style="color:${d.aceptado>0?'var(--success)':'var(--muted)'};">${d.aceptado>0?money(d.aceptado):'—'}</td>
@@ -3823,8 +3984,11 @@ function viewMinisterio_Cola() {
   const colA = puedeGest ? 7 : 6;
 
   return `<div class="page-header">
-      <div><h1>Cola de notificación</h1><div class="sub">Facturas emitidas pendientes de notificación consolidada</div></div>
-      ${puedeNotif ? `<button class="btn btn-primary" id="btn-notificar" ${aptas.length ? '' : 'disabled'}>Ejecutar notificación consolidada</button>` : ''}
+      <div><h1>Cola de notificación</h1><div class="sub">Facturas emitidas pendientes de notificación consolidada${state.ultimaSincroSamo ? ` · <span style="color:var(--muted);">última sincronización con SAMO: ${state.ultimaSincroSamo}</span>` : ''}</div></div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        ${puedeGest ? `<button class="btn btn-secondary" onclick="window.__sincronizarSamo('original')">⟳ Sincronizar con SAMO</button>` : ''}
+        ${puedeNotif ? `<button class="btn btn-primary" id="btn-notificar" ${aptas.length ? '' : 'disabled'}>Ejecutar notificación consolidada</button>` : ''}
+      </div>
     </div>
     <div class="note"><strong>Cada financiador recibe una sola notificación consolidada.</strong> A partir de esa fecha corren los 60 días.</div>
     <div class="note note-blue"><strong>Las facturas de financiadores con facturación en pausa quedan retenidas</strong> y no se notifican. Para liberarlas hay que reactivar la facturación desde <a href="#" data-goto="abm_financiadores"><strong>Financiadores</strong></a>.</div>
@@ -3990,7 +4154,7 @@ function viewMinisterio_ABMFinanciadores() {
   const q = fl.q.trim().toLowerCase();
   const lista = FINANCIADORES
     .filter(f => fl.estado === "TODOS" || f.estado === fl.estado)
-    .filter(f => !q || f.nombre.toLowerCase().includes(q) || f.tipo.toLowerCase().includes(q));
+    .filter(f => !q || f.nombre.toLowerCase().includes(q) || tipoFinLabel(f).toLowerCase().includes(q));
 
   const cnt = { activo: 0, en_pausa: 0, sin_usuario: 0 };
   FINANCIADORES.forEach(f => cnt[f.estado]++);
@@ -4071,7 +4235,7 @@ function viewMinisterio_ABMFinanciadores() {
           ? '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted);">Sin financiadores para estos filtros.</td></tr>'
           : lista.map(f => `<tr>
               <td><strong>${f.nombre}</strong>${f.cuit ? `<div style="font-size:11px;color:var(--muted);">CUIT ${f.cuit}</div>` : ''}</td>
-              <td style="color:var(--muted);">${f.tipo}</td>
+              <td style="color:var(--muted);">${tipoFinLabel(f)}</td>
               <td>${chipEst(f.estado)}${f.estado==="en_pausa" && f.motivoPausa ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">${f.motivoPausa}</div>` : ''}</td>
               <td style="color:var(--muted);">${f.alta || '—'}</td>
               <td style="text-align:center;">${celdaUsuarios(f)}</td>
@@ -4471,6 +4635,130 @@ window.__setRuteoObjeciones = function(hospId, via) {
     : `✓ ${hospNombre(hospId)}: las objeciones pasarán por el ministerio`);
   render();
 };
+/* Sincronización con SAMO (sistema de facturación): trae las facturas emitidas que todavía no están en el
+   portal. En el prototipo es una acción de demo: registra la fecha/hora de la última corrida y avisa. Para
+   el Plan de Pago, además busca facturas PV 191 nuevas en el pool "sin vincular" (ver __vincularFacturaPlan). */
+window.__sincronizarSamo = function(scope) {
+  if (!guardGestion()) return;
+  const ahora = new Date();
+  state.ultimaSincroSamo = HOY + " " + String(ahora.getHours()).padStart(2, "0") + ":" + String(ahora.getMinutes()).padStart(2, "0");
+  if (scope === "plan") {
+    const nuevas = (state.facturasPlanSinVincular || []).length;
+    showToast(nuevas ? `⟳ SAMO sincronizado — ${nuevas} factura(s) PV 191 a vincular` : "⟳ SAMO sincronizado — sin facturas nuevas del plan");
+  } else {
+    const aptas = state.facturas.filter(f => f.estado === "en_cola" && finHabilitado(f.financiador) && !esIndisponible(f.nro)).length;
+    showToast(`⟳ SAMO sincronizado — ${aptas} factura(s) emitida(s) en la cola`);
+  }
+  render();
+};
+
+/* ===== Administración de CUITs (control de acceso por SSO) =====
+   Espeja la pantalla del portal real: cada CUIT que se autentica por SSO necesita un ROL asignado
+   (ministerio / financiador) y estar HABILITADO para acceder a las secciones del portal. Un CUIT
+   registrado sin rol puede autenticarse pero no entra a nada. En el prototipo es un registro de demo:
+   el switcher de rol del topbar sigue conmutando libremente (es una maqueta), pero esta pantalla
+   documenta y gestiona el modelo de acceso real. El acceso de los financiadores (alta del admin,
+   solicitudes de operadores) se sigue gestionando en la pantalla Financiadores. */
+const ROL_CUIT_LABEL = { ministerio: "Ministerio", financiador: "Financiador" };
+function viewMinisterio_CUITs() {
+  const puedeGest = minPuedeGestionar();
+  const fl = state.filtrosCuit || { q: "", rol: "TODOS" }; state.filtrosCuit = fl;
+  const q = (fl.q || "").trim().toLowerCase();
+  const lista = state.cuitsRegistro
+    .filter(r => fl.rol === "TODOS" || (fl.rol === "SIN" ? !r.rol : r.rol === fl.rol))
+    .filter(r => !q || r.cuit.includes(q) || (r.descripcion || "").toLowerCase().includes(q) || (ROL_CUIT_LABEL[r.rol] || "").toLowerCase().includes(q));
+  const cnt = { ministerio: 0, financiador: 0, sinRol: 0 };
+  state.cuitsRegistro.forEach(r => { if (!r.rol) cnt.sinRol++; else cnt[r.rol]++; });
+  const chipRol = (rol) => rol ? `<span class="chip chip-aceptada">${ROL_CUIT_LABEL[rol]}</span>` : '<span class="chip chip-en-cola">Sin rol</span>';
+  const chipEstado = (hab) => hab ? '<span class="chip chip-aceptada">Habilitado</span>' : '<span class="chip chip-por-vencer">Deshabilitado</span>';
+  return `<div class="page-header">
+      <div><h1>Administración de CUITs</h1><div class="sub">Asignación de rol y habilitación de acceso por CUIT (SSO)</div></div>
+    </div>
+    <div class="note note-blue">El acceso operativo al portal requiere la <strong>habilitación del CUIT</strong>. Un CUIT registrado sin rol asignado puede autenticarse, pero <strong>no accede a las secciones</strong> del portal hasta que se le asigne un rol. El acceso de los financiadores (alta del administrador y solicitudes de operadores) se gestiona en <a href="#" data-goto="abm_financiadores"><strong>Financiadores</strong></a>.</div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">Total CUITs</div><div class="value">${state.cuitsRegistro.length}</div></div>
+      <div class="kpi"><div class="label">Ministerio</div><div class="value">${cnt.ministerio}</div></div>
+      <div class="kpi"><div class="label">Financiador</div><div class="value">${cnt.financiador}</div></div>
+      <div class="kpi ${cnt.sinRol ? 'warning' : ''}"><div class="label">Sin rol asignado</div><div class="value ${cnt.sinRol ? 'warn' : ''}">${cnt.sinRol}</div></div>
+    </div>
+    ${puedeGest ? `<div class="card">
+      <h3 class="card-title">Nueva alta</h3>
+      <div class="filter-bar" style="flex-wrap:wrap;gap:10px;align-items:flex-end;">
+        <label style="font-size:12px;color:var(--muted);">CUIT<br><input id="cuit-nuevo" type="text" placeholder="20-12345678-9" style="min-width:170px;"></label>
+        <label style="font-size:12px;color:var(--muted);">Rol<br><select id="cuit-rol"><option value="">Sin rol</option><option value="ministerio">Ministerio</option><option value="financiador">Financiador</option></select></label>
+        <label style="font-size:12px;color:var(--muted);">Descripción<br><input id="cuit-desc" type="text" placeholder="Referencia (opcional)" style="min-width:200px;"></label>
+        <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;"><input id="cuit-habil" type="checkbox" checked> Habilitado</label>
+        <button class="btn btn-primary" onclick="window.__altaCuit()">Dar de alta</button>
+      </div>
+    </div>` : ''}
+    <div class="card" style="padding:0;">
+      <div class="filter-bar" style="padding:16px 20px 0;">
+        <select data-filtro-cuit="rol">
+          <option value="TODOS" ${fl.rol==="TODOS"?"selected":""}>Todos los roles</option>
+          <option value="ministerio" ${fl.rol==="ministerio"?"selected":""}>Ministerio</option>
+          <option value="financiador" ${fl.rol==="financiador"?"selected":""}>Financiador</option>
+          <option value="SIN" ${fl.rol==="SIN"?"selected":""}>Sin rol</option>
+        </select>
+        <input data-filtro-cuit="q" value="${fl.q || ''}" placeholder="Buscar por CUIT o descripción…" style="min-width:220px;">
+      </div>
+      <table>
+        <thead><tr><th>CUIT</th><th>Rol</th><th>Estado</th><th>Descripción</th>${puedeGest ? '<th style="text-align:right;">Acciones</th>' : ''}</tr></thead>
+        <tbody>${lista.length === 0
+          ? `<tr><td colspan="${puedeGest ? 5 : 4}" style="text-align:center;padding:24px;color:var(--muted);">Sin CUITs para estos filtros.</td></tr>`
+          : lista.map(r => `<tr>
+              <td><code>${r.cuit}</code></td>
+              <td>${chipRol(r.rol)}</td>
+              <td>${chipEstado(r.habilitado)}</td>
+              <td style="color:var(--muted);font-size:12px;">${r.descripcion || '—'}</td>
+              ${puedeGest ? `<td style="text-align:right;white-space:nowrap;">
+                <button class="btn btn-secondary btn-sm" onclick="window.__editarCuit('${r.cuit}')">Editar</button>
+                <button class="btn btn-danger btn-sm" onclick="window.__eliminarCuit('${r.cuit}')">Eliminar</button>
+              </td>` : ''}
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+window.__altaCuit = function() {
+  if (!guardGestion()) return;
+  const cuit = ($("#cuit-nuevo").value || "").trim();
+  if (!/^\d{2}-?\d{8}-?\d$/.test(cuit.replace(/\s/g, ""))) { showToast("⚠ CUIT inválido (formato 20-12345678-9)"); return; }
+  if (state.cuitsRegistro.some(r => r.cuit.replace(/-/g, "") === cuit.replace(/-/g, ""))) { showToast("⚠ Ese CUIT ya está registrado"); return; }
+  const rol = $("#cuit-rol").value || null;
+  const descripcion = ($("#cuit-desc").value || "").trim();
+  const habilitado = $("#cuit-habil").checked;
+  state.cuitsRegistro.push({ cuit, rol, habilitado, descripcion });
+  render(); showToast(`✓ CUIT ${cuit} registrado${rol ? ` como ${ROL_CUIT_LABEL[rol]}` : " (sin rol)"}`);
+};
+window.__editarCuit = function(cuit) {
+  if (!guardGestion()) return;
+  const r = state.cuitsRegistro.find(x => x.cuit === cuit); if (!r) return;
+  openModal(`<h3>Editar CUIT ${r.cuit}</h3>
+    <label>Rol</label>
+    <select id="edit-cuit-rol"><option value="" ${!r.rol?'selected':''}>Sin rol</option><option value="ministerio" ${r.rol==='ministerio'?'selected':''}>Ministerio</option><option value="financiador" ${r.rol==='financiador'?'selected':''}>Financiador</option></select>
+    <label style="display:flex;align-items:center;gap:6px;margin-top:10px;"><input id="edit-cuit-habil" type="checkbox" ${r.habilitado?'checked':''}> Habilitado</label>
+    <label style="margin-top:10px;">Descripción</label>
+    <input id="edit-cuit-desc" type="text" value="${r.descripcion || ''}">
+    <div class="modal-actions" style="margin-top:16px;">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="window.__guardarCuit('${r.cuit}')">Guardar</button>
+    </div>`);
+};
+window.__guardarCuit = function(cuit) {
+  const r = state.cuitsRegistro.find(x => x.cuit === cuit); if (!r) return;
+  r.rol = $("#edit-cuit-rol").value || null;
+  r.habilitado = $("#edit-cuit-habil").checked;
+  r.descripcion = ($("#edit-cuit-desc").value || "").trim();
+  closeModal(); render(); showToast(`✓ CUIT ${cuit} actualizado`);
+};
+window.__eliminarCuit = function(cuit) {
+  if (!guardGestion()) return;
+  const r = state.cuitsRegistro.find(x => x.cuit === cuit); if (!r) return;
+  confirmarAccion({ titulo: `Eliminar CUIT ${cuit}`, textoBoton: "Sí, eliminar", clase: "btn-danger",
+    mensaje: `Vas a quitar el CUIT ${cuit} del registro de acceso.`,
+    detalle: "El titular dejará de poder autenticarse en el portal. Esta acción no afecta las facturas ni los usuarios ya creados.",
+    onOk: () => { state.cuitsRegistro = state.cuitsRegistro.filter(x => x.cuit !== cuit); closeModal(); render(); showToast(`CUIT ${cuit} eliminado`); } });
+};
 
 /* ========================================================= ROUTER ========================================================= */
 function render() {
@@ -4506,6 +4794,7 @@ function render() {
     else if (view === "min_detalle_hosp") html = viewMinisterio_DetalleActor("hospital", state.context.actor);
     else if (view === "abm_financiadores") html = viewMinisterio_ABMFinanciadores();
     else if (view === "hospitales") html = viewMinisterio_Hospitales();
+    else if (view === "cuits") html = viewMinisterio_CUITs();
     else if (view === "min_usuarios") html = viewMinisterio_Usuarios();
   } else if (role === "hospital") {
     if (view === "panel_hospital") html = viewHospital_Panel();
@@ -4527,6 +4816,7 @@ function render() {
     else if (view === "detalle_factura") html = viewFinanciador_DetalleFactura(state.context.factura);
     else if (view === "conciliacion_financiador" || view === "conc_esperan_yo") html = viewFinanciador_Conciliacion("yo");
     else if (view === "conc_esperan_hosp") html = viewFinanciador_Conciliacion("hosp");
+    else if (view === "resumen_objeciones") html = viewFinanciador_ResumenObjeciones();
     else if (view === "informar_pagos") html = viewFinanciador_InformarPagos();
     else if (view === "historial_financiador") html = viewFinanciador_Historial();
     else if (view === "usuarios_financiador") html = esAdminFinActual() ? viewFinanciador_Usuarios() : viewFinanciador_Panel();
@@ -4649,6 +4939,9 @@ function wireEvents() {
   /* ---- Filtro de búsqueda de la vista Hospitales (ministerio) ---- */
   wireFiltros('[data-filtro-hosp]', 'filtroHosp', 'filtrosHosp');
 
+  /* ---- Filtro de la vista Administración de CUITs (ministerio) ---- */
+  wireFiltros('[data-filtro-cuit]', 'filtroCuit', 'filtrosCuit');
+
   /* ---- Filtros de la Cola de notificación (aptas: typeahead + rango; retenidas) ---- */
   wireFiltros('[data-filtro-cola]', 'filtroCola', 'filtrosCola');
   const fcR = document.querySelector('[data-filtro-cola-reset]');
@@ -4694,7 +4987,9 @@ function wireEvents() {
   if (fpr) fpr.addEventListener('click', () => { state.filtrosPanelFin = { hospital: "TODOS", periodo: "TODOS" }; render(); });
   // Las tarjetas de por vencer / vencidas llevan al listado ya filtrado por esa situación.
   document.querySelectorAll('[data-ir-facturas]').forEach(el => el.addEventListener('click', () => {
-    state.filtrosFactFin = { hospital: state.filtrosPanelFin.hospital, estado: "TODOS", situacion: el.dataset.irFacturas, q: "" };
+    // Los KPIs "Por vencer" / "Vencidas" del panel llevan a la banda temporal correspondiente.
+    const banda = el.dataset.irFacturas === "por_vencer" ? "venc" : el.dataset.irFacturas === "vencidas" ? "vencida" : "TODOS";
+    state.filtrosFactFin = { hospital: state.filtrosPanelFin.hospital, estado: "TODOS", lado: "TODOS", banda, q: "" };
     state.view = "facturas_financiador"; render();
   }));
   /* ---- Filtros de notificaciones y de facturas ---- */
@@ -4712,7 +5007,7 @@ function wireEvents() {
   }));
   wireFiltros('[data-filtro-fact]', 'filtroFact', 'filtrosFactFin');
   const ffr = document.querySelector('[data-filtro-fact-reset]');
-  if (ffr) ffr.addEventListener('click', () => { state.filtrosFactFin = { hospital: "TODOS", estado: "TODOS", situacion: "TODOS", q: "" }; render(); });
+  if (ffr) ffr.addEventListener('click', () => { state.filtrosFactFin = { hospital: "TODOS", estado: "TODOS", lado: "TODOS", banda: "TODOS", q: "" }; render(); });
   /* ---- Ordenamiento por encabezado de las tablas de facturas ---- */
   document.querySelectorAll('[data-sort-fact]').forEach(el => el.addEventListener('click', () => { toggleSort(state.sortFactFin, el.dataset.sortFact); render(); }));
   document.querySelectorAll('[data-sort-fact-hosp]').forEach(el => el.addEventListener('click', () => { toggleSort(state.sortFactHosp, el.dataset.sortFactHosp); render(); }));
@@ -5185,7 +5480,7 @@ window.openModalUsuariosFin = function(finId) {
       return `<button class="btn btn-primary btn-sm" data-aprobar-usr="${u.id}">Aprobar</button>
         <button class="btn btn-danger btn-sm" data-rechazar-usr="${u.id}">Rechazar</button>`;
     if (u.estado === "activo")
-      return `<button class="btn btn-danger btn-sm" data-inhabilitar-usr="${u.id}">Inhabilitar</button>`;
+      return `${u.rol === "operador" ? `<button class="btn btn-secondary btn-sm" data-designar-admin="${u.id}">Designar administrador</button> ` : ''}<button class="btn btn-danger btn-sm" data-inhabilitar-usr="${u.id}">Inhabilitar</button>`;
     if (u.estado === "inhabilitado")
       return `<button class="btn btn-primary btn-sm" data-rehabilitar-usr="${u.id}">Rehabilitar</button>`;
     return `<span style="color:var(--muted);font-size:12px;">—</span>`;
@@ -5211,8 +5506,26 @@ window.openModalUsuariosFin = function(finId) {
     document.querySelectorAll('#modal-content [data-rechazar-usr]').forEach(el => el.addEventListener('click', () => window.__resolverSolicitud(el.dataset.rechazarUsr, "rechazar")));
     document.querySelectorAll('#modal-content [data-inhabilitar-usr]').forEach(el => el.addEventListener('click', () => window.__inhabilitarUsuarioMin(el.dataset.inhabilitarUsr)));
     document.querySelectorAll('#modal-content [data-rehabilitar-usr]').forEach(el => el.addEventListener('click', () => window.__rehabilitarUsuarioMin(el.dataset.rehabilitarUsr)));
+    document.querySelectorAll('#modal-content [data-designar-admin]').forEach(el => el.addEventListener('click', () => window.__designarAdminMin(el.dataset.designarAdmin)));
   };
   rewire();
+};
+/* Designar administrador: promueve un operador a administrador (apoderado / responsable). Como el
+   financiador tiene UN solo admin atado a su CUIT, el admin anterior pasa a operador y el CUIT de la
+   persona jurídica se transfiere al nuevo admin. Lo hace el ministerio (doble confirmación). */
+window.__designarAdminMin = function(userId) {
+  if (!guardGestion()) return;
+  const u = state.usuariosFin.find(x => x.id === userId); if (!u || u.rol !== "operador") return;
+  const prev = adminDeFin(u.financiador);
+  confirmarAccion({ titulo: `Designar administrador a ${u.nombre} ${u.apellido}`, textoBoton: "Sí, designar", clase: "btn-primary",
+    mensaje: `${u.nombre} ${u.apellido} pasa a ser el administrador (apoderado / responsable) de ${finNombre(u.financiador)}.`,
+    detalle: prev ? `El administrador actual, ${prev.nombre} ${prev.apellido}, vuelve a operador. El CUIT de la persona jurídica se transfiere al nuevo administrador.` : "Queda como único administrador del financiador.",
+    onOk: () => {
+      if (prev) { prev.rol = "operador"; u.cuit = prev.cuit; delete prev.cuit; }
+      else { u.cuit = u.cuit || finCuit(u.financiador); }
+      u.rol = "admin"; u.hospitales = null;   // el admin ve todos los hospitales
+      closeModal(); render(); showToast(`✓ ${u.nombre} ${u.apellido} es ahora administrador de ${finNombre(u.financiador)}`);
+    } });
 };
 window.__inhabilitarUsuarioMin = function(userId) {
   if (!guardGestion()) return;
@@ -6257,16 +6570,35 @@ const primerDiaMes = (iso) => mesDe(iso) + "-01";
    (!cuotaNotificada: las de meses anteriores ya son historial) y (c) no está paga. */
 function generarFacturasPlanCola() {
   const out = []; let seq = 1001;
+  const sinVincular = state.facturasPlanSinVincular || [];
   state.planesPago.forEach((plan) => {
     if (!planActivo(plan)) return;              // solo planes al día o en riesgo emiten facturas nuevas
     cuotasDe(plan).forEach(c => {
       if (c.estado === "PAGA") return;
       if (cuotaNotificada(plan.id, c.nro)) return;        // ya liquidada (mes anterior) → fuera de la cola
       if (primerDiaMes(c.vencimiento) > HOY) return;      // su mes todavía no empezó → "Futura", aún no elegible
+      // Si SAMO emitió la factura PV 191 de esta cuota pero todavía no se vinculó, no entra a la cola apta:
+      // primero hay que vincularla (ver facturasPlanSinVincular / __vincularFacturaPlan).
+      if (sinVincular.some(fv => fv.planId === plan.id && fv.cuotaSugerida === c.nro)) return;
       out.push({ nro: "0191-" + String(seq++).padStart(8, "0"), financiador: plan.financiadorId,
         planId: plan.id, cuotaNro: c.nro, periodo: mesDe(c.vencimiento), fechaEmision: primerDiaMes(c.vencimiento),
         monto: c.total, estado: "en_cola" });
     });
+  });
+  return out;
+}
+/* Facturas del plan (PV 191) que SAMO ya emitió pero que NO están vinculadas a una cuota. En el portal real,
+   las facturas del plan llegan desde SAMO como documentos sueltos y la DRC las vincula a la cuota que
+   corresponde antes de notificarlas. Acá se siembra una por plan activo (la cuota corriente), y vincularlas
+   las pasa a la cola apta (ver __vincularFacturaPlan). */
+function generarFacturasPlanSinVincular() {
+  const out = []; let seq = 5001;
+  state.planesPago.forEach((plan) => {
+    if (!planActivo(plan)) return;
+    const c = cuotasDe(plan).find(x => x.estado !== "PAGA" && !cuotaNotificada(plan.id, x.nro) && primerDiaMes(x.vencimiento) <= HOY);
+    if (!c) return;
+    out.push({ nro: "0191-" + String(seq++).padStart(8, "0"), financiadorId: plan.financiadorId, planId: plan.id,
+      vencimiento: c.vencimiento, monto: c.total, concepto: `CUOTA ${c.nro} plan de pagos`, cuotaSugerida: c.nro });
   });
   return out;
 }
@@ -6750,6 +7082,7 @@ function viewPlan_Min_Alertas() {
    sin "Retenidas" ni "Hospitales intervinientes" (esos no aplican al régimen). */
 function viewPlan_Min_Cola() {
   const puedeGest = minPuedeGestionar(), puedeNotif = minPuedeNotificar();
+  const sinVinc = (state.facturasPlanSinVincular || []);
   const todas = (state.facturasPlanCola || []);
   const aptas = todas.filter(f => f.estado === "en_cola" && !esIndisponible(f.nro));
   const indisp = todas.filter(f => f.estado === "en_cola" && esIndisponible(f.nro));
@@ -6788,8 +7121,11 @@ function viewPlan_Min_Cola() {
     </tr>`; };
   const colspanA = puedeGest ? 6 : 5, colspanI = puedeGest ? 6 : 5;
   return `<div class="page-header">
-      <div><h1>Cola de notificación Plan de Pago</h1><div class="sub">Establecimiento único: Ministerio de Salud PBA – SAMO · punto de venta 191</div></div>
-      ${puedeNotif ? `<button class="btn btn-primary" id="btn-notificar-plan" ${aptas.length ? '' : 'disabled'}>Ejecutar notificación consolidada</button>` : ''}
+      <div><h1>Cola de notificación Plan de Pago</h1><div class="sub">Establecimiento único: Ministerio de Salud PBA – SAMO · punto de venta 191${state.ultimaSincroSamo ? ` · <span style="color:var(--muted);">última sincronización con SAMO: ${state.ultimaSincroSamo}</span>` : ''}</div></div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        ${puedeGest ? `<button class="btn btn-secondary" onclick="window.__sincronizarSamo('plan')">⟳ Sincronizar con SAMO</button>` : ''}
+        ${puedeNotif ? `<button class="btn btn-primary" id="btn-notificar-plan" ${aptas.length ? '' : 'disabled'}>Ejecutar notificación consolidada</button>` : ''}
+      </div>
     </div>
     <div class="note"><strong>Una factura por financiador por mes.</strong> Son las facturas del <strong>plan de pago</strong> (punto de venta 191); las del circuito corriente van a la <strong>Cola de notificación</strong> del portal original.</div>
     ${!puedeNotif ? notaPerfilMin("no podés ejecutar la notificación consolidada; solo el perfil Notificador puede.") : ''}
@@ -6797,7 +7133,27 @@ function viewPlan_Min_Cola() {
       <div class="kpi ${aptas.length ? 'action-required' : ''}"><div class="label">Aptas para notificar</div><div class="value ${aptas.length ? 'danger' : ''}">${aptas.length}</div><div class="hint money">${money(totalMonto)}</div></div>
       <div class="kpi"><div class="label">Obras sociales a notificar</div><div class="value">${fins.size}</div><div class="hint">una comunicación c/u</div></div>
       <div class="kpi ${indisp.length ? 'warning' : ''}"><div class="label">Facturas indisponibilizadas</div><div class="value ${indisp.length ? 'warn' : ''}">${indisp.length}</div><div class="hint">temporalmente fuera de la cola</div></div>
+      <div class="kpi ${sinVinc.length ? 'warning' : ''}"><div class="label">Sin vincular a una cuota</div><div class="value ${sinVinc.length ? 'warn' : ''}">${sinVinc.length}</div><div class="hint">facturas PV 191 de SAMO</div></div>
     </div>
+    ${sinVinc.length ? `<div class="card" style="padding:0;">
+      <h3 class="card-title" style="padding:16px 20px 0;">Facturas PV 191 sin vincular <span style="font-size:12px;font-weight:400;color:var(--muted);">${sinVinc.length}</span></h3>
+      <div style="padding:0 20px;"><div class="note note-blue">Estas facturas las <strong>emitió SAMO</strong> y todavía no están vinculadas a una cuota. Vinculá cada una a la cuota que corresponde para poder notificarla. Si el vencimiento coincide con una cuota, ya viene elegida; se vincula recién al tocar <strong>Vincular</strong>.</div></div>
+      <table>
+        <thead><tr><th>Obra social</th><th>Factura</th><th>Vencimiento</th><th class="money-header">Monto</th><th>Concepto</th><th>Cuota</th><th></th></tr></thead>
+        <tbody>${sinVinc.map(fv => { const plan = planPorId(fv.planId); const cuotas = plan ? cuotasDe(plan) : [];
+          return `<tr>
+            <td><strong>${finNombre(fv.financiadorId)}</strong></td>
+            <td><code>${fv.nro}</code></td>
+            <td>${fv.vencimiento}</td>
+            <td class="money">${money(fv.monto)}</td>
+            <td style="font-size:12px;color:var(--muted);">${fv.concepto || '—'}</td>
+            <td><select id="vsel-${fv.nro}" ${puedeGest ? '' : 'disabled'}>
+              ${cuotas.map(c => `<option value="${c.nro}" ${c.nro === fv.cuotaSugerida ? 'selected' : ''}>N° ${c.nro} · ${c.vencimiento} · ${money(c.total)}</option>`).join('')}
+            </select></td>
+            <td style="text-align:right;">${puedeGest ? `<button class="btn btn-primary btn-sm" onclick="window.__vincularFacturaPlan('${fv.nro}', document.getElementById('vsel-${fv.nro}').value)">Vincular</button>` : '<span style="font-size:12px;color:var(--muted);">solo lectura</span>'}</td>
+          </tr>`; }).join('')}</tbody>
+      </table>
+    </div>` : ''}
     <div class="card" style="padding:0;">
       <h3 class="card-title" style="padding:16px 20px 0;">Facturas del plan aptas para notificar
         <span style="font-size:12px;font-weight:400;color:var(--muted);">${aptasVis.length} de ${aptas.length}</span>
@@ -6849,6 +7205,21 @@ window.__confirmarNotifPlan = function() {
 window.__habilitarPlan = function() {
   const n = habilitarFacturas(state.selColaPlanInd); state.selColaPlanInd = [];
   render(); showToast(n ? `✓ ${n} factura(s) habilitada(s) — vuelven a aptas` : "Nada que habilitar");
+};
+/* Vincular una factura PV 191 (emitida por SAMO) a una cuota del plan: sale del pool "sin vincular" y entra
+   a la cola de notificación como apta. Es el paso que en el portal real hace la DRC antes de notificar. */
+window.__vincularFacturaPlan = function(nro, cuotaNro) {
+  if (!guardGestion()) return;
+  const idx = (state.facturasPlanSinVincular || []).findIndex(x => x.nro === nro);
+  if (idx < 0) return;
+  const fv = state.facturasPlanSinVincular[idx];
+  const plan = planPorId(fv.planId);
+  const c = plan ? cuotasDe(plan).find(x => x.nro === Number(cuotaNro)) : null;
+  if (!c) { showToast("⚠ Elegí una cuota"); return; }
+  state.facturasPlanCola.push({ nro: fv.nro, financiador: fv.financiadorId, planId: fv.planId, cuotaNro: c.nro,
+    periodo: mesDe(c.vencimiento), fechaEmision: fv.vencimiento, monto: fv.monto, estado: "en_cola" });
+  state.facturasPlanSinVincular.splice(idx, 1);
+  render(); showToast(`✓ Factura ${fv.nro} vinculada a la cuota N° ${c.nro} — apta para notificar`);
 };
 function openModalNotificarPlan() {
   const aptas = (state.facturasPlanCola || []).filter(f => f.estado === "en_cola");
@@ -7555,7 +7926,9 @@ state.planesPago.forEach(p => {
   if (p.estado !== "CADUCO" && planTerminado(p)) p.estado = "FINALIZADO";
 });
 state.notificacionesDRC = generarNotifsDRC();
-// Facturas del plan (punto de venta 191) pendientes de notificación consolidada.
+// Facturas del plan (PV 191) que SAMO emitió y aún no se vincularon a una cuota (se vinculan antes de notificar).
+state.facturasPlanSinVincular = generarFacturasPlanSinVincular();
+// Facturas del plan (punto de venta 191) pendientes de notificación consolidada (ya vinculadas).
 state.facturasPlanCola = generarFacturasPlanCola();
 
 render();
