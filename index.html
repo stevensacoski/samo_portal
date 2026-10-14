@@ -1027,10 +1027,11 @@ let state = {
     { id: "USR-F006-1", financiador: "F006", rol: "admin", nombre: "Pablo", apellido: "Domínguez", dni: "25.881.470", mail: "pdominguez@medife.com.ar", telefono: "11-40900000", cargo: "Apoderado", cuit: "30-58765432-1", estado: "activo", fechaSolicitud: "2026-05-10", fechaAlta: "2026-05-10", hospitales: null }
   ],
   usuarioActivoFin: "USR-F001-1",
-  // Ruteo de las objeciones (conciliaciones) por hospital: "ministerio" (default, entran por la Auditoría
-  // central) o "directo" (van directo al hospital). Se configura en la vista Hospitales del ministerio.
+  // Ruteo de las objeciones (conciliaciones) por hospital: "directo" (default, van directo al hospital)
+  // o "ministerio" (entran por la Auditoría central). Se configura en la vista Hospitales del ministerio.
   // Vive solo en memoria, como todo el prototipo (F5 lo resetea al default).
-  ruteoObjeciones: Object.fromEntries(HOSPITALES.map(h => [h.id, "ministerio"])),
+  // Default (oct 2026): las objeciones van DIRECTO al hospital; el ministerio puede cambiar un hospital a "vía ministerio".
+  ruteoObjeciones: Object.fromEntries(HOSPITALES.map(h => [h.id, "directo"])),
   filtrosHosp: { q: "" },
   // Última sincronización simulada con SAMO (sistema de facturación). Solo informativa (demo).
   ultimaSincroSamo: null,
@@ -1075,6 +1076,7 @@ const NAV = {
     { label: "Financiadores", view: "abm_financiadores" },
     { label: "Hospitales", view: "hospitales" },
     { label: "Usuarios del Ministerio", view: "min_usuarios", soloGestion: true },
+    { label: "Soporte / Ayuda", view: "soporte" },
   ],
   hospital: [
     { label: "Panel", view: "panel_hospital" },
@@ -1100,6 +1102,7 @@ const NAV = {
     { label: "Historial", view: "historial_financiador" },
     // Solo la ve el usuario admin: se filtra en renderSidebar según esAdminFinActual().
     { label: "Gestión de usuarios", view: "usuarios_financiador", soloAdmin: true },
+    { label: "Soporte / Ayuda", view: "soporte" },
   ]
 };
 /* "2da etapa — marzo": secciones que quedan para el segundo lanzamiento (no se implementan ahora). Se
@@ -1223,8 +1226,15 @@ const DIAS_VENTANA_OBJECION = 15;
 const diasDesdeNotif = (fecha) => Math.floor((new Date(HOY) - new Date(fecha)) / 86400000);
 const diasVentanaObjecion = (f) => DIAS_VENTANA_OBJECION - diasDesdeNotif(f.fecha);
 const ventanaObjecionAbierta = (f) => isImpaga(f) && f.estado !== "en_cola" && diasVentanaObjecion(f) >= 0;
-// saldo = monto notificado − pagos imputados − notas de crédito (brief 3.2).
-const saldoPendiente = (f) => f.monto - (f.montoPagado||0) - (f.notasCredito||0);
+/* PARCHE (oct 2026) — hasta que esté operativa la emisión de notas de crédito + notificación + imputación
+   de pagos, cuando una objeción se le da la razón al financiador (estado `a_acreditar`) ese monto se
+   descuenta YA del saldo a pagar, sin esperar a la NC. Al emitirse la NC la objeción pasa a `cerrado_nc`
+   y el monto se mueve a f.notasCredito: el descuento NO se duplica (sale de un bucket y entra en el otro).
+   Para volver al comportamiento definitivo (el saldo baja recién con la NC): sacar montoAcreditadoPendiente
+   de saldoPendiente y restaurar su conteo en montoEnDebate / el cache de recalcularEstadoFactura. */
+const montoAcreditadoPendiente = (f) => objecionesDe(f).filter(o => o.estado === "a_acreditar").reduce((s, o) => s + (o.monto||0), 0);
+// saldo = monto notificado − pagos imputados − notas de crédito − objeciones reconocidas pendientes de NC (parche).
+const saldoPendiente = (f) => f.monto - (f.montoPagado||0) - (f.notasCredito||0) - montoAcreditadoPendiente(f);
 /* El saldo se parte en dos ejes independientes:
    - en debate: lo que el financiador objetó y todavía se discute;
    - cobrable: el resto, que está reconocido y se puede pagar YA sin esperar a que cierre la conciliación.
@@ -1243,8 +1253,9 @@ const planteoAbierto = (o) => !PLANTEO_CERRADO.includes(o.estado);
 const planteoTrabado = (o) => o.estado === "sin_acuerdo"; // cerrado pero con monto todavía en disputa
 const planteosAbiertos = (f) => objecionesDe(f).filter(planteoAbierto);
 /* `a_acreditar` = la auditoría le dio la razón al financiador (o el hospital aceptó el planteo): no hay
-   nada más que discutir, falta la nota de crédito. Sigue contando como abierto y en debate porque el
-   saldo de la factura todavía no bajó — recién baja cuando se emite la NC. */
+   nada más que discutir, falta la nota de crédito. Sigue `planteoAbierto` (la pelota es del hospital, que
+   debe emitir la NC), PERO por el parche de saldoPendiente su monto ya se descontó del saldo a pagar y
+   dejó de contar en "en debate" (ver montoAcreditadoPendiente / montoEnDebate / recalcularEstadoFactura). */
 const PLANTEO_EN_CONCILIACION = ["en_auditoria", "derivado_hospital", "respondido"];
 const planteoEnConciliacion = (o) => PLANTEO_EN_CONCILIACION.includes(o.estado);
 const planteosAcreditables = (f) => objecionesDe(f).filter(o => o.estado === "a_acreditar");
@@ -1301,8 +1312,9 @@ const planteoEsDe = (o, rol) =>
 const ESTADOS_CONCILIACION = ["esperando_auditoria", "esperando_hospital", "esperando_financiador", "rechazada_parcial"];
 function recalcularEstadoFactura(f) {
   const abiertos = planteosAbiertos(f);
-  // El cache de "en debate" incluye lo cerrado sin acuerdo (sigue en disputa hasta el vencimiento).
-  f.montoDebate = objecionesDe(f).filter(o => planteoAbierto(o) || planteoTrabado(o)).reduce((s, o) => s + o.monto, 0);
+  // El cache de "en debate" excluye `a_acreditar` (ya descontado del saldo por el parche) e incluye lo
+  // cerrado sin acuerdo (sigue en disputa hasta el vencimiento).
+  f.montoDebate = objecionesDe(f).filter(o => (planteoAbierto(o) && o.estado !== "a_acreditar") || planteoTrabado(o)).reduce((s, o) => s + o.monto, 0);
   // No pisar estados de pago ni de mora: la conciliación solo gobierna cuando la factura está en conciliación.
   if (!ESTADOS_CONCILIACION.includes(f.estado) && f.estado !== "aceptada") return;
   if (!abiertos.length) { f.estado = saldoPendiente(f) <= 0 ? "cerrada" : "aceptada"; return; }
@@ -1341,8 +1353,9 @@ function anotarPlanteo(f, o, { who, nombre, tipo, categoria, texto, detalles = [
 }
 
 function montoEnDebate(f) {
-  // Cuentan las objeciones abiertas Y las cerradas sin acuerdo (siguen en disputa, definen en legales).
-  const objs = objecionesDe(f).filter(o => planteoAbierto(o) || planteoTrabado(o));
+  // En disputa: objeciones abiertas (salvo `a_acreditar`, que por el parche ya se descontó del saldo)
+  // y las cerradas sin acuerdo (siguen en disputa, definen en legales).
+  const objs = objecionesDe(f).filter(o => (planteoAbierto(o) && o.estado !== "a_acreditar") || planteoTrabado(o));
   if (objs.length) return Math.min(saldoPendiente(f), objs.reduce((s, o) => s + o.monto, 0));
   return enConciliacion(f) ? Math.min(saldoPendiente(f), f.montoDebate || 0) : 0;
 }
@@ -3067,9 +3080,13 @@ function viewFinanciador_DetalleFactura(nro) {
             <div class="rr-grid">
               <div><div class="rr-label">Reconocido y cobrable</div><div class="rr-valor success">${money(montoCobrable(f))}</div></div>
               <div><div class="rr-label">En debate</div><div class="rr-valor warn">${money(montoEnDebate(f))}</div></div>
+              ${montoAcreditadoPendiente(f) > 0 ? `<div><div class="rr-label">Reconocido a tu favor</div><div class="rr-valor success">− ${money(montoAcreditadoPendiente(f))}</div></div>` : ''}
               <div><div class="rr-label">Ya cobrado</div><div class="rr-valor">${money(f.montoPagado || 0)}</div></div>
               <div><div class="rr-label">Total facturado</div><div class="rr-valor">${money(f.monto)}</div></div>
             </div>
+            ${montoAcreditadoPendiente(f) > 0 ? `<div class="note note-blue" style="margin:10px 0 0;">
+              La auditoría/hospital te dio la razón por <strong>${money(montoAcreditadoPendiente(f))}</strong>: ese monto ya se <strong>descontó del saldo a pagar</strong> (pendiente de nota de crédito).
+            </div>` : ''}
             ${montoEnDebate(f) > 0 ? `<div class="note note-blue" style="margin:10px 0 0;">
               Lo objetado (${money(montoEnDebate(f))}) espera resolución, pero <strong>los ${money(montoCobrable(f))} restantes están reconocidos y se pueden pagar ya</strong>: no hace falta esperar a que cierre la conciliación.
             </div>` : ''}
@@ -3325,7 +3342,7 @@ window.confirmarObjecionItems = function(nro) {
   const detalle = $("#obj-detalle").value.trim() || "(sin detalle)";
   const adjuntos = adjuntosDelUploader('obj-uploader', `respaldo_objecion_${nro}.pdf`);
   // RUTEO DE OBJECIONES (cableado): según cómo esté configurado el hospital en la vista Hospitales, la
-  // objeción entra por la auditoría central (default) o va DIRECTO al hospital. Define el estado inicial
+  // objeción va DIRECTO al hospital (default) o entra por la auditoría central. Define el estado inicial
   // del planteo: "directo" → derivado_hospital (la factura queda esperando_hospital); si no → en_auditoria.
   const via = objecionesVia(f.hospital);
   const directo = via === "directo";
@@ -3384,11 +3401,11 @@ function viewFinanciador_Conciliacion(subestado) {
   const titulo = subestado === "yo" ? "Esperan mi respuesta" : "Esperando resolución";
   const sub = subestado === "yo"
     ? "La auditoría o el hospital ya respondieron: te toca re-evaluar. Al abrir una factura, las prestaciones a resolver quedan resaltadas en la tabla."
-    : "Ya planteaste tu objeción. La resuelve la auditoría central del ministerio, que puede desestimarla o derivarla al hospital.";
+    : "Ya planteaste tu objeción. La resuelve el hospital o la auditoría central del ministerio, según cómo esté ruteado cada hospital.";
   return `
     <div class="page-header"><div><h1>Conciliación — ${titulo}</h1><div class="sub">${sub}</div></div></div>
     ${notaRestriccionHospitales()}
-    ${subestado !== "yo" ? `<div class="note note-blue"><strong>Toda objeción pasa primero por la auditoría central del ministerio.</strong> No se plantea directamente al hospital: el ministerio unifica criterios y filtra los planteos antes de derivarlos.</div>` : ''}
+    ${subestado !== "yo" ? `<div class="note note-blue">Según la configuración de cada hospital, la objeción se <strong>envía directo al hospital</strong> (default) o <strong>pasa primero por la auditoría central del ministerio</strong>, que unifica criterios antes de derivarla.</div>` : ''}
     ${facts.length === 0 ? `<div class="card" style="text-align:center;color:var(--muted);padding:40px;">Sin conciliaciones.</div>` : `
     <div class="card" style="padding:0;"><table>
       <thead><tr><th>Factura</th><th>Hospital</th>${subestado !== "yo" ? '<th>Pelota en</th>' : ''}<th>Días</th><th class="money-header">En debate</th><th></th></tr></thead>
@@ -3606,6 +3623,105 @@ window.exportFinObjeciones = function() {
     planteosAbiertos(f).length === 0 ? "Conciliada" : (donde[f.estado] || f.estado), diasRestantes(f.fecha)]));
   exportCSV("resumen_objeciones.csv", rows);
 };
+
+/* ── Soporte / Ayuda ──────────────────────────────────────────────────────────
+   Sección de ayuda por rol (financiador y ministerio). Contenido estático de demo:
+   manual (placeholder), FAQ redactado para el idioma de cada rol, glosario de los
+   términos del portal y datos de contacto. Los datos reales (mail, teléfono, PDF del
+   manual, trámite de domicilio) quedan como [completar] bien visibles. El FAQ usa
+   <details> nativo (acordeón sin JS). */
+function faqItem(q, a) {
+  return `<details style="border:1px solid var(--border,#e2e8f0);border-radius:10px;padding:12px 16px;margin-bottom:10px;">
+    <summary style="cursor:pointer;font-weight:600;color:var(--text,#1a1d21);">${q}</summary>
+    <div style="margin-top:10px;color:var(--muted);line-height:1.55;">${a}</div>
+  </details>`;
+}
+function soporteManual() {
+  return `<div class="card">
+    <h3 class="card-title">Manual de uso</h3>
+    <p style="color:var(--muted);margin-top:0;">Guía paso a paso del portal, con capturas de cada sección.</p>
+    <button class="btn btn-secondary" disabled title="Pendiente de carga">📄 Descargar manual (PDF)</button>
+    <div class="note" style="margin-top:14px;">Botón deshabilitado hasta cargar el documento — <strong>[completar: enlace al manual]</strong>.</div>
+  </div>`;
+}
+function soporteContacto() {
+  return `<div class="card">
+    <h3 class="card-title">Contacto de soporte</h3>
+    <p style="color:var(--muted);margin-top:0;">¿No encontrás la respuesta? Escribinos y te ayudamos.</p>
+    <ul style="line-height:1.9;margin:0;padding-left:20px;">
+      <li>📧 Mail de soporte: <strong>[completar: soporte-portal@ms.gba.gov.ar]</strong></li>
+      <li>🕗 Horario de atención: <strong>[completar: lunes a viernes, 9 a 17 h]</strong></li>
+      <li>☎ Teléfono / mesa de ayuda: <strong>[completar]</strong></li>
+    </ul>
+    <div class="note" style="margin-top:14px;">Los campos <strong>[completar]</strong> son placeholders: reemplazalos por los datos reales de la Dirección de SAMO antes de publicar.</div>
+  </div>`;
+}
+function soporteGlosario(rol) {
+  const disp = rol === "financiador" ? "lo pagás vos" : "lo cobra el hospital";
+  const terms = [
+    ["Notificación fehaciente", "Aviso formal, con validez legal, de que hay facturas a pagar. Llega al Domicilio Electrónico. Desde su fecha corren los 60 días."],
+    ["Domicilio Electrónico (Domicilio Digital)", "Buzón oficial de PBA donde el financiador recibe las notificaciones. Si el CUIT no lo tiene constituido, no se puede notificar."],
+    ["Notificación consolidada", "Un solo envío por financiador que agrupa todas sus facturas aptas de esa tanda."],
+    ["Conciliación", "Proceso de discusión de una factura: el financiador objeta, el ministerio resuelve y, si corresponde, deriva al hospital. (Antes se llamaba \"discusión\".)"],
+    ["Objeción", "Planteo del financiador sobre una o más prestaciones de un paciente. Se registra por paciente y agrupa uno o más motivos."],
+    ["Auditoría central", "Área del ministerio por la que pasa toda objeción: la desestima, la deriva al hospital o le da la razón al financiador."],
+    ["Ventana de objeción", "Primeros 15 días desde la notificación: solo dentro de ese plazo se pueden abrir objeciones nuevas."],
+    ["En debate / disponible", `Lo objetado queda \"en debate\"; el resto queda reconocido y disponible de inmediato (${disp}), sin esperar a que se resuelva la objeción.`],
+    ["Nota de crédito (NC)", "Comprobante que emite el hospital para descontar del saldo lo que se le reconoció al financiador."],
+    ["Deuda pre-portal", "Deuda histórica anterior a la adhesión al portal. Informativa y de solo lectura: no tiene plazo de 60 días ni conciliación; se gestiona por los canales previos."],
+  ];
+  if (rol === "ministerio") {
+    terms.push(["Ruteo de objeciones", "Config por hospital: las objeciones van directo al hospital o pasan primero por la auditoría central."]);
+    terms.push(["Caducidad (Plan de Pago)", "Pérdida del régimen de regularización por incumplimiento (p. ej. cuotas impagas)."]);
+  }
+  return `<div class="card" style="padding:0;">
+    <h3 class="card-title" style="padding:16px 20px 0;">Glosario</h3>
+    <table><thead><tr><th style="width:240px;">Término</th><th>Qué significa</th></tr></thead>
+    <tbody>${terms.map(([t, d]) => `<tr><td><strong>${t}</strong></td><td style="color:var(--muted);">${d}</td></tr>`).join("")}</tbody></table>
+  </div>`;
+}
+function viewFinanciador_Soporte() {
+  return `<div class="page-header">
+      <div><h1>Soporte / Ayuda</h1><div class="sub">Guía, preguntas frecuentes y contacto para financiadores</div></div>
+    </div>
+    <div class="note note-blue">Esta sección te ayuda a operar el portal. Si tu duda es sobre una factura puntual, abrila desde <a href="#" data-goto="facturas_financiador"><strong>Facturas a revisar</strong></a>; acá están las respuestas generales.</div>
+    ${soporteManual()}
+    <div class="card">
+      <h3 class="card-title">Preguntas frecuentes</h3>
+      ${faqItem("¿Cómo sé que me notificaron una factura y desde cuándo corren los plazos?", "Recibís una <strong>notificación fehaciente</strong> en tu Domicilio Electrónico. Desde la fecha de esa notificación corren los <strong>60 días corridos</strong> para pagar. Las ves en <a href='#' data-goto='notificaciones'>Notificaciones recibidas</a>.")}
+      ${faqItem("¿Qué significan los estados de una factura?", "<strong>Notificada</strong>: te llegó y todavía no la abriste. <strong>Vista</strong>: ya la revisaste. <strong>Aceptada</strong>: reconociste el total a pagar. <strong>En conciliación</strong>: hay una objeción en discusión.")}
+      ${faqItem("¿Cómo objeto una o varias prestaciones?", "Abrí la factura en <a href='#' data-goto='facturas_financiador'>Facturas a revisar</a>, tildá las prestaciones (o el paciente entero), elegí un motivo y enviá. Se crea <strong>una objeción por paciente</strong>. Solo podés abrir objeciones nuevas dentro de los primeros <strong>15 días</strong> desde la notificación.")}
+      ${faqItem("¿Qué pasa con lo que no objeto?", "Objetar <strong>no frena el resto</strong> de la factura: lo que no objetás queda reconocido y a pagar de inmediato, dentro de los 60 días.")}
+      ${faqItem("¿Quién resuelve mi objeción?", "La <strong>auditoría central del ministerio</strong>. No se le plantea directo al hospital: el ministerio la desestima (te la devuelve), la deriva al hospital o te da la razón. El seguimiento lo ves en <a href='#' data-goto='resumen_objeciones'>Resumen de objeciones</a>.")}
+      ${faqItem("¿Cómo informo un pago?", "Elegís el hospital y las facturas y cargás el comprobante. El pago se imputa a facturas de un <strong>único hospital</strong>. (Disponible en la etapa correspondiente.)")}
+      ${faqItem("¿Qué es la deuda pre-portal?", "Es tu deuda histórica <strong>anterior a la adhesión</strong> al portal. Es informativa y de solo lectura: no tiene plazo de 60 días ni conciliación, y se gestiona por los canales previos.")}
+      ${faqItem("¿Cómo agrego usuarios de mi organización?", "Solo el <strong>administrador</strong> (apoderado) los solicita, desde Gestión de usuarios. Entran como <strong>pendientes</strong> hasta que el ministerio los aprueba. A cada operador podés restringirle qué hospitales ve.")}
+      ${faqItem("Me figura \"el CUIT no tiene domicilio electrónico conformado\". ¿Qué hago?", "Significa que tu CUIT todavía no tiene constituido el <strong>Domicilio Electrónico</strong> en PBA, así que no podemos notificarte por ese canal. Constituilo en <strong>[completar: trámite PBA]</strong> y avisá a soporte para reintentar el envío.")}
+    </div>
+    ${soporteGlosario("financiador")}
+    ${soporteContacto()}
+    <div class="note" style="text-align:center;">Portal de Financiadores — SAMO · versión de prototipo · <a href="#" data-goto="panel_financiador">Volver al panel</a></div>`;
+}
+function viewMinisterio_Soporte() {
+  return `<div class="page-header">
+      <div><h1>Soporte / Ayuda</h1><div class="sub">Guía, preguntas frecuentes y contacto para el equipo del ministerio</div></div>
+    </div>
+    <div class="note note-blue">Respuestas operativas para gestionar la cola de notificación, la auditoría central, los financiadores y el Plan de Pagos.</div>
+    ${soporteManual()}
+    <div class="card">
+      <h3 class="card-title">Preguntas frecuentes</h3>
+      ${faqItem("¿Cómo ejecuto la notificación consolidada?", "En <a href='#' data-goto='cola'>Cola de notificación</a> revisás las facturas aptas y ejecutás la <strong>notificación consolidada</strong>. Cada financiador recibe <strong>un solo envío</strong>; desde esa fecha corren los 60 días. Las facturas de financiadores <strong>en pausa</strong> quedan retenidas.")}
+      ${faqItem("¿Cómo resuelvo una objeción del financiador?", "En <a href='#' data-goto='auditoria'>Auditoría central</a> abrís la objeción y elegís: <strong>Desestimar</strong> (improcedente, vuelve al financiador), <strong>Derivar al hospital</strong> (para NC o descargo), <strong>Dar la razón al financiador</strong>, o una <strong>resolución parcial</strong> (criterio distinto por planteo).")}
+      ${faqItem("¿Qué es la Administración de CUITs?", "Asigna el <strong>rol</strong> (Ministerio / Financiador) y la <strong>habilitación</strong> de acceso por CUIT vía SSO. Un CUIT sin rol puede autenticarse pero no accede a las secciones.")}
+      ${faqItem("¿Cómo doy de alta, pauso o reactivo un financiador?", "En <a href='#' data-goto='abm_financiadores'>Financiadores</a>. El <strong>alta</strong> crea el usuario administrador (apoderado). <strong>Pausar</strong> retiene sus facturas (no se notifican); <strong>reactivar</strong> las vuelve a la cola. Ambas piden doble confirmación.")}
+      ${faqItem("¿Qué es el ruteo de objeciones?", "En <a href='#' data-goto='hospitales'>Hospitales</a> definís, por hospital, si las objeciones de los financiadores van <strong>directo al hospital</strong> o <strong>pasan por el ministerio</strong> (auditoría central).")}
+      ${faqItem("Plan de Pagos: ¿qué acciones tengo?", "Revisar el pago informado por el financiador, <strong>intimar</strong> nueva deuda, <strong>declarar caducidad</strong>, dar de alta un financiador al plan y <strong>vincular</strong> la factura PV 191 a su cuota antes de notificar.")}
+      ${faqItem("Un envío al Domicilio Digital figura con error. ¿Qué hago?", "Los envíos con error <strong>no se reintentan solos</strong>: las facturas vuelven a la cola y se reenvían en la próxima tanda. Si el error es que el CUIT no tiene domicilio electrónico conformado, el financiador debe constituirlo primero.")}
+    </div>
+    ${soporteGlosario("ministerio")}
+    ${soporteContacto()}
+    <div class="note" style="text-align:center;">Portal de Financiadores — SAMO · versión de prototipo · <a href="#" data-goto="dashboard">Volver al panel</a></div>`;
+}
 
 function viewFinanciador_InformarPagos() {
   const pagos = state.pagosInformados.filter(p => p.financiador === "F001");
@@ -4588,9 +4704,9 @@ window.exportMinMorosidad = function() {
 
 /* ---- Hospitales (ministerio): catálogo sincronizado + ruteo de las objeciones del financiador ----
    Por cada hospital se define si las objeciones (conciliaciones) que inicia el financiador entran por la
-   Auditoría central del ministerio (default) o van directo al hospital. Es una configuración en memoria,
-   como todo el prototipo (F5 la resetea al default "ministerio"). */
-const objecionesVia = (hospId) => state.ruteoObjeciones[hospId] || "ministerio";
+   directo al hospital (default) o vía la Auditoría central del ministerio. Es una configuración en memoria,
+   como todo el prototipo (F5 la resetea al default "directo"). */
+const objecionesVia = (hospId) => state.ruteoObjeciones[hospId] || "directo";
 // Coberturas = cantidad de financiadores distintos que tienen facturas en ese hospital (dato vivo).
 const coberturasHosp = (hospId) => new Set(state.facturas.filter(f => f.hospital === hospId).map(f => f.financiador)).size;
 function viewMinisterio_Hospitales() {
@@ -4616,7 +4732,7 @@ function viewMinisterio_Hospitales() {
     <div class="page-header">
       <div><h1>Hospitales</h1><div class="sub">Catálogo de hospitales sincronizados</div></div>
     </div>
-    <div class="note note-blue">El alta y la modificación de hospitales se realiza por <strong>importación externa</strong>. Desde acá se define, por hospital, si las objeciones de los financiadores <strong>pasan por el ministerio</strong> (Auditoría central) o van <strong>directo al hospital</strong>. Por defecto pasan por el ministerio.</div>
+    <div class="note note-blue">El alta y la modificación de hospitales se realiza por <strong>importación externa</strong>. Desde acá se define, por hospital, si las objeciones de los financiadores van <strong>directo al hospital</strong> o <strong>pasan por el ministerio</strong> (Auditoría central). Por defecto van directo al hospital.</div>
     <div class="card">
       <div class="filter-bar">
         <input type="text" placeholder="Buscar por nombre o código…" value="${state.filtrosHosp.q || ''}" data-filtro-hosp="q">
@@ -4796,6 +4912,7 @@ function render() {
     else if (view === "hospitales") html = viewMinisterio_Hospitales();
     else if (view === "cuits") html = viewMinisterio_CUITs();
     else if (view === "min_usuarios") html = viewMinisterio_Usuarios();
+    else if (view === "soporte") html = viewMinisterio_Soporte();
   } else if (role === "hospital") {
     if (view === "panel_hospital") html = viewHospital_Panel();
     else if (view === "detalle_financiador") html = viewHospital_DetalleFinanciador(state.context.financiador);
@@ -4820,6 +4937,7 @@ function render() {
     else if (view === "informar_pagos") html = viewFinanciador_InformarPagos();
     else if (view === "historial_financiador") html = viewFinanciador_Historial();
     else if (view === "usuarios_financiador") html = esAdminFinActual() ? viewFinanciador_Usuarios() : viewFinanciador_Panel();
+    else if (view === "soporte") html = viewFinanciador_Soporte();
   }
   if (role !== "hospital" && view.indexOf("plan_") === 0) {
     // En las vistas del Plan de Pago la leyenda de estados del circuito corriente no aplica: se muestra la del plan.
@@ -5101,18 +5219,18 @@ function wireAccionesPlanteo(root = document) {
     confirmarAccion({ titulo: "Aceptar la objeción", clase: "btn-warn", textoBoton: "Sí, reconocerla",
       mensaje: `Vas a reconocer la objeción ${o.id} de ${o.paciente || ''} por ${money(o.monto)}.`,
       detalle: (otros > 0
-        ? `Queda <strong>pendiente de nota de crédito</strong>. La NC se emite una sola vez por factura: todavía ${otros === 1 ? 'hay 1 objeción' : `hay ${otros} objeciones`} en conciliación.`
-        : "Queda reconocida y, si no queda nada en conciliación, vas a poder emitir la <strong>nota de crédito consolidada</strong> de la factura."),
+        ? `El monto se <strong>descuenta ya del saldo a pagar</strong> (parche vigente) y queda pendiente de nota de crédito. La NC se emite una sola vez por factura: todavía ${otros === 1 ? 'hay 1 objeción' : `hay ${otros} objeciones`} en conciliación.`
+        : "El monto se <strong>descuenta ya del saldo a pagar</strong> (parche vigente). Como no queda nada en conciliación, vas a poder emitir la <strong>nota de crédito consolidada</strong> de la factura."),
       onOk: () => { closeModal(); reconocerPlanteo(f, o); } });
   }));
   // Emisión de la NC única de la factura, que cubre todos los planteos reconocidos.
   document.querySelectorAll('[data-nc-consolidada]').forEach(el => el.addEventListener('click', () => {
     const f = state.facturas.find(x => x.nro === el.dataset.ncConsolidada); if (!f) return;
     const acreditables = planteosAcreditables(f);
-    const monto = Math.min(saldoPendiente(f), acreditables.reduce((s, o) => s + o.monto, 0));
+    const monto = Math.min(saldoPendiente(f) + montoAcreditadoPendiente(f), acreditables.reduce((s, o) => s + o.monto, 0));
     confirmarAccion({ titulo: "Emitir la nota de crédito consolidada", clase: "btn-warn", textoBoton: "Sí, emitir NC",
       mensaje: `Vas a emitir una nota de crédito por ${money(monto)} que cubre ${acreditables.length} planteo(s) reconocido(s) de la factura ${f.nro}.`,
-      detalle: `El monto se descuenta del saldo${monto >= saldoPendiente(f) ? ", que queda en cero y cierra la factura por NC" : `, que queda en ${money(saldoPendiente(f) - monto)}`}. La NC se notifica al financiador para que la reconcilie.`,
+      detalle: `Formaliza en una NC los montos reconocidos a favor del financiador —que, por el parche vigente, ya estaban descontados del saldo—. La NC se notifica al financiador para que la reconcilie.`,
       onOk: () => { closeModal(); emitirNCConsolidada(f); } });
   }));
   $$('[data-fin-aceptar]').forEach(el => el.addEventListener('click', () => {
@@ -5612,7 +5730,7 @@ function openModalAudRazon(f, o) {
   openModal(`<h3>Dar la razón al financiador</h3>
     ${cabeceraPlanteo(f, o)}
     <div class="note">La objeción es procedente y la auditoría la reconoce. El planteo queda <strong>reconocido, pendiente de nota de crédito</strong>: el hospital no lo discute, solo lo acredita.</div>
-    <div class="note note-blue">La NC se emite <strong>una sola vez por factura</strong>, cuando todos los planteos estén resueltos, para no generar varias notas de crédito sobre la misma factura.</div>
+    <div class="note note-blue">Por el <strong>parche vigente</strong>, al reconocerlo el monto se <strong>descuenta ya del saldo a pagar</strong> del financiador (sin esperar a la NC). La NC se emite <strong>una sola vez por factura</strong>, cuando todos los planteos estén resueltos.</div>
     <label>Fundamento del reconocimiento</label>
     <textarea id="aud-fund" placeholder="Ej: se verificó que la práctica no contaba con autorización previa y no era urgencia."></textarea>
     ${adjuntosAuditoria()}
@@ -5650,9 +5768,9 @@ window.confirmarAudPlanteo = function(nro, objId, accion) {
     state.auditoria.resueltas++;
     anotarPlanteo(f, o, { who: "ministerio", nombre: "Auditoría central — SAMO", tipo: "Objeción procedente — reconocida",
       texto: `Le damos la razón al financiador. ${fund}`,
-      detalles: [`El planteo queda reconocido por ${money(o.monto)}, pendiente de nota de crédito.`,
+      detalles: [`El planteo queda reconocido por ${money(o.monto)}: ese monto se descuenta ya del saldo a pagar (parche vigente).`,
         "La NC se emite consolidada por factura, cuando no queden planteos en conciliación."], adjuntos: docs });
-    toast = `${o.id} reconocido — pendiente de nota de crédito`;
+    toast = `${o.id} reconocido — ${money(o.monto)} descontados del saldo`;
   }
   recalcularEstadoFactura(f);
   closeModal(); render(); showToast(toast);
@@ -5710,10 +5828,10 @@ window.confirmarDescargoPlanteo = function(nro, objId) {
 function reconocerPlanteo(f, o) {
   o.estado = "a_acreditar"; o.resolucion = "reconocida_hospital";
   anotarPlanteo(f, o, { who: "hospital", nombre: "Hosp. San Martín", tipo: "Planteo reconocido",
-    texto: `Reconocemos el planteo por ${money(o.monto)}. Queda pendiente de nota de crédito.`,
+    texto: `Reconocemos el planteo por ${money(o.monto)}. Ese monto se descuenta ya del saldo a pagar (parche vigente); la NC queda pendiente.`,
     detalles: ["La NC se emite consolidada por factura, cuando no queden planteos en conciliación."] });
   recalcularEstadoFactura(f);
-  render(); showToast(`${o.id} reconocido — pendiente de la NC consolidada`);
+  render(); showToast(`${o.id} reconocido — ${money(o.monto)} descontados del saldo`);
 }
 
 /* Una sola nota de crédito por factura, que cubre todos los planteos reconocidos.
@@ -5721,9 +5839,13 @@ function reconocerPlanteo(f, o) {
 function emitirNCConsolidada(f) {
   const acreditables = planteosAcreditables(f);
   if (!acreditables.length) return;
-  const monto = Math.min(saldoPendiente(f), acreditables.reduce((s, o) => s + o.monto, 0));
+  // El parche ya descontó estos montos del saldo; para la NC usamos el saldo "bruto" (antes del descuento
+  // del parche) para no emitir una NC en $0. Al pasar las objeciones a cerrado_nc el descuento se mueve de
+  // bucket (montoAcreditadoPendiente → f.notasCredito), así que el saldo no cambia y no se duplica.
+  const saldoBruto = saldoPendiente(f) + montoAcreditadoPendiente(f);
+  const monto = Math.min(saldoBruto, acreditables.reduce((s, o) => s + o.monto, 0));
   const id = "NC-2026-" + String(state.notasCredito.length + 40).padStart(4, "0");
-  const total = monto >= saldoPendiente(f);
+  const total = monto >= saldoBruto;
   state.notasCredito.push({ id, factura: f.nro, hospital: f.hospital, financiador: f.financiador,
     monto, tipo: total ? "total" : "parcial",
     motivo: acreditables.map(o => o.categoria).join(" · "), fecha: HOY, estado: "notificada" });
