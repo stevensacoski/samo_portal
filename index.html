@@ -1461,6 +1461,12 @@ function evaluarVencimientos() {
 const DIAS_TURNO_OBJECION = 10;     // plazo de cada réplica (días corridos)
 const DIAS_CIERRE_FACTURA = 60;     // cierre/mora de la factura (el interés corre desde acá)
 const DIAS_GRACIA_AUDITORIA = 5;    // margen extra SOLO para auditorías compartidas → tope día 65
+/* Tope de interacciones del financiador (schema §0.15): tiene DOS turnos de respuesta. En el primero puede
+   "pedir más información" (réplica, vuelve al hospital/ministerio); cuando se la devuelven refutada (segundo
+   turno) ya NO puede pedir más info — solo aceptar, mandar a auditoría compartida o cerrar sin acuerdo. Si no,
+   el "pedir más documentación" sería eterno. Se cuenta en `o.pedidosInfoFin`. */
+const MAX_PEDIDOS_INFO_FIN = 1;
+const finPuedePedirInfo = (o) => (o.pedidosInfoFin || 0) < MAX_PEDIDOS_INFO_FIN;
 const sumarDias = (iso, n) => { const d = new Date(iso); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const diasEntreISO = (a, b) => Math.round((new Date(b) - new Date(a)) / 86400000);
 /* Fecha (ISO) del último movimiento de la objeción, desde donde corre el +10. `turnoDesde` es el ancla que
@@ -1577,19 +1583,23 @@ function pelotaDesglose(f, rol) {
    conciliaciones, "Días esperando mi respuesta" = los de la objeción de mi lado que lleva MÁS tiempo (si tengo
    una de 9 días y otra de 1, muestro 9 — es la que presiona el reloj de 10). */
 const diasEsperandoObjecion = (o) => diasEntreISO(ultimoMovObjecion(o), HOY);
+// Días transcurridos (desde el último movimiento) de la objeción de mi lado que lleva MÁS tiempo. Devuelve
+// null si no hay ninguna de mi lado (así la celda distingue "no me toca" de "recién me la hicieron" = 0 días).
 function diasEsperandoMias(f, rol) {
-  const mias = rol === "financiador" ? objsFinTurno(f)
+  const mias = (rol === "financiador" ? objsFinTurno(f)
              : rol === "hospital" ? objsHospTurno(f)
-             : objsAudTurno(f);
-  let max = 0; mias.forEach(o => { if (objEnTurno(o)) max = Math.max(max, diasEsperandoObjecion(o)); });
-  return max;
+             : objsAudTurno(f)).filter(objEnTurno);
+  if (!mias.length) return null;
+  return mias.reduce((mx, o) => Math.max(mx, diasEsperandoObjecion(o)), 0);
 }
-// Celda "Días esperando mi respuesta" (la objeción más vieja de mi lado, contra el límite de 10). Rojo si aprieta.
+// Celda "Días esperando mi respuesta". 1-based: recién objetada (0 días transcurridos) = día 1/10 (no "—").
+// Rojo cuando aprieta. "—" solo si no hay objeciones de mi lado.
 function celdaDiasEsperando(f, rol) {
   const d = diasEsperandoMias(f, rol);
-  if (!d) return '<span style="color:var(--muted);">—</span>';
-  const col = d >= DIAS_TURNO_OBJECION - 2 ? 'var(--danger)' : d >= DIAS_TURNO_OBJECION - 5 ? 'var(--warn)' : 'var(--muted)';
-  return `<strong style="color:${col};">${d}</strong><span style="color:var(--muted);font-size:11px;"> / ${DIAS_TURNO_OBJECION}</span>`;
+  if (d === null) return '<span style="color:var(--muted);">—</span>';
+  const dia = Math.min(d + 1, DIAS_TURNO_OBJECION);
+  const col = dia >= DIAS_TURNO_OBJECION - 1 ? 'var(--danger)' : dia >= DIAS_TURNO_OBJECION - 4 ? 'var(--warn)' : 'var(--muted)';
+  return `<strong style="color:${col};">${dia}</strong><span style="color:var(--muted);font-size:11px;"> / ${DIAS_TURNO_OBJECION}</span>`;
 }
 /* Estadística POR OBJECIÓN (no por factura) de un conjunto de facturas (§0.15). Alimenta los KPIs de "Resumen
    de objeciones" (financiador) y "Auditoría central" (ministerio). Invariantes: en proceso + resueltas = total;
@@ -2181,9 +2191,10 @@ function accionesPlanteo(f, o, rol) {
       <button class="btn btn-secondary btn-sm" data-fin-desauditar="${k}">Quitar</button>`;
     return `
       <button class="btn btn-success btn-sm" data-fin-aceptar="${k}">✓ Aceptar la respuesta</button>
-      <button class="btn btn-warn btn-sm" data-fin-info="${k}">Pedir más información</button>
+      ${finPuedePedirInfo(o) ? `<button class="btn btn-warn btn-sm" data-fin-info="${k}">Pedir más información</button>` : ''}
       <button class="btn btn-secondary btn-sm" data-fin-auditar="${k}" title="La reservás para discutirla en una auditoría compartida (presencial o virtual) con el hospital">👁 Ver en auditoría compartida</button>
-      <button class="btn btn-danger btn-sm" data-fin-sostener="${k}" title="Cierra la conciliación sin acuerdo: se define en legales al vencimiento">Mantener la objeción</button>`;
+      <button class="btn btn-danger btn-sm" data-fin-sostener="${k}" title="Cierra la conciliación sin acuerdo: se define en legales al vencimiento">Mantener la objeción</button>
+      ${!finPuedePedirInfo(o) ? `<div style="font-size:11px;color:var(--muted);width:100%;margin-top:2px;">Ya pediste más información una vez y te la devolvieron: en esta instancia tenés que <strong>definir</strong> (aceptar, auditoría compartida o cerrar sin acuerdo).</div>` : ''}`;
   }
   return '';
 }
@@ -2209,7 +2220,7 @@ function accionesGrupoPlanteo(f, os, rol) {
     <button class="btn btn-primary btn-sm" data-hosp-responder="${k}">✎ Rechazar las ${n}</button>`;
   else if (rol === "financiador" && est === "respondido") btns = `
     <button class="btn btn-success btn-sm" data-fin-aceptar="${k}">✓ Aceptar la respuesta en las ${n}</button>
-    <button class="btn btn-warn btn-sm" data-fin-info="${k}">Pedir info en las ${n}</button>
+    ${mismos.every(finPuedePedirInfo) ? `<button class="btn btn-warn btn-sm" data-fin-info="${k}">Pedir info en las ${n}</button>` : ''}
     <button class="btn btn-secondary btn-sm" data-fin-auditar="${k}">👁 Ver las ${n} en auditoría compartida</button>
     <button class="btn btn-danger btn-sm" data-fin-sostener="${k}">Mantener las ${n}</button>`;
   if (!btns) return '';
@@ -6733,9 +6744,10 @@ function emitirNCConsolidada(f) {
 // --- Financiador: pedir más info (una prestación o varias con el atajo "misma respuesta") ---
 function openModalFinRespuesta(f, os, modo) {
   const ids = os.map(o => o.id).join(",");
+  const aMin = objecionesVia(f.hospital) === "ministerio";   // ruteo del hospital: a quién vuelve el pedido
   openModal(`<h3>Pedir más información</h3>
     ${cabeceraGrupo(f, os)}
-    <div class="note note-blue">Pedís documentación adicional. ${os.length > 1 ? 'Las prestaciones vuelven' : 'El planteo vuelve'} a la auditoría central para que la gestione.</div>
+    <div class="note note-blue">Pedís documentación adicional. ${os.length > 1 ? 'Las prestaciones vuelven' : 'El planteo vuelve'} ${aMin ? 'a la auditoría central del ministerio' : 'al hospital'} para que ${aMin ? 'la gestione' : 'amplíe la documentación'}.</div>
     <label>Qué documentación necesitás</label>
     <textarea id="fin-texto" placeholder="Ej: falta la epicrisis firmada y el parte quirúrgico."></textarea>
     <div class="modal-actions">
@@ -6748,15 +6760,19 @@ window.confirmarFinRespuesta = function(nro, objIds, modo) {
   const ids = String(objIds).split(",").filter(Boolean);
   const os = objecionesDe(f).filter(x => ids.includes(x.id)); if (!os.length) return;
   const texto = ($("#fin-texto")?.value || "").trim() || "(sin detalle)";
-  // Toda vuelta atrás pasa otra vez por la auditoría: el financiador no le escribe directo al hospital.
+  // "Pedir más info" cuenta como una réplica y vuelve a QUIEN CORRESPONDE según el ruteo del hospital
+  // (§0.13/§5.11): directo → al hospital; vía ministerio → a la auditoría central. (Antes iba siempre a la
+  // auditoría, lo que rompía el ruteo.) El movimiento (anotarPlanteo con when = HOY) reinicia el turno de esa parte.
+  const aMin = objecionesVia(f.hospital) === "ministerio";
   os.forEach(o => {
-    o.estado = "en_auditoria";
+    o.pedidosInfoFin = (o.pedidosInfoFin || 0) + 1;   // tope de interacciones: a la 2ª vuelta ya no puede pedir info
+    o.estado = aMin ? "en_auditoria" : "derivado_hospital";
     anotarPlanteo(f, o, { who: "financiador", nombre: "IOMA", tipo: "Pedido de información",
-      texto, detalles: ["Vuelve a la auditoría central para su resolución."] });
+      texto, detalles: [aMin ? "Vuelve a la auditoría central para su resolución." : "Vuelve al hospital para que amplíe la documentación."] });
   });
   recalcularEstadoFactura(f);
   closeModal(); render();
-  showToast(`${os.length} prestación(es) — pedido enviado a la auditoría`);
+  showToast(`${os.length} prestación(es) — pedido enviado ${aMin ? "a la auditoría" : "al hospital"}`);
 };
 
 /* Mantener la objeción = cerrar la conciliación SIN ACUERDO. Es terminal: el financiador ya no está de
