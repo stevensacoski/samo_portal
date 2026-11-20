@@ -320,6 +320,68 @@
   th.th-sort .sort-arrow { font-size: 9px; opacity: 0.5; margin-left: 2px; }
   th.th-sort.active .sort-arrow { opacity: 1; }
   th.th-sort.money-header { text-align: right; }
+
+  /* ========================================================================
+     Modo "Hospital QA" — réplica estética del portal real (samo.markeyqa.com).
+     Misma lógica que el rol Hospital (state.role === 'hospital'); solo cambia la
+     piel (body.qa-mode): se oculta el chrome del prototipo y se dibuja el del
+     sistema de facturación provincial (topbar oscuro Buenos Aires Provincia, menú
+     lateral, home "Inicio", cartelera roja de pendientes y pestañas de conciliación).
+     ======================================================================== */
+  body.qa-mode .topbar, body.qa-mode .sidebar { display: none; }
+  body.qa-mode .layout { min-height: 100vh; }
+  body.qa-mode .main { padding: 0; background: #fff; }
+  body.qa-mode .nota-embebido { display: none; }   /* en QA ya estamos DENTRO del sistema: la nota se contradice */
+  .qa-topbar { background: #434a54; color: #fff; height: 56px; display: flex; align-items: center; gap: 16px; padding: 0 18px; position: sticky; top: 0; z-index: 60; }
+  .qa-burger { background: transparent; border: none; color: #fff; font-size: 22px; cursor: pointer; line-height: 1; padding: 4px 9px; border-radius: 4px; font-family: inherit; }
+  .qa-burger:hover { background: rgba(255,255,255,0.12); }
+  .qa-ba-logo { display: flex; align-items: center; gap: 9px; cursor: pointer; }
+  .qa-ba-logo .ba-mark { font-weight: 800; font-size: 27px; line-height: 1; font-family: 'Encode Sans','Roboto',sans-serif; }
+  .qa-ba-logo .ba-txt { font-size: 13px; line-height: 1.12; font-weight: 700; letter-spacing: .2px; }
+  .qa-ba-logo .ba-txt small { display: block; font-weight: 400; opacity: .85; font-size: 11px; }
+  /* Conmutador compacto: en QA solo lleva a la vista normal de Financiador, a la derecha del usuario. */
+  .qa-roleswitch { display: flex; gap: 3px; margin-left: 18px; }
+  .qa-roleswitch button { background: rgba(255,255,255,.14); border: none; color: #fff; font-size: 12.5px; font-weight: 600; padding: 6px 14px; border-radius: 5px; cursor: pointer; font-family: inherit; }
+  .qa-roleswitch button:hover { background: rgba(255,255,255,.26); }
+  /* Cartelera roja de pendientes — pill INLINE en el topbar, al lado del logo (como el portal real). */
+  .qa-alert-pill { background: #d9433a; color: #fff; border-radius: 5px; padding: 8px 16px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .qa-alert-pill:hover { background: #c0392b; }
+  /* Pill celeste de auditorías compartidas que requieren atención (acción pendiente o chat nuevo). */
+  .qa-aud-pill { background: var(--mds-turquesa); color: #fff; border-radius: 5px; padding: 8px 16px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .qa-aud-pill:hover { filter: brightness(0.92); }
+  .qa-user { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 14px; }
+  .qa-user .qa-avatar { width: 27px; height: 27px; border-radius: 50%; background: #5a6472; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+  /* home Inicio */
+  .qa-body { padding: 28px 34px; max-width: 1520px; }
+  .qa-h1 { font-size: 30px; font-weight: 400; color: #3a3f46; margin: 0; }
+  .qa-h1-rule { border: 0; border-top: 1px solid #e3e6ea; margin: 14px 0 26px; }
+  .qa-h2 { font-size: 21px; font-weight: 700; color: #3a3f46; margin: 0 0 22px; }
+  .qa-ambito-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 365px)); gap: 34px; margin-bottom: 46px; }
+  .qa-ambito { border: 1px solid #e3e6ea; border-radius: 6px; border-top: 4px solid #3b7cb8; background: #f7f9fb; padding: 32px 20px; text-align: center; cursor: pointer; transition: box-shadow .15s; }
+  .qa-ambito:hover { box-shadow: 0 4px 14px rgba(0,0,0,.08); }
+  .qa-ambito.guardia { border-top-color: #e08a2e; }
+  .qa-ambito .ic { font-size: 30px; color: #4a5560; margin-bottom: 12px; }
+  .qa-ambito .t { font-size: 26px; font-weight: 700; color: #3a3f46; }
+  .qa-ambito .d { color: #6b7480; font-size: 14px; margin-top: 6px; }
+  .qa-btn-lite { background: #f3f5f7; border: 1px solid #dfe3e8; border-radius: 4px; padding: 6px 13px; font-size: 13px; color: #3a3f46; cursor: pointer; font-family: inherit; }
+  /* menú lateral (drawer) */
+  .qa-drawer-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 55; }
+  .qa-drawer { position: fixed; top: 0; left: 0; width: 256px; height: 100vh; background: #434a54; z-index: 58; overflow-y: auto; box-shadow: 2px 0 12px rgba(0,0,0,.28); }
+  .qa-drawer-head { display: flex; align-items: center; gap: 10px; padding: 9px 14px; }
+  .qa-drawer-close { background: transparent; border: none; color: #fff; font-size: 22px; cursor: pointer; font-family: inherit; line-height: 1; }
+  .qa-menu-item { display: flex; align-items: center; justify-content: space-between; padding: 11px 18px; color: #c5cbd3; font-size: 14px; cursor: pointer; border-left: 3px solid transparent; }
+  .qa-menu-item.inert:hover { background: rgba(255,255,255,.05); }
+  .qa-menu-item.active-link { color: #fff; background: rgba(255,255,255,.09); border-left-color: #3b7cb8; font-weight: 700; }
+  .qa-menu-item.active-link:hover { background: rgba(255,255,255,.16); }
+  .qa-menu-caret { opacity: .45; font-size: 11px; }
+  /* pestañas del "Conciliación portal" */
+  .qa-tabs { display: flex; gap: 2px; border-bottom: 1px solid #e3e6ea; padding: 0 34px; background: #fff; }
+  .qa-tab { padding: 13px 16px; font-size: 14px; color: #6b7480; cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -1px; display: flex; align-items: center; gap: 7px; background: transparent; border-top: none; border-left: none; border-right: none; font-family: inherit; }
+  .qa-tab:hover { color: #3a3f46; }
+  .qa-tab.active { color: #2c3038; font-weight: 700; border-bottom-color: #434a54; }
+  .qa-tab .qa-tab-badge { background: #e08a2e; color: #fff; border-radius: 10px; font-size: 11px; font-weight: 700; padding: 1px 7px; }
+  .qa-tab.red .qa-tab-badge { background: #c0392b; }
+  .qa-tab.cyan .qa-tab-badge { background: var(--mds-turquesa); }
 </style>
 </head>
 <body>
@@ -343,6 +405,7 @@
     <button data-role="ministerio" class="active">Ministerio</button>
     <button data-role="hospital">Hospital</button>
     <button data-role="financiador">Financiador</button>
+    <button data-role="hospital_qa">Hospital QA</button>
   </div>
 </div>
 
@@ -1091,6 +1154,7 @@ const NAV = {
     { label: "Administración de CUITs", view: "cuits" },
     { label: "Financiadores", view: "abm_financiadores" },
     { label: "Hospitales", view: "hospitales" },
+    { label: "Denuncias de internación", view: "denuncias_min" },
     { label: "Usuarios del Ministerio", view: "min_usuarios", soloGestion: true },
     { label: "Soporte / Ayuda", view: "soporte" },
   ],
@@ -1102,13 +1166,13 @@ const NAV = {
       { label: "Esperando al financiador", view: "conc_h_esperan_fin" },
       { label: "Auditorías compartidas", view: "conc_h_auditorias" },
     ]},
-    { label: "Pagos por confirmar", view: "pagos_hospital" },
-    { label: "Morosidad y legales", view: "morosidad_hospital" },
     { label: "Historial", view: "cerradas_hospital" },
+    // Pagos por confirmar, Denuncias de internación y Morosidad y legales → "2da etapa — marzo" (SEGUNDA_ETAPA.hospital).
   ],
   financiador: [
     { label: "Panel", view: "panel_financiador" },
     { label: "Notificaciones recibidas", view: "notificaciones" },
+    // Denuncias de internación → "2da etapa — marzo" (SEGUNDA_ETAPA.financiador).
     { label: "Facturas a revisar", view: "facturas_financiador" },
     { label: "Deuda previa al portal", view: "deuda_preportal" },
     { label: "Conciliación", view: "conciliacion_financiador", sub: [
@@ -1131,9 +1195,23 @@ const SEGUNDA_ETAPA = {
     { label: "Morosidad → Legales", view: "morosidad", etapa2: true },
     { label: "Expedientes judiciales", view: "expedientes", etapa2: true },
   ],
+  hospital: [
+    { label: "Pagos por confirmar", view: "pagos_hospital", etapa2: true },
+    { label: "Denuncias de internación", view: "den_hosp", etapa2: true, sub: [
+      { label: "Plazo corriendo", view: "den_hosp" },
+      { label: "Derivaciones a concretar", view: "den_hosp_deriv" },
+      { label: "Historial", view: "den_hosp_hist" },
+    ]},
+    { label: "Morosidad y legales", view: "morosidad_hospital", etapa2: true },
+  ],
   financiador: [
     { label: "Notas de crédito", view: "notas_credito", etapa2: true },
     { label: "Informar pagos", view: "informar_pagos", etapa2: true },
+    { label: "Denuncias de internación", view: "den_fin", etapa2: true, sub: [
+      { label: "Pendientes de respuesta", view: "den_fin" },
+      { label: "Derivaciones en curso", view: "den_fin_deriv" },
+      { label: "Historial", view: "den_fin_hist" },
+    ]},
   ],
 };
 
@@ -1954,6 +2032,8 @@ function renderSidebar() {
     // Ministerio: alerta en "Auditoría central" de las objeciones que ruteadas vía ministerio esperan su
     // resolución (antes no se marcaba nada y el ministerio no sabía que tenía algo que responder).
     if (state.role === "ministerio" && item.view === "auditoria") { const n = state.facturas.filter(f => f.estado === "esperando_auditoria").length; if (n > 0) parentBadge += `<span class="badge warn">${n}</span>`; }
+    if (state.role === "hospital" && item.view === "den_hosp") { const n = denAccionHosp(); if (n > 0) parentBadge += `<span class="badge warn">${n}</span>`; }
+    if (state.role === "financiador" && item.view === "den_fin") { const n = denAccionFin(); if (n > 0) parentBadge += `<span class="badge">${n}</span>`; }
     html.push(`<a data-view="${item.view}" class="${activeCls}${et2Cls}">${item.label}${parentBadge}</a>`);
     if (item.sub) {
       item.sub.forEach(sub => {
@@ -2003,7 +2083,7 @@ function renderSidebar() {
    desde el sistema de facturación que ya usa hoy — sin link nuevo ni usuario nuevo (principio de
    diseño de la reunión 11/8). Las pantallas del rol Hospital se muestran igual, pero aclarando que
    van embebidas: el modo de integración (iframe, permiso por perfil, etc.) está por definirse. */
-const notaEmbebido = () => `<div class="decision-abierta" style="margin-bottom:16px;">
+const notaEmbebido = () => `<div class="decision-abierta nota-embebido" style="margin-bottom:16px;">
   <strong>Vista embebida —</strong> estas pantallas <strong>no son un portal aparte para el hospital</strong>. El hospital no recibe un usuario ni un link nuevo:
   ve esta sección desde el <strong>sistema de facturación que ya usa</strong>. <em>A definir:</em> si se integra embebida (iframe), como módulo nuevo, o habilitando una función para un perfil determinado.
 </div>`;
@@ -5642,11 +5722,18 @@ window.__eliminarCuit = function(cuit) {
 function render() {
   evaluarVencimientos();
   evaluarVencimientosObjeciones();   // §0.15 — penalización por silencio (después de la mora de factura)
+  if (state.denuncias) evaluarDenuncias();   // fase 2 — silencio positivo 48 h + derivación no concretada
   renderSidebar();
   const main = $("#main"); const role = state.role; const view = state.view;
+  // Modo "Hospital QA": misma lógica que el rol Hospital, solo cambia la piel. El home propio es qa_inicio;
+  // el resto reusa íntegramente el router del hospital (role sigue siendo 'hospital') dentro del shell QA.
+  const qaSkin = state.skin === "qa";
+  document.body.classList.toggle("qa-mode", qaSkin);
   let html = "";
   // Las vistas del plan (plan_*) conviven con el circuito corriente en la interfaz única (ministerio y financiador).
-  if (role !== "hospital" && view.indexOf("plan_") === 0) {
+  if (qaSkin && view === "qa_inicio") {
+    html = viewHospitalQA_Inicio();
+  } else if (role !== "hospital" && view.indexOf("plan_") === 0) {
     if (role === "financiador") {
       if (view === "plan_fin_cronograma") html = viewPlan_Fin_Cronograma();
       else if (view === "plan_fin_docs") html = viewPlan_Fin_Docs();
@@ -5673,6 +5760,8 @@ function render() {
     else if (view === "min_detalle_hosp") html = viewMinisterio_DetalleActor("hospital", state.context.actor);
     else if (view === "abm_financiadores") html = viewMinisterio_ABMFinanciadores();
     else if (view === "hospitales") html = viewMinisterio_Hospitales();
+    else if (view === "denuncias_min") html = viewMinisterio_Denuncias();
+    else if (view === "den_detalle") html = viewDenuncia_Detalle(state.context.den);
     else if (view === "cuits") html = viewMinisterio_CUITs();
     else if (view === "min_usuarios") html = viewMinisterio_Usuarios();
     else if (view === "soporte") html = viewMinisterio_Soporte();
@@ -5685,12 +5774,20 @@ function render() {
     else if (view === "conc_h_esperan_fin") html = viewHospital_Conciliacion("fin");
     else if (view === "conc_h_auditorias") html = viewAuditoriasCompartidasLista("hospital");
     else if (view === "pagos_hospital") html = viewHospital_Pagos();
+    else if (view === "den_hosp") html = viewHospital_Denuncias("curso");
+    else if (view === "den_hosp_deriv") html = viewHospital_Denuncias("deriv");
+    else if (view === "den_hosp_hist") html = viewHospital_Denuncias("hist");
+    else if (view === "den_detalle") html = viewDenuncia_Detalle(state.context.den);
     else if (view === "morosidad_hospital") html = viewHospital_Morosidad();
     else if (view === "cerradas_hospital") html = viewHospital_Cerradas();
   } else if (role === "financiador") {
     if (view === "panel_financiador") html = viewFinanciador_Panel();
     else if (view === "detalle_hospital") html = viewFinanciador_DetalleHospital(state.context.hospital);
     else if (view === "notificaciones") html = viewFinanciador_Notificaciones();
+    else if (view === "den_fin") html = viewFinanciador_Denuncias("curso");
+    else if (view === "den_fin_deriv") html = viewFinanciador_Denuncias("deriv");
+    else if (view === "den_fin_hist") html = viewFinanciador_Denuncias("hist");
+    else if (view === "den_detalle") html = viewDenuncia_Detalle(state.context.den);
     else if (view === "facturas_financiador") html = viewFinanciador_Facturas();
     else if (view === "deuda_preportal") html = viewFinanciador_DeudaPreportal();
     else if (view === "notas_credito") html = viewFinanciador_NotasCredito();
@@ -5704,7 +5801,9 @@ function render() {
     else if (view === "usuarios_financiador") html = esAdminFinActual() ? viewFinanciador_Usuarios() : viewFinanciador_Panel();
     else if (view === "soporte") html = viewFinanciador_Soporte();
   }
-  if (role !== "hospital" && view.indexOf("plan_") === 0) {
+  if (qaSkin) {
+    // En modo QA no se muestra la leyenda del prototipo; el contenido va envuelto en el shell del portal real.
+  } else if (role !== "hospital" && view.indexOf("plan_") === 0) {
     // En las vistas del Plan de Pago la leyenda de estados del circuito corriente no aplica: se muestra la del plan.
     html += `<div class="legend"><h4>Estados — Plan de Pago</h4><div class="legend-items">
       ${chipPlan("VIGENTE")} ${chipPlan("EN_RIESGO")} ${chipPlan("FINALIZADO")} ${chipPlan("CADUCO")}
@@ -5719,6 +5818,11 @@ function render() {
       ${chip("morosa")} ${chip("intimada")} ${chip("judicializada")}
       ${chip("cerrada")} ${chip("cerrada_nc")}
     </div></div>`;
+  }
+  if (qaSkin) {
+    // Envuelve el contenido en el chrome del portal real: topbar oscuro + menú + cartelera roja + pestañas.
+    const inner = view === "qa_inicio" ? html : `${qaConcTabs()}<div class="qa-body">${html}</div>`;
+    html = `${qaTopbar()}${qaDrawer()}${inner}`;
   }
   main.innerHTML = html;
   /* Cualquier tabla de listado con más de 15 filas se envuelve en scroll interno con headers
@@ -5968,6 +6072,7 @@ function wireEvents() {
         closeModal(); render(); showToast(`⚖ Intimación cursada a ${finNombre(p.financiador)}`);
       } });
   }));
+  wireDenuncias();
   wireAccionesPlanteo();
   wirePlanEvents();
   wireEventsResto();
@@ -7451,15 +7556,7 @@ function openModalVerPaquete(expId) {
 }
 
 document.querySelectorAll('.role-switcher button').forEach(b => {
-  b.addEventListener('click', () => {
-    document.querySelectorAll('.role-switcher button').forEach(x => x.classList.remove('active'));
-    b.classList.add('active');
-    state.role = b.dataset.role;
-    // Al cambiar de rol, arranca en la primera entrada de su navegación.
-    state.view = navFor(state.role)[0].view;
-    state.context = {}; state.planCtx = null;
-    render();
-  });
+  b.addEventListener('click', () => window.__setRole(b.dataset.role));
 });
 
 /* Descargos realistas del hospital según el motivo de la objeción (para el mock). */
@@ -7802,11 +7899,132 @@ const PLAN_SUB_MIN = { label: "Plan de Pagos", view: "plan_min_planes", sub: [
    (para el financiador, solo si ese financiador tiene un plan). Las secciones de "2da etapa — marzo"
    van siempre al fondo tras un separador. El hospital usa su NAV tal cual. */
 function navFor(role) {
-  if (role === "hospital") return NAV.hospital;
   const et2 = SEGUNDA_ETAPA[role] ? [SEG_ETAPA2_SEP, ...SEGUNDA_ETAPA[role]] : [];
   if (role === "ministerio") return [...NAV.ministerio, PLAN_SUB_MIN, ...et2];
   if (role === "financiador") { const base = tienePlan(usuarioFinActual()?.financiador || "F001") ? [...NAV.financiador, PLAN_SUB_FIN] : [...NAV.financiador]; return [...base, ...et2]; }
-  return [...(NAV[role] || []), ...et2];
+  return [...(NAV[role] || []), ...et2];   // hospital (y cualquier otro): su NAV + separador "2da etapa — marzo"
+}
+
+/* ====================================================================================
+   MODO HOSPITAL QA — réplica estética del portal real (samo.markeyqa.com).
+   El rol subyacente sigue siendo 'hospital' (toda la lógica y las vistas se reusan tal
+   cual); solo cambia la piel: state.skin === 'qa'. El home propio es la vista 'qa_inicio';
+   el resto de las pestañas de "Conciliación portal" reusan las vistas del hospital
+   (panel, mis facturas, los dos subestados de conciliación y auditorías compartidas),
+   envueltas por render() en el shell del portal real. "Pagos por confirmar" y
+   "Morosidad y legales" quedan fuera a propósito (son 2da etapa).
+   ==================================================================================== */
+// Menú lateral del sistema de facturación provincial. Solo "Conciliación portal" (__CONC__) es operativa.
+const QA_MENU = [
+  { l: "Diágnosticos", caret: true }, { l: "Interfaces", caret: true }, { l: "Documentos", caret: true },
+  { l: "Atenciones", caret: true }, { l: "Facturación", caret: true }, { l: "Cuenta Corriente", caret: true },
+  { l: "Soporte", caret: false }, { l: "Reportes", caret: true }, { l: "Convenios", caret: true },
+  { l: "Seguridad", caret: true }, { l: "__CONC__", caret: false }, { l: "Sistema", caret: true },
+  { l: "Documentación", caret: true },
+];
+// Tabla "Comprobantes sin presentar" del home (decorativa, réplica de demo).
+const QA_COMPROBANTES = [
+  ["Albergue Cumen-Che", 277], ["BASE S.A.M.O. EN EL SUR", 2041], ["Hosp. Interzonal Gral. San Martín", 186],
+  ["Hosp. Zonal Gral. de Agudos Dr. R. Carrillo", 93], ["Htal. Sub-Zonal El Dique", 58],
+  ["Unidad de Pronta Atención N° 7", 41], ["Centro de Salud Mental N° 1", 21],
+];
+
+// Conmutador de rol/piel. 'hospital_qa' = rol hospital + piel QA; el resto limpia la piel.
+window.__setRole = function(r) {
+  if (r === "hospital_qa") { state.role = "hospital"; state.skin = "qa"; state.view = "qa_inicio"; }
+  else { state.role = r; state.skin = null; state.view = navFor(r)[0].view; }
+  state.context = {}; state.planCtx = null; state.qaMenuOpen = false;
+  const activeKey = state.skin === "qa" ? "hospital_qa" : state.role;
+  document.querySelectorAll(".role-switcher button").forEach(x => x.classList.toggle("active", x.dataset.role === activeKey));
+  render();
+};
+window.__qaBurger = function() { state.qaMenuOpen = !state.qaMenuOpen; render(); };
+window.__qaGo = function(view) { state.qaMenuOpen = false; state.view = view; state.context = {}; render(); };
+window.__qaInert = function() { showToast("Módulo del sistema de facturación — fuera del alcance del prototipo de conciliación."); };
+
+// Topbar oscuro "Buenos Aires Provincia". La cartelera roja va INLINE al lado del logo (como el portal real);
+// el único conmutador es "Financiador" (lleva a su vista normal), a la derecha del usuario.
+function qaTopbar() {
+  const n = kpisHospital().espYo;
+  const alerta = n
+    ? `<div class="qa-alert-pill" onclick="window.__qaGo('conc_h_esperan_yo')" title="Ir a responder">⚠ ${n} caso(s) esperan tu respuesta en el portal</div>`
+    : "";
+  // Pill celeste: auditorías compartidas que requieren atención (coordinar/cerrar o mensaje nuevo del financiador).
+  const audN = audAtencionHosp("H001");
+  const audAlerta = audN
+    ? `<div class="qa-aud-pill" onclick="window.__qaGo('conc_h_auditorias')" title="Ir a auditorías compartidas">🏥 ${audN} auditoría(s) compartida(s) requieren tu atención</div>`
+    : "";
+  return `<div class="qa-topbar">
+    <button class="qa-burger" onclick="window.__qaBurger()" title="Menú">☰</button>
+    <div class="qa-ba-logo" onclick="window.__qaGo('qa_inicio')" title="Inicio">
+      <span class="ba-mark">P</span>
+      <span class="ba-txt">Buenos Aires<small>Provincia</small></span>
+    </div>
+    ${alerta}${audAlerta}
+    <div class="qa-user"><span class="qa-avatar">👤</span><span>33813990</span></div>
+    <div class="qa-roleswitch"><button onclick="window.__setRole('financiador')">Financiador</button></div>
+  </div>`;
+}
+
+// Menú lateral desplegable (drawer). Solo "Conciliación portal" navega; el resto es inerte (toast).
+function qaDrawer() {
+  if (!state.qaMenuOpen) return "";
+  const items = QA_MENU.map(m => {
+    if (m.l === "__CONC__") return `<div class="qa-menu-item active-link" onclick="window.__qaGo('panel_hospital')">Conciliación portal</div>`;
+    return `<div class="qa-menu-item inert" onclick="window.__qaInert()"><span>${m.l}</span>${m.caret ? '<span class="qa-menu-caret">▾</span>' : ''}</div>`;
+  }).join("");
+  return `<div class="qa-drawer-backdrop" onclick="window.__qaBurger()"></div>
+    <div class="qa-drawer">
+      <div class="qa-drawer-head"><button class="qa-drawer-close" onclick="window.__qaBurger()">✕</button></div>
+      ${items}
+    </div>`;
+}
+
+// Pestañas de "Conciliación portal". Reusan data-goto (ya cableado) para navegar entre vistas del hospital.
+function qaConcTabs() {
+  const k = kpisHospital(); const v = state.view;
+  const inPanel = v === "panel_hospital" || v === "detalle_financiador";
+  const inFact  = v === "facturas_hospital";
+  const inYo    = v === "conc_h_esperan_yo" || v === "conciliacion_hospital";
+  const inFin   = v === "conc_h_esperan_fin";
+  const inAud   = v === "conc_h_auditorias";
+  const audN = audAtencionHosp("H001");   // auditorías que requieren atención (acción pendiente o chat nuevo)
+  const tab = (label, view, active, badge, badgeCls) =>
+    `<button class="qa-tab ${active?'active':''} ${badgeCls||''}" data-goto="${view}">${label}${badge?`<span class="qa-tab-badge">${badge}</span>`:''}</button>`;
+  return `<div class="qa-tabs">
+    ${tab("Panel", "panel_hospital", inPanel, 0, '')}
+    ${tab("Mis facturas", "facturas_hospital", inFact, 0, '')}
+    ${tab("Esperan mi respuesta", "conc_h_esperan_yo", inYo, k.espYo, 'red')}
+    ${tab("Esperando al financiador", "conc_h_esperan_fin", inFin, k.espFin, '')}
+    ${tab("Auditorías compartidas", "conc_h_auditorias", inAud, audN ? `🏥 ${audN}` : 0, 'cyan')}
+  </div>`;
+}
+
+// Home "Inicio" del sistema de facturación (réplica): ámbitos + comprobantes sin presentar (decorativos).
+function viewHospitalQA_Inicio() {
+  const rows = QA_COMPROBANTES.map(([e, c]) => `<tr><td>${e}</td><td style="text-align:right;">${c.toLocaleString("es-AR")}</td></tr>`).join("");
+  return `<div class="qa-body">
+    <h1 class="qa-h1">Inicio</h1><hr class="qa-h1-rule">
+    <h2 class="qa-h2">¿En qué ámbito querés trabajar?</h2>
+    <div class="qa-ambito-grid">
+      <div class="qa-ambito" onclick="window.__qaInert()"><div class="ic">👤</div><div class="t">Ambulatorio</div><div class="d">Consultas y atenciones programadas</div></div>
+      <div class="qa-ambito guardia" onclick="window.__qaInert()"><div class="ic">✚</div><div class="t">Guardia</div><div class="d">Atenciones de urgencia</div></div>
+    </div>
+    <h2 class="qa-h2" style="font-size:19px;">Comprobantes sin presentar</h2>
+    <div class="card" style="padding:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <div style="display:flex;gap:6px;">
+          <button class="qa-btn-lite" onclick="window.__qaInert()">Copy</button>
+          <button class="qa-btn-lite" onclick="window.__qaInert()">Excel</button>
+          <button class="qa-btn-lite" onclick="window.__qaInert()">PDF</button>
+          <button class="qa-btn-lite" onclick="window.__qaInert()">Columnas</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;"><span style="color:#6b7480;font-size:13px;">Buscar:</span><input class="qa-btn-lite" style="width:210px;cursor:pointer;" onclick="window.__qaInert()" readonly placeholder=""></div>
+      </div>
+      <table><thead><tr><th>Establecimiento</th><th style="text-align:right;">Cantidad</th></tr></thead><tbody>${rows}</tbody></table>
+    </div>
+    <div class="note note-blue" style="margin-top:16px;">Pantalla de inicio del sistema de facturación (réplica de demo). La única sección operativa de este prototipo es <strong>Conciliación portal</strong>: abrila desde el menú <strong>☰</strong> o <a onclick="window.__qaGo('panel_hospital')" style="cursor:pointer;text-decoration:underline;color:var(--primary);">entrá acá</a>.</div>
+  </div>`;
 }
 
 /* ---- Bloque compartido: cronograma de cuotas (financiador y detalle del ministerio) ---- */
@@ -8925,6 +9143,486 @@ function wirePlanEvents() {
   const bHP = document.querySelector('[data-habilitar-plan]'); if (bHP) bHP.addEventListener('click', () => window.__habilitarPlan());
 }
 
+/* =====================================================================================================
+   DENUNCIAS DE INTERNACIÓN (FASE 2)
+   El objeto es el EPISODIO de internación del paciente, no la factura. Cuando un afiliado de un financiador
+   queda internado en un hospital público, se lo denuncia al financiador, que tiene 48 h para responder
+   (acepta / acepta con alcance / pide derivación / pide información). Si no responde, se toma como ACEPTADO
+   (silencio positivo → aceptación tácita). La constancia resultante viaja con la factura de esa internación y
+   desarma objeciones de "falta de autorización" / "sin convenio".
+
+   Solo lo operan Hospital y Financiador; el Ministerio solo hace SEGUIMIENTO (vista propia, solo lectura).
+   Supuestos del prototipo (a validar en la reunión, doc de preguntas P7.x): carga el SAMO del hospital, el
+   envío sale solo con el usuario institucional del Ministerio, 48 h CORRIDAS desde la puesta a disposición, y
+   pedir información NO frena el reloj.
+
+   (Las vistas de hospital y financiador adoptan el diseño de la versión explorada con Claude; el ministerio
+   mantiene la pantalla de seguimiento con KPIs + tabla por financiador + detalle filtrable.)
+   ===================================================================================================== */
+const AHORA_DEN = "2026-08-03T10:00";          // "ahora" simulado del prototipo (HOY + hora)
+const HORAS_DENUNCIA = 48;
+const addHoras = (dt, h) => { const d = new Date(Date.parse(dt) + h * 36e5); const p = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; };
+const fmtDT = (dt) => dt ? `${dt.slice(8, 10)}/${dt.slice(5, 7)} ${dt.slice(11, 16)} h` : "—";
+const horasRestDen = (d) => (Date.parse(d.vence) - Date.parse(AHORA_DEN)) / 36e5;
+
+const DEN_ESTADO = {
+  PENDIENTE:        { txt: "Esperando respuesta", cls: "chip-esperando-financiador", abierta: true },
+  INFO_PEDIDA:      { txt: "Pidió información — responde el hospital", cls: "chip-esperando-hospital", abierta: true },
+  DERIV_SOLICITADA: { txt: "Derivación solicitada — confirmar traslado", cls: "chip-esperando-hospital", abierta: true },
+  DERIV_EN_CURSO:   { txt: "Derivación en curso — esperando retiro", cls: "chip-por-vencer", abierta: true },
+  ACEPTADA:         { txt: "Aceptada", cls: "chip-aceptada" },
+  ACEPTADA_ALCANCE: { txt: "Aceptada con alcance", cls: "chip-pago-parcial" },
+  ACEPTADA_TACITA:  { txt: "Aceptada tácitamente (48 h)", cls: "chip-vista" },
+  DERIV_FALLIDA:    { txt: "Derivación no concretada — se atiende", cls: "chip-morosa" },
+  DERIVADO:         { txt: "Derivado — paciente retirado", cls: "chip-cerrada" },
+};
+const chipDen = (d) => { const e = DEN_ESTADO[d.estado]; return `<span class="chip ${e.cls}">${e.txt}</span>`; };
+const denAbierta = (d) => !!DEN_ESTADO[d.estado].abierta;
+const denConRespuesta = (d) => !!d.respuesta;                       // respondió expresamente (cualquier tipo)
+const denAceptadaTotal = (d) => ["ACEPTADA", "ACEPTADA_ALCANCE", "ACEPTADA_TACITA", "DERIV_FALLIDA"].includes(d.estado);
+const denRelojCorre = (d) => ["PENDIENTE", "INFO_PEDIDA"].includes(d.estado);
+// Financiadores fuera del portal: la denuncia se registra igual pero sale por mail, como hoy (P7.7).
+const finEnPortal = (finId) => { const f = FINANCIADORES.find(x => x.id === finId); return f && f.estado !== "sin_usuario"; };
+
+/* ---- Mock: denuncias de varios hospitales y financiadores (H001 = San Martín, F001 = IOMA) ---- */
+function mkDen(o) {
+  const enviada = o.enviada || o.ingreso;
+  return Object.assign({ canal: finEnPortal(o.financiador) ? "Domicilio electrónico" : "Mail (fuera del portal)",
+    enviada, vence: addHoras(enviada, HORAS_DENUNCIA), adjuntos: ["hoja_ingreso.pdf"], log: [
+      { who: "hospital", when: enviada, text: `Denuncia enviada al financiador por ${finEnPortal(o.financiador) ? "domicilio electrónico (puesta a disposición)" : "mail"}. Corre el plazo de ${HORAS_DENUNCIA} h.` }] }, o);
+}
+const DENUNCIAS_INICIAL = [
+  mkDen({ id: "DEN-2026-0412", hospital: "H001", financiador: "F001", paciente: "Ferreyra, Marta", dni: "22.418.902", afiliado: "IOMA 4-512-7781",
+    ingreso: "2026-08-02T21:40", servicio: "Clínica médica", diagnostico: "Neumonía adquirida en la comunidad (J18.9)", practica: "Internación clínica, antibioticoterapia EV", medico: "Dra. Paz", trasladable: "si", estado: "PENDIENTE" }),
+  mkDen({ id: "DEN-2026-0409", hospital: "H001", financiador: "F001", paciente: "Ledesma, Hugo", dni: "26.771.330", afiliado: "IOMA 4-507-3302",
+    ingreso: "2026-08-01T13:15", servicio: "Unidad coronaria", diagnostico: "Síndrome coronario agudo (I24.9)", practica: "Cinecoronariografía; eventual angioplastia", medico: "Dr. Ruiz", trasladable: "evaluar", estado: "PENDIENTE" }),
+  (() => { const d = mkDen({ id: "DEN-2026-0405", hospital: "H001", financiador: "F001", paciente: "Sosa, Norma", dni: "24.918.118", afiliado: "IOMA 4-502-1187",
+    ingreso: "2026-08-01T19:30", servicio: "Clínica médica", diagnostico: "Insuficiencia cardíaca descompensada (I50.0)", practica: "Internación clínica", medico: "Dr. Benítez", trasladable: "si", estado: "INFO_PEDIDA" });
+    d.respuestaInfo = { fecha: "2026-08-02T11:20", usuario: "Auditoría médica IOMA", texto: "Solicitamos ecocardiograma y laboratorio de ingreso." };
+    d.log.push({ who: "financiador", when: "2026-08-02T11:20", text: "Pide información: ecocardiograma y laboratorio de ingreso. El plazo sigue corriendo." }); return d; })(),
+  (() => { const d = mkDen({ id: "DEN-2026-0398", hospital: "H001", financiador: "F001", paciente: "Molina, Ricardo", dni: "18.334.201", afiliado: "IOMA 4-499-2015",
+    ingreso: "2026-07-31T16:30", servicio: "Traumatología", diagnostico: "Fractura de cadera (S72.0)", practica: "Artroplastia parcial de cadera (programable)", medico: "Dr. Quiroga", trasladable: "si", estado: "DERIV_SOLICITADA" });
+    d.respuesta = { tipo: "derivacion", fecha: "2026-08-01T10:10", usuario: "Auditoría médica IOMA", centro: "Clínica IOMA La Plata", gestiona: "Financiador (ambulancia propia)", retiro: "2026-08-03T16:00", contacto: "Central de traslados IOMA · 0221-480-4410", texto: "Solicitamos derivación a prestador propio para la cirugía." };
+    d.log.push({ who: "financiador", when: "2026-08-01T10:10", text: "Solicita derivación a Clínica IOMA La Plata. Retiro estimado 03/08 16:00 h, a cargo del financiador." }); return d; })(),
+  (() => { const d = mkDen({ id: "DEN-2026-0390", hospital: "H001", financiador: "F001", paciente: "Ojeda, Silvina", dni: "33.102.064", afiliado: "IOMA 4-520-0640",
+    ingreso: "2026-07-30T09:50", servicio: "Cirugía general", diagnostico: "Colecistitis aguda (K81.0)", practica: "Colecistectomía laparoscópica", medico: "Dra. Méndez", trasladable: "si", estado: "DERIV_EN_CURSO" });
+    d.respuesta = { tipo: "derivacion", fecha: "2026-07-31T09:00", usuario: "Auditoría médica IOMA", centro: "Sanatorio IPENSA", gestiona: "Financiador (ambulancia propia)", retiro: "2026-08-03T18:00", contacto: "Traslados IOMA · 0221-480-4410", texto: "Derivamos a prestador de red." };
+    d.derivacion = { confirmada: "2026-07-31T12:30", porQuien: "SAMO Hosp. San Martín" };
+    d.log.push({ who: "financiador", when: "2026-07-31T09:00", text: "Solicita derivación a Sanatorio IPENSA. Retiro estimado 03/08 18:00 h." },
+               { who: "hospital", when: "2026-07-31T12:30", text: "Confirma que la paciente es trasladable (médico tratante: Dra. Méndez). Queda a la espera del retiro." }); return d; })(),
+  (() => { const d = mkDen({ id: "DEN-2026-0377", hospital: "H001", financiador: "F001", paciente: "González, María", dni: "25.312.023", afiliado: "IOMA 4-501-0231",
+    ingreso: "2026-07-27T19:00", servicio: "Clínica médica", diagnostico: "Pielonefritis aguda (N10)", practica: "Internación clínica", medico: "Dr. Benítez", trasladable: "si", estado: "ACEPTADA" });
+    d.respuesta = { tipo: "acepta", fecha: "2026-07-28T09:30", usuario: "Auditoría médica IOMA", texto: "Se acepta la internación en el hospital." };
+    d.log.push({ who: "financiador", when: "2026-07-28T09:30", text: "Acepta la internación. Se genera la constancia." }); return d; })(),
+  (() => { const d = mkDen({ id: "DEN-2026-0371", hospital: "H001", financiador: "F001", paciente: "Pérez, Juan", dni: "30.812.819", afiliado: "IOMA 4-503-8193",
+    ingreso: "2026-07-25T02:10", servicio: "Clínica médica", diagnostico: "ACV isquémico (I63.9)", practica: "Internación clínica, TAC de cerebro", medico: "Dra. Paz", trasladable: "no", estado: "ACEPTADA_TACITA" });
+    d.log.push({ who: "sistema", when: "2026-07-27T02:10", text: "Vencieron las 48 h sin respuesta: ACEPTACIÓN TÁCITA. Constancia generada automáticamente." }); return d; })(),
+  (() => { const d = mkDen({ id: "DEN-2026-0360", hospital: "H001", financiador: "F001", paciente: "Romero, Elsa", dni: "14.556.905", afiliado: "IOMA 4-488-9050",
+    ingreso: "2026-07-21T11:45", servicio: "Unidad de terapia intensiva", diagnostico: "Sepsis de foco abdominal (A41.9)", practica: "Internación en UTI", medico: "Dr. Ruiz", trasladable: "si", estado: "DERIV_FALLIDA" });
+    d.respuesta = { tipo: "derivacion", fecha: "2026-07-22T08:20", usuario: "Auditoría médica IOMA", centro: "Clínica IOMA La Plata", gestiona: "Financiador", retiro: "2026-07-22T18:00", contacto: "Traslados IOMA", texto: "Derivamos a UTI de prestador propio." };
+    d.derivacion = { confirmada: "2026-07-22T10:00", porQuien: "SAMO Hosp. San Martín", fallida: "2026-07-23T08:00", motivo: "El financiador no retiró al paciente en el plazo acordado." };
+    d.log.push({ who: "financiador", when: "2026-07-22T08:20", text: "Solicita derivación a Clínica IOMA La Plata." },
+               { who: "hospital", when: "2026-07-23T08:00", text: "Retiro no concretado en plazo: la denuncia se da por aceptada y el paciente sigue internado en el hospital." }); return d; })(),
+  (() => { const d = mkDen({ id: "DEN-2026-0352", hospital: "H001", financiador: "F001", paciente: "Vera, Tomás", dni: "40.221.117", afiliado: "IOMA 4-530-1170",
+    ingreso: "2026-07-18T22:30", servicio: "Traumatología", diagnostico: "Fractura expuesta de tibia (S82.2)", practica: "Osteosíntesis", medico: "Dr. Quiroga", trasladable: "si", estado: "DERIVADO" });
+    d.respuesta = { tipo: "derivacion", fecha: "2026-07-19T09:00", usuario: "Auditoría médica IOMA", centro: "Sanatorio IPENSA", gestiona: "Financiador", retiro: "2026-07-19T15:00", contacto: "Traslados IOMA", texto: "Derivación a prestador de red." };
+    d.derivacion = { confirmada: "2026-07-19T10:30", porQuien: "SAMO Hosp. San Martín", retiro: "2026-07-19T14:40", retiradoPor: "Ambulancia IOMA móvil 12" };
+    d.log.push({ who: "hospital", when: "2026-07-19T14:40", text: "Paciente retirado por ambulancia IOMA móvil 12. Derivación concretada." }); return d; })(),
+  // Otros hospitales y financiadores (alimentan solo el seguimiento del Ministerio)
+  mkDen({ id: "DEN-2026-0410", hospital: "H002", financiador: "F002", paciente: "Ibarra, Rosa", dni: "11.903.774", afiliado: "PAMI 15-0099021", ingreso: "2026-08-02T08:00", servicio: "Clínica médica", diagnostico: "EPOC reagudizado (J44.1)", practica: "Internación clínica", medico: "—", trasladable: "si", estado: "PENDIENTE" }),
+  Object.assign(mkDen({ id: "DEN-2026-0402", hospital: "H002", financiador: "F003", paciente: "Luna, Pablo", dni: "35.670.118", afiliado: "OSDE 210-4471", ingreso: "2026-07-31T20:00", servicio: "Cirugía general", diagnostico: "Apendicitis aguda (K35.8)", practica: "Apendicectomía", medico: "—", trasladable: "si", estado: "DERIVADO" }), { respuesta: { tipo: "derivacion", fecha: "2026-08-01T07:00" } }),
+  Object.assign(mkDen({ id: "DEN-2026-0396", hospital: "H003", financiador: "F003", paciente: "Paz, Andrea", dni: "29.004.550", afiliado: "OSDE 210-9930", ingreso: "2026-07-30T10:00", servicio: "Obstetricia", diagnostico: "Amenaza de parto pretérmino (O60.0)", practica: "Internación obstétrica", medico: "—", trasladable: "no", estado: "ACEPTADA" }), { respuesta: { tipo: "acepta", fecha: "2026-07-30T18:00" } }),
+  mkDen({ id: "DEN-2026-0388", hospital: "H003", financiador: "F005", paciente: "Correa, Luis", dni: "20.114.332", afiliado: "OSECAC 55012", ingreso: "2026-07-29T05:30", servicio: "Clínica médica", diagnostico: "Diabetes descompensada (E11.6)", practica: "Internación clínica", medico: "—", trasladable: "si", estado: "ACEPTADA_TACITA" }),
+  mkDen({ id: "DEN-2026-0385", hospital: "H005", financiador: "F002", paciente: "Aguirre, Delia", dni: "09.877.401", afiliado: "PAMI 15-0102118", ingreso: "2026-07-28T14:00", servicio: "Unidad coronaria", diagnostico: "Fibrilación auricular (I48)", practica: "Internación en UCO", medico: "—", trasladable: "si", estado: "ACEPTADA_TACITA" }),
+  mkDen({ id: "DEN-2026-0381", hospital: "H004", financiador: "F014", paciente: "Rivas, Mario", dni: "17.445.209", afiliado: "OSDOP 44120", ingreso: "2026-07-28T09:00", servicio: "Clínica médica", diagnostico: "Neumonía (J18.9)", practica: "Internación clínica", medico: "—", trasladable: "si", estado: "ACEPTADA_TACITA" }),
+  Object.assign(mkDen({ id: "DEN-2026-0379", hospital: "H005", financiador: "F004", paciente: "Funes, Clara", dni: "31.660.773", afiliado: "SMG 88120", ingreso: "2026-07-27T23:00", servicio: "Traumatología", diagnostico: "Fractura de radio (S52.5)", practica: "Osteosíntesis", medico: "—", trasladable: "si", estado: "ACEPTADA_ALCANCE" }), { respuesta: { tipo: "alcance", fecha: "2026-07-28T12:00" } }),
+  Object.assign(mkDen({ id: "DEN-2026-0368", hospital: "H002", financiador: "F001", paciente: "Toledo, Ana", dni: "27.889.012", afiliado: "IOMA 4-515-7781", ingreso: "2026-07-24T07:00", servicio: "Clínica médica", diagnostico: "Celulitis (L03.1)", practica: "Internación clínica", medico: "—", trasladable: "si", estado: "DERIV_FALLIDA" }), { respuesta: { tipo: "derivacion", fecha: "2026-07-24T15:00" } }),
+];
+state.denuncias = JSON.parse(JSON.stringify(DENUNCIAS_INICIAL));
+state.filtrosDenuncia = { estado: "TODOS", financiador: "TODOS", q: "" };
+
+/* Silencio a las 48 h → aceptación tácita (se evalúa en cada render, como los vencimientos de facturas). */
+function evaluarDenuncias() {
+  state.denuncias.forEach(d => {
+    if (denRelojCorre(d) && horasRestDen(d) <= 0) {
+      d.estado = "ACEPTADA_TACITA";
+      d.log.push({ who: "sistema", when: d.vence, text: `Vencieron las ${HORAS_DENUNCIA} h sin respuesta: ACEPTACIÓN TÁCITA. Constancia generada automáticamente.` });
+    }
+  });
+}
+const densHosp = () => state.denuncias.filter(d => d.hospital === "H001");
+const densFin = () => state.denuncias.filter(d => d.financiador === "F001" && puedeVerHospitalFin(d.hospital));
+const denPor = (id) => state.denuncias.find(d => d.id === id);
+// Pendientes de acción, para los badges del sidebar.
+const denAccionHosp = () => densHosp().filter(d => ["INFO_PEDIDA", "DERIV_SOLICITADA", "DERIV_EN_CURSO"].includes(d.estado)).length;
+const denAccionFin = () => densFin().filter(d => d.estado === "PENDIENTE").length;
+
+/* ---- Bloques compartidos ---- */
+function relojDen(d) {
+  if (!denRelojCorre(d)) return `<span style="color:var(--muted);font-size:12px;">—</span>`;
+  const h = Math.max(0, horasRestDen(d)); const pct = Math.max(0, Math.min(100, h / HORAS_DENUNCIA * 100));
+  const col = h < 12 ? "var(--danger)" : h < 24 ? "var(--warn)" : "var(--success)";
+  return `<div style="min-width:120px;"><div style="font-size:12px;font-weight:600;color:${col};">${Math.floor(h)} h ${Math.round((h % 1) * 60)} min</div>
+    <div style="height:5px;background:var(--border);border-radius:3px;margin-top:3px;"><div style="height:5px;width:${pct}%;background:${col};border-radius:3px;"></div></div>
+    <div style="font-size:10.5px;color:var(--muted);margin-top:2px;">vence ${fmtDT(d.vence)}</div></div>`;
+}
+const trasladableTxt = (t) => t === "si" ? "Sí" : t === "no" ? "No" : "A evaluar";
+function tablaDen(lista, rol, vacio) {
+  if (!lista.length) return `<div style="color:var(--muted);padding:24px;text-align:center;">${vacio}</div>`;
+  return `<table>
+    <thead><tr><th>Denuncia</th><th>Paciente</th><th>${rol === "hospital" ? "Financiador" : "Hospital"}</th><th>Ingreso</th><th>Servicio</th><th style="text-align:center;">Estado</th><th>Plazo 48 h</th><th></th></tr></thead>
+    <tbody>${lista.map(d => `<tr class="clickable" onclick="abrirDenuncia('${d.id}')">
+      <td><code>${d.id}</code>${d.canal.startsWith("Mail") ? ' <span class="chip chip-en-cola" title="Financiador sin usuario en el portal: sale por mail">mail</span>' : ''}</td>
+      <td><strong>${esc(d.paciente)}</strong><div style="font-size:11px;color:var(--muted);">DNI ${d.dni}</div></td>
+      <td>${rol === "hospital" ? finNombre(d.financiador) : hospCorto(d.hospital)}</td>
+      <td>${fmtDT(d.ingreso)}</td><td>${esc(d.servicio)}</td>
+      <td style="text-align:center;">${chipDen(d)}</td><td>${relojDen(d)}</td>
+      <td style="text-align:right;"><button class="btn btn-${rol === "financiador" && d.estado === "PENDIENTE" ? "primary" : "secondary"} btn-sm" onclick="event.stopPropagation();abrirDenuncia('${d.id}')">${rol === "financiador" && d.estado === "PENDIENTE" ? "Responder →" : "Ver →"}</button></td>
+    </tr>`).join("")}</tbody></table>`;
+}
+window.abrirDenuncia = function(id) { state.view = "den_detalle"; state.context = { den: id }; render(); };
+
+/* ---- HOSPITAL ---- */
+function viewHospital_Denuncias(modo) {
+  const todas = densHosp();
+  const enCurso = todas.filter(d => denRelojCorre(d)).sort((a, b) => a.vence.localeCompare(b.vence));
+  const deriv = todas.filter(d => ["DERIV_SOLICITADA", "DERIV_EN_CURSO"].includes(d.estado));
+  const hist = todas.filter(d => !denAbierta(d)).sort((a, b) => b.ingreso.localeCompare(a.ingreso));
+  const info = todas.filter(d => d.estado === "INFO_PEDIDA");
+  const titulo = modo === "deriv" ? "Derivaciones a concretar" : modo === "hist" ? "Historial de denuncias" : "Denuncias de internación";
+  return `${notaEmbebido()}<div class="page-header">
+      <div><h1>${titulo}</h1><div class="sub">Aviso al financiador de afiliados internados · ${HORAS_DENUNCIA} h para responder · el silencio vale como aceptación</div></div>
+      <div class="page-actions"><button class="btn btn-primary" onclick="openModalNuevaDenuncia()">+ Nueva denuncia</button></div>
+    </div>
+    ${modo === "curso" ? `
+    ${info.length ? `<div class="action-required-banner"><div><strong>⚠ ${info.length} financiador(es) pidieron información</strong> — el reloj sigue corriendo: respondé con lo que pidan.</div></div>` : ""}
+    ${deriv.filter(d => d.estado === "DERIV_SOLICITADA").length ? `<div class="action-required-banner" style="background:var(--warn-soft);border-color:#e0c977;"><div><strong style="color:var(--warn);">${deriv.filter(d => d.estado === "DERIV_SOLICITADA").length} derivación(es) esperan que confirmes si el paciente es trasladable.</strong></div><button class="btn btn-warn btn-sm" data-goto="den_hosp_deriv">Ver derivaciones →</button></div>` : ""}
+    <div class="kpi-grid">
+      <div class="kpi ${enCurso.length ? 'warning' : ''}"><div class="label">Plazo corriendo</div><div class="value ${enCurso.length ? 'warn' : ''}">${enCurso.length}</div><div class="hint">${enCurso.filter(d => horasRestDen(d) < 12).length} vencen en menos de 12 h</div></div>
+      <div class="kpi ${deriv.length ? 'action-required' : ''}"><div class="label">Derivaciones abiertas</div><div class="value ${deriv.length ? 'danger' : ''}">${deriv.length}</div><div class="hint">solicitadas o esperando retiro</div></div>
+      <div class="kpi good"><div class="label">Aceptadas (expresa o tácita)</div><div class="value success">${todas.filter(denAceptadaTotal).length}</div><div class="hint">${todas.filter(d => d.estado === "ACEPTADA_TACITA").length} por silencio</div></div>
+      <div class="kpi"><div class="label">Derivados</div><div class="value">${todas.filter(d => d.estado === "DERIVADO").length}</div><div class="hint">pacientes retirados</div></div>
+    </div>
+    <div class="note note-blue"><strong>Cómo funciona.</strong> Cargás la denuncia y sale sola al domicilio electrónico del financiador (con el usuario institucional del Ministerio). Si en ${HORAS_DENUNCIA} h no responde, queda <strong>aceptada tácitamente</strong> y la constancia se adjunta al episodio: viaja con la factura y respalda frente a objeciones por "falta de autorización" o "sin convenio".</div>
+    <div class="card" style="padding:0;"><div class="group-header"><strong>Con el plazo corriendo</strong> <span style="color:var(--muted);font-weight:400;">— ordenadas por vencimiento</span></div>
+      ${tablaDen(enCurso, "hospital", "No hay denuncias con el plazo corriendo.")}</div>` : ""}
+    ${modo === "deriv" ? `<div class="note"><strong>Derivación.</strong> Confirmá si el paciente está en condiciones de ser trasladado (criterio del médico tratante) y registrá el retiro. <strong>Si el retiro no ocurre en el plazo acordado o el paciente no es trasladable, la denuncia se da por aceptada</strong> y se atiende en el hospital.</div>
+    <div class="card" style="padding:0;">${tablaDen(deriv, "hospital", "No hay derivaciones abiertas.")}</div>` : ""}
+    ${modo === "hist" ? `<div class="card" style="padding:0;">${tablaDen(hist, "hospital", "Todavía no hay denuncias cerradas.")}</div>` : ""}
+    <div class="decision-abierta"><strong>A definir (reunión):</strong> quién carga y envía (P7.1), si se precarga desde el ingreso a internación en facturación (P7.2), base normativa del silencio y si las 48 h son corridas u hábiles (P7.3). El prototipo asume: carga el SAMO del hospital, envío automático, 48 h corridas.</div>`;
+}
+
+window.openModalNuevaDenuncia = function() {
+  const fins = FINANCIADORES.filter(f => f.estado !== "en_pausa");
+  openModal(`<h3>Nueva denuncia de internación</h3>
+    <p class="subtle">Hospital Interzonal San Martín · se envía al confirmar y arranca el plazo de ${HORAS_DENUNCIA} h</p>
+    <label>Financiador</label>
+    <select id="den-fin">${fins.map(f => `<option value="${f.id}">${f.nombre}${f.estado === "sin_usuario" ? " — sin usuario en el portal (sale por mail)" : ""}</option>`).join("")}</select>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+      <div><label>Paciente (apellido, nombre)</label><input id="den-pac" placeholder="Ej: Gómez, Ana"></div>
+      <div><label>DNI</label><input id="den-dni" placeholder="Ej: 28.456.789"></div>
+      <div><label>N° de afiliado</label><input id="den-afi" placeholder="Se valida contra el padrón"></div>
+      <div><label>Ingreso a internación</label><input id="den-ing" type="datetime-local" value="${AHORA_DEN}"></div>
+      <div><label>Servicio</label><select id="den-serv">${["Clínica médica", "Unidad de terapia intensiva", "Unidad coronaria", "Cirugía general", "Traumatología", "Obstetricia", "Pediatría"].map(s => `<option>${s}</option>`).join("")}</select></div>
+      <div><label>Médico tratante</label><input id="den-med" placeholder="Ej: Dra. Paz"></div>
+    </div>
+    <label>Diagnóstico presuntivo</label><input id="den-diag" placeholder="Ej: Neumonía (J18.9)">
+    <label>Práctica o intervención prevista</label><input id="den-prac" placeholder="Ej: Internación clínica, antibioticoterapia EV">
+    <label>¿El paciente está en condiciones de ser trasladado?</label>
+    <select id="den-tras"><option value="evaluar">A evaluar</option><option value="si">Sí</option><option value="no">No (no derivable)</option></select>
+    <div class="attachments" style="margin-top:10px;"><span class="attachment-chip">📎 hoja_ingreso.pdf</span> <span style="font-size:11px;color:var(--muted);">(adjunto simulado)</span></div>
+    <div class="note note-blue" style="margin-top:10px;">El padrón se consulta al enviar y queda registrada la fecha y hora de la consulta (sirve de prueba de la cobertura).</div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarNuevaDenuncia()">Enviar denuncia</button>
+    </div>`);
+};
+window.confirmarNuevaDenuncia = function() {
+  const v = (id) => ($("#" + id).value || "").trim();
+  if (!v("den-pac") || !v("den-dni")) { showToast("⚠ Completá paciente y DNI"); return; }
+  const n = 413 + state.denuncias.filter(d => d.id >= "DEN-2026-0413").length;
+  const d = mkDen({ id: "DEN-2026-" + String(n).padStart(4, "0"), hospital: "H001", financiador: v("den-fin"), paciente: v("den-pac"), dni: v("den-dni"),
+    afiliado: v("den-afi") || "—", ingreso: v("den-ing") || AHORA_DEN, enviada: AHORA_DEN, servicio: v("den-serv"), diagnostico: v("den-diag") || "—",
+    practica: v("den-prac") || "—", medico: v("den-med") || "—", trasladable: v("den-tras"), estado: "PENDIENTE" });
+  state.denuncias.unshift(d);
+  closeModal(); state.view = "den_hosp"; render();
+  showToast(`✓ ${d.id} enviada por ${d.canal.toLowerCase()} — vence ${fmtDT(d.vence)}`);
+};
+
+/* ---- FINANCIADOR ---- */
+function viewFinanciador_Denuncias(modo) {
+  const todas = densFin();
+  const pend = todas.filter(d => denRelojCorre(d)).sort((a, b) => a.vence.localeCompare(b.vence));
+  const deriv = todas.filter(d => ["DERIV_SOLICITADA", "DERIV_EN_CURSO"].includes(d.estado));
+  const hist = todas.filter(d => !denAbierta(d)).sort((a, b) => b.ingreso.localeCompare(a.ingreso));
+  const urg = pend.filter(d => d.estado === "PENDIENTE" && horasRestDen(d) < 12);
+  const titulo = modo === "deriv" ? "Derivaciones en curso" : modo === "hist" ? "Historial de denuncias" : "Denuncias de internación";
+  return `<div class="page-header">
+      <div><h1>${titulo}</h1><div class="sub">Afiliados internados en hospitales públicos · ${HORAS_DENUNCIA} h para responder · <strong>sin respuesta se acepta tácitamente</strong></div></div>
+    </div>
+    ${modo === "curso" ? `
+    ${urg.length ? `<div class="action-required-banner"><div><strong>⏱ ${urg.length} denuncia(s) vencen en menos de 12 h.</strong> Si no respondés, quedan aceptadas.</div></div>` : ""}
+    <div class="kpi-grid">
+      <div class="kpi ${pend.filter(d => d.estado === "PENDIENTE").length ? 'action-required' : 'good'}"><div class="label">Esperan tu respuesta</div><div class="value ${pend.filter(d => d.estado === "PENDIENTE").length ? 'danger' : 'success'}">${pend.filter(d => d.estado === "PENDIENTE").length}</div><div class="hint">${urg.length} vencen en &lt;12 h</div></div>
+      <div class="kpi"><div class="label">Información pedida</div><div class="value">${pend.filter(d => d.estado === "INFO_PEDIDA").length}</div><div class="hint">el plazo sigue corriendo</div></div>
+      <div class="kpi"><div class="label">Derivaciones en curso</div><div class="value">${deriv.length}</div><div class="hint">retiro a tu cargo</div></div>
+      <div class="kpi"><div class="label">Aceptadas por silencio</div><div class="value warn">${todas.filter(d => d.estado === "ACEPTADA_TACITA").length}</div><div class="hint">de ${todas.length} recibidas</div></div>
+    </div>
+    <div class="note note-blue"><strong>Qué podés responder:</strong> aceptar la internación, aceptarla con un alcance (qué autorizás y qué no), solicitar la derivación a tu red (indicando centro, quién traslada y cuándo se retira al paciente) o pedir información. <strong>Pedir información no frena el plazo.</strong> La respuesta (o el silencio) queda como constancia y acompaña la factura de esa internación.</div>
+    <div class="card" style="padding:0;"><div class="group-header"><strong>Con plazo corriendo</strong> <span style="color:var(--muted);font-weight:400;">— ordenadas por vencimiento</span></div>
+      ${tablaDen(pend, "financiador", "No tenés denuncias pendientes.")}</div>` : ""}
+    ${modo === "deriv" ? `<div class="note"><strong>El retiro y el traslado están a tu cargo.</strong> Si el paciente no se retira en el horario indicado, la denuncia se da por aceptada y la atención sigue en el hospital.</div>
+    <div class="card" style="padding:0;">${tablaDen(deriv, "financiador", "No tenés derivaciones en curso.")}</div>` : ""}
+    ${modo === "hist" ? `<div class="card" style="padding:0;">${tablaDen(hist, "financiador", "Sin denuncias cerradas.")}</div>` : ""}`;
+}
+
+window.openModalResponderDenuncia = function(id) {
+  const d = denPor(id); if (!d) return;
+  openModal(`<h3>Responder denuncia ${d.id}</h3>
+    <p class="subtle">${esc(d.paciente)} · ${hospCorto(d.hospital)} · vence ${fmtDT(d.vence)} (${Math.floor(Math.max(0, horasRestDen(d)))} h restantes)</p>
+    <label>Respuesta</label>
+    <select id="den-resp" onchange="cambiaRespDen()">
+      <option value="acepta">Aceptar la internación en el hospital</option>
+      <option value="alcance">Aceptar con alcance (autorizo parte)</option>
+      <option value="derivacion">Solicitar derivación a mi red</option>
+      <option value="info">Pedir información (no frena el plazo)</option>
+    </select>
+    <div id="den-blk-alcance" style="display:none;"><label>Qué autorizás y qué no</label><textarea id="den-alc" placeholder="Ej: autorizamos la internación clínica; la angioplastia requiere autorización previa."></textarea></div>
+    <div id="den-blk-deriv" style="display:none;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <div><label>Centro receptor</label><input id="den-centro" placeholder="Ej: Clínica IOMA La Plata"></div>
+        <div><label>Quién gestiona el traslado</label><select id="den-gest"><option>Financiador (ambulancia propia)</option><option>Financiador (servicio contratado)</option><option>Centro receptor</option></select></div>
+        <div><label>Retiro estimado</label><input id="den-retiro" type="datetime-local" value="${addHoras(AHORA_DEN, 6)}"></div>
+        <div><label>Contacto para coordinar</label><input id="den-cont" placeholder="Ej: Central de traslados 0221-..."></div>
+      </div>
+      <div class="note" style="margin-top:8px;">Si el retiro no ocurre a tiempo o el hospital informa que el paciente no es trasladable, la denuncia se da por aceptada.</div>
+    </div>
+    <label>Comentario</label><textarea id="den-txt" placeholder="Opcional (obligatorio si pedís información)"></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarRespuestaDenuncia('${d.id}')">Enviar respuesta</button>
+    </div>`);
+};
+window.cambiaRespDen = function() {
+  const t = $("#den-resp").value;
+  $("#den-blk-alcance").style.display = t === "alcance" ? "block" : "none";
+  $("#den-blk-deriv").style.display = t === "derivacion" ? "block" : "none";
+};
+window.confirmarRespuestaDenuncia = function(id) {
+  const d = denPor(id); if (!d) return;
+  const t = $("#den-resp").value; const txt = ($("#den-txt").value || "").trim();
+  const usr = usuarioFinActual(); const quien = usr ? `${usr.nombre} ${usr.apellido} (IOMA)` : "IOMA";
+  if (t === "info") {
+    if (!txt) { showToast("⚠ Indicá qué información necesitás"); return; }
+    d.estado = "INFO_PEDIDA"; d.respuestaInfo = { fecha: AHORA_DEN, usuario: quien, texto: txt };
+    d.log.push({ who: "financiador", when: AHORA_DEN, text: `Pide información: ${txt} El plazo sigue corriendo.` });
+  } else if (t === "derivacion") {
+    const centro = ($("#den-centro").value || "").trim(); if (!centro) { showToast("⚠ Indicá el centro receptor"); return; }
+    d.respuesta = { tipo: "derivacion", fecha: AHORA_DEN, usuario: quien, centro, gestiona: $("#den-gest").value, retiro: $("#den-retiro").value, contacto: $("#den-cont").value, texto: txt };
+    d.estado = "DERIV_SOLICITADA";
+    d.log.push({ who: "financiador", when: AHORA_DEN, text: `Solicita derivación a ${centro}. Retiro estimado ${fmtDT(d.respuesta.retiro)}, gestiona: ${d.respuesta.gestiona}.` });
+  } else {
+    const alc = t === "alcance" ? ($("#den-alc").value || "").trim() : "";
+    if (t === "alcance" && !alc) { showToast("⚠ Detallá el alcance"); return; }
+    d.respuesta = { tipo: t, fecha: AHORA_DEN, usuario: quien, alcance: alc, texto: txt };
+    d.estado = t === "alcance" ? "ACEPTADA_ALCANCE" : "ACEPTADA";
+    d.log.push({ who: "financiador", when: AHORA_DEN, text: t === "alcance" ? `Acepta con alcance: ${alc}` : "Acepta la internación en el hospital. Se genera la constancia." });
+  }
+  closeModal(); render(); showToast(`✓ Respuesta registrada — ${DEN_ESTADO[d.estado].txt}`);
+};
+
+/* ---- Acciones del hospital sobre una denuncia ---- */
+window.openModalDenInfo = function(id) {
+  const d = denPor(id); if (!d) return;
+  openModal(`<h3>Responder pedido de información — ${d.id}</h3>
+    <div class="note">${esc(d.respuestaInfo?.texto || "")}</div>
+    <label>Respuesta</label><textarea id="den-info-txt" placeholder="Ej: adjuntamos ecocardiograma y laboratorio de ingreso."></textarea>
+    <div class="attachments" style="margin-top:8px;"><span class="attachment-chip">📎 estudios_complementarios.pdf</span> <span style="font-size:11px;color:var(--muted);">(simulado)</span></div>
+    <div class="modal-actions"><button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarDenInfo('${d.id}')">Enviar</button></div>`);
+};
+window.confirmarDenInfo = function(id) {
+  const d = denPor(id); const txt = ($("#den-info-txt").value || "").trim(); if (!txt) { showToast("⚠ Escribí la respuesta"); return; }
+  d.estado = "PENDIENTE"; d.adjuntos.push("estudios_complementarios.pdf");
+  d.log.push({ who: "hospital", when: AHORA_DEN, text: `Responde el pedido de información: ${txt} (el plazo original no cambia).` });
+  closeModal(); render(); showToast("✓ Información enviada al financiador");
+};
+window.denConfirmarTraslado = function(id, ok) {
+  const d = denPor(id); if (!d) return;
+  if (ok) {
+    d.estado = "DERIV_EN_CURSO"; d.derivacion = { confirmada: AHORA_DEN, porQuien: "SAMO Hosp. San Martín" };
+    d.log.push({ who: "hospital", when: AHORA_DEN, text: `Confirma que el paciente es trasladable. Queda a la espera del retiro (estimado ${fmtDT(d.respuesta?.retiro)}).` });
+  } else {
+    const motivo = prompt("Motivo (criterio del médico tratante):", "Paciente inestable, no apto para traslado.");
+    if (motivo === null) return;
+    d.estado = "DERIV_FALLIDA"; d.derivacion = { fallida: AHORA_DEN, motivo: "No trasladable: " + motivo };
+    d.log.push({ who: "hospital", when: AHORA_DEN, text: `Informa que el paciente NO es trasladable (${motivo}). La denuncia se da por aceptada y la atención sigue en el hospital.` });
+  }
+  render(); showToast(ok ? "✓ Traslado confirmado — esperando retiro" : "✓ Registrado: no trasladable, se da por aceptada");
+};
+window.denRegistrarRetiro = function(id, ok) {
+  const d = denPor(id); if (!d) return;
+  if (ok) {
+    const quien = prompt("¿Quién retiró al paciente?", "Ambulancia IOMA"); if (quien === null) return;
+    d.estado = "DERIVADO"; Object.assign(d.derivacion = d.derivacion || {}, { retiro: AHORA_DEN, retiradoPor: quien });
+    d.log.push({ who: "hospital", when: AHORA_DEN, text: `Paciente retirado (${quien}). Derivación concretada.` });
+  } else {
+    d.estado = "DERIV_FALLIDA"; Object.assign(d.derivacion = d.derivacion || {}, { fallida: AHORA_DEN, motivo: "El financiador no retiró al paciente en el plazo acordado." });
+    d.log.push({ who: "hospital", when: AHORA_DEN, text: "Retiro no concretado en plazo: la denuncia se da por aceptada y el paciente sigue internado en el hospital." });
+  }
+  render(); showToast(ok ? "✓ Derivación concretada" : "✓ Retiro no concretado — se da por aceptada");
+};
+// Atajo de demo: adelanta el reloj de UNA denuncia para ver la aceptación tácita.
+window.denSimularVencimiento = function(id) {
+  const d = denPor(id); if (!d) return; d.vence = addHoras(AHORA_DEN, -0.1); render();
+  showToast("⏩ Simulado: vencieron las 48 h sin respuesta");
+};
+
+/* ---- Detalle (hospital, financiador y ministerio) ---- */
+function viewDenuncia_Detalle(id) {
+  const d = denPor(id); const rol = state.role;
+  if (!d) return `<div class="card">Denuncia no encontrada.</div>`;
+  const volver = rol === "hospital" ? "den_hosp" : rol === "ministerio" ? "denuncias_min" : "den_fin";
+  const r = d.respuesta; const dv = d.derivacion;
+  const constancia = denAceptadaTotal(d) || d.estado === "DERIVADO";
+  let acciones = "";
+  if (rol === "financiador" && d.estado === "PENDIENTE") acciones = `<button class="btn btn-primary" onclick="openModalResponderDenuncia('${d.id}')">Responder</button>`;
+  if (rol === "hospital" && d.estado === "INFO_PEDIDA") acciones = `<button class="btn btn-primary" onclick="openModalDenInfo('${d.id}')">Responder pedido de información</button>`;
+  if (rol === "hospital" && d.estado === "DERIV_SOLICITADA") acciones = `<button class="btn btn-success" onclick="denConfirmarTraslado('${d.id}', true)">✓ Es trasladable</button> <button class="btn btn-danger" onclick="denConfirmarTraslado('${d.id}', false)">✗ No es trasladable</button>`;
+  if (rol === "hospital" && d.estado === "DERIV_EN_CURSO") acciones = `<button class="btn btn-success" onclick="denRegistrarRetiro('${d.id}', true)">✓ Registrar retiro</button> <button class="btn btn-danger" onclick="denRegistrarRetiro('${d.id}', false)">Retiro no concretado</button>`;
+  return `<div class="page-header">
+      <div><a href="#" data-goto="${volver}" style="font-size:12px;">← Denuncias</a>
+        <h1>${d.id} · ${esc(d.paciente)}</h1>
+        <div class="sub">${rol === "hospital" ? finNombre(d.financiador) : hospNombre(d.hospital)} · enviada ${fmtDT(d.enviada)} por ${d.canal.toLowerCase()}</div></div>
+      <div class="page-actions">${chipDen(d)}</div>
+    </div>
+    ${acciones ? `<div class="card" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><strong style="margin-right:8px;">Acción pendiente:</strong>${acciones}</div>` : ""}
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:16px;">
+      <div class="card">
+        <h3 class="card-title">Datos de la internación</h3>
+        <table style="font-size:13px;"><tbody>
+          <tr><td style="color:var(--muted);width:200px;">Paciente</td><td><strong>${esc(d.paciente)}</strong> · DNI ${d.dni}</td></tr>
+          <tr><td style="color:var(--muted);">Afiliado</td><td>${esc(d.afiliado)} <span style="font-size:11px;color:var(--muted);">(padrón consultado ${fmtDT(d.enviada)})</span></td></tr>
+          <tr><td style="color:var(--muted);">Ingreso</td><td>${fmtDT(d.ingreso)} · ${esc(d.servicio)}</td></tr>
+          <tr><td style="color:var(--muted);">Diagnóstico presuntivo</td><td>${esc(d.diagnostico)}</td></tr>
+          <tr><td style="color:var(--muted);">Práctica prevista</td><td>${esc(d.practica)}</td></tr>
+          <tr><td style="color:var(--muted);">Médico tratante</td><td>${esc(d.medico)}</td></tr>
+          <tr><td style="color:var(--muted);">Trasladable</td><td>${trasladableTxt(d.trasladable)}</td></tr>
+        </tbody></table>
+        <div class="attachments" style="margin-top:10px;">${d.adjuntos.map(a => `<span class="attachment-chip">📎 ${a}</span>`).join(" ")}</div>
+      </div>
+      <div class="card">
+        <h3 class="card-title">Plazo</h3>
+        ${denRelojCorre(d) ? relojDen(d) + (rol !== "ministerio" ? `<div style="margin-top:10px;"><a href="#" style="font-size:11px;" onclick="event.preventDefault();denSimularVencimiento('${d.id}')">⏩ Simular vencimiento (demo)</a></div>` : "") : `<div style="color:var(--muted);font-size:13px;">Cerrado: ${DEN_ESTADO[d.estado].txt.toLowerCase()}.</div>`}
+        ${r ? `<h3 class="card-title" style="margin-top:16px;">Respuesta del financiador</h3>
+          <div style="font-size:13px;line-height:1.6;">
+            <div><strong>${r.tipo === "acepta" ? "Acepta la internación" : r.tipo === "alcance" ? "Acepta con alcance" : "Solicita derivación"}</strong> · ${fmtDT(r.fecha)}</div>
+            ${r.usuario ? `<div style="color:var(--muted);">${esc(r.usuario)}</div>` : ""}
+            ${r.alcance ? `<div>${esc(r.alcance)}</div>` : ""}
+            ${r.centro ? `<div>Centro: <strong>${esc(r.centro)}</strong></div><div>Traslado: ${esc(r.gestiona || "—")}</div><div>Retiro estimado: ${fmtDT(r.retiro)}</div><div>Contacto: ${esc(r.contacto || "—")}</div>` : ""}
+            ${r.texto ? `<div style="color:var(--muted);margin-top:4px;">"${esc(r.texto)}"</div>` : ""}
+          </div>` : ""}
+        ${dv && (dv.retiro || dv.fallida) ? `<h3 class="card-title" style="margin-top:16px;">Derivación</h3><div style="font-size:13px;">${dv.retiro ? `Retirado ${fmtDT(dv.retiro)} · ${esc(dv.retiradoPor)}` : esc(dv.motivo)}</div>` : ""}
+      </div>
+    </div>
+    ${constancia ? `<div class="card" style="border-left:4px solid var(--success);">
+      <h3 class="card-title">Constancia</h3>
+      <div style="font-size:13px;">${d.estado === "ACEPTADA_TACITA" ? `Aceptación <strong>tácita</strong> por vencimiento del plazo de ${HORAS_DENUNCIA} h (${fmtDT(d.vence)}) sin respuesta del financiador.`
+        : d.estado === "DERIV_FALLIDA" ? `Se da por aceptada: ${esc(dv?.motivo || "derivación no concretada")}`
+        : d.estado === "DERIVADO" ? `Derivación concretada: el episodio en este hospital termina con el retiro del paciente.`
+        : `Aceptación expresa del financiador (${fmtDT(r?.fecha)}).`}</div>
+      <div class="attachments" style="margin-top:8px;"><span class="attachment-chip">📄 constancia_${d.id.toLowerCase()}.pdf</span></div>
+      <div class="note note-blue" style="margin-top:10px;margin-bottom:0;">La constancia se adjunta al episodio en el sistema de facturación y <strong>viaja con la factura</strong> de esta internación: respalda frente a objeciones por "falta de autorización previa" o "sin convenio".</div>
+    </div>` : ""}
+    <div class="card">
+      <h3 class="card-title">Historial</h3>
+      ${d.log.slice().reverse().map(l => `<div style="border-left:3px solid ${l.who === "financiador" ? "var(--warn)" : l.who === "sistema" ? "var(--muted)" : "var(--primary)"};padding:6px 12px;margin-bottom:8px;font-size:13px;">
+        <div style="font-size:11px;color:var(--muted);">${fmtDT(l.when)} · ${l.who === "financiador" ? finNombre(d.financiador) : l.who === "sistema" ? "Sistema" : hospCorto(d.hospital)}</div>${esc(l.text)}</div>`).join("")}
+    </div>`;
+}
+
+/* ---- MINISTERIO: seguimiento (solo lectura) — pantalla propia con KPIs + tabla por financiador + detalle ---- */
+function viewMinisterio_Denuncias() {
+  const ds = state.denuncias; const fl = state.filtrosDenuncia;
+  const pend = ds.filter(denRelojCorre);
+  const tacitas = ds.filter(d => d.estado === "ACEPTADA_TACITA");
+  const conResp = ds.filter(denConRespuesta);
+  const derivSol = ds.filter(d => d.respuesta && d.respuesta.tipo === "derivacion");
+  const derivados = ds.filter(d => d.estado === "DERIVADO");
+  const fallidas = ds.filter(d => d.estado === "DERIV_FALLIDA");
+  const fuera = ds.filter(d => !finEnPortal(d.financiador));
+  const cerradas = ds.filter(d => !denRelojCorre(d));
+  const tasa = cerradas.length ? Math.round(cerradas.filter(denConRespuesta).length / cerradas.length * 100) : 0;
+  const fins = [...new Set(ds.map(d => d.financiador))];
+  const filtradas = ds.filter(d =>
+    (fl.estado === "TODOS" || d.estado === fl.estado) &&
+    (fl.financiador === "TODOS" || d.financiador === fl.financiador) &&
+    (!fl.q || (d.paciente + " " + d.id + " " + hospCorto(d.hospital)).toLowerCase().includes(fl.q.toLowerCase())));
+  return `
+    <div class="page-header">
+      <div><h1>Denuncias de internación</h1><div class="sub">Seguimiento del Ministerio — solo lectura · las operan hospital y financiador</div></div>
+      <div class="page-actions"><button class="btn btn-excel" onclick="exportDenuncias()">⬇ Excel</button></div>
+    </div>
+    <div class="note note-blue"><strong>El Ministerio solo hace seguimiento (P7.6).</strong> La denuncia la cargan los hospitales y la responden los financiadores (auditoría médica). Acá ves el panorama: cuántas quedan sin respuesta, cuántas se aceptaron por silencio y cómo terminaron las derivaciones.</div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="label">Denuncias enviadas</div><div class="value">${ds.length}</div><div class="hint">${fuera.length} por mail (fuera del portal)</div></div>
+      <div class="kpi ${pend.length ? 'warning' : ''}"><div class="label">Con plazo corriendo</div><div class="value ${pend.length ? 'warn' : ''}">${pend.length}</div><div class="hint">${pend.filter(d => horasRestDen(d) < 12).length} vencen en &lt;12 h</div></div>
+      <div class="kpi good"><div class="label">Con respuesta</div><div class="value success">${conResp.length}</div><div class="hint">${tasa}% de las cerradas respondidas</div></div>
+      <div class="kpi"><div class="label">Sin respuesta (tácitas)</div><div class="value">${tacitas.length}</div><div class="hint">aceptadas por silencio</div></div>
+      <div class="kpi"><div class="label">Derivaciones</div><div class="value">${derivados.length} / ${derivSol.length}</div><div class="hint">concretadas / solicitadas · ${fallidas.length} no concretadas</div></div>
+    </div>
+    <div class="card">
+      <h3 class="card-title">Por financiador</h3>
+      <table>
+        <thead><tr><th>Financiador</th><th style="text-align:center;">Denuncias</th><th style="text-align:center;">Con respuesta</th><th style="text-align:center;">Sin respuesta (tácita)</th><th style="text-align:center;">Plazo corriendo</th><th style="text-align:center;">Deriv. solicitada</th><th style="text-align:center;">Derivados</th><th style="text-align:center;">No concretadas</th><th style="text-align:center;">Tasa de respuesta</th></tr></thead>
+        <tbody>${fins.map(fid => { const g = ds.filter(d => d.financiador === fid);
+          const gResp = g.filter(denConRespuesta).length, gTac = g.filter(d => d.estado === "ACEPTADA_TACITA").length, gPend = g.filter(denRelojCorre).length;
+          const gDerS = g.filter(d => d.respuesta && d.respuesta.tipo === "derivacion").length, gDer = g.filter(d => d.estado === "DERIVADO").length, gFall = g.filter(d => d.estado === "DERIV_FALLIDA").length;
+          const cer = g.length - gPend; const t = cer ? Math.round(gResp / cer * 100) : null;
+          return `<tr><td><strong>${finNombre(fid)}</strong>${finEnPortal(fid) ? "" : ' <span class="chip chip-en-cola">fuera del portal</span>'}</td>
+            <td style="text-align:center;">${g.length}</td><td style="text-align:center;">${gResp}</td><td style="text-align:center;">${gTac || "—"}</td>
+            <td style="text-align:center;">${gPend || "—"}</td><td style="text-align:center;">${gDerS || "—"}</td><td style="text-align:center;">${gDer || "—"}</td>
+            <td style="text-align:center;${gFall ? "color:var(--danger);font-weight:600;" : ""}">${gFall || "—"}</td>
+            <td style="text-align:center;">${t === null ? "—" : `<strong style="color:${t >= 70 ? "var(--success)" : t >= 40 ? "var(--warn)" : "var(--danger)"};">${t}%</strong>`}</td></tr>`; }).join("")}</tbody>
+      </table>
+    </div>
+    <div class="card" style="padding:0;">
+      <div class="group-header" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <strong style="margin-right:auto;">Detalle de denuncias</strong>
+        <input data-filtro-denuncia="q" placeholder="Buscar paciente / hospital…" value="${esc(fl.q)}" style="padding:5px 10px;border:1px solid var(--border);border-radius:5px;font-size:12px;">
+        <select data-filtro-denuncia="financiador" style="padding:5px;border:1px solid var(--border);border-radius:5px;font-size:12px;">
+          <option value="TODOS">Todos los financiadores</option>
+          ${fins.map(fid => `<option value="${fid}" ${fl.financiador === fid ? 'selected' : ''}>${finNombre(fid)}</option>`).join("")}
+        </select>
+        <select data-filtro-denuncia="estado" style="padding:5px;border:1px solid var(--border);border-radius:5px;font-size:12px;">
+          <option value="TODOS">Todos los estados</option>
+          ${Object.entries(DEN_ESTADO).map(([k, v]) => `<option value="${k}" ${fl.estado === k ? 'selected' : ''}>${v.txt}</option>`).join("")}
+        </select>
+      </div>
+      <table>
+        <thead><tr><th>Denuncia</th><th>Paciente</th><th>Hospital</th><th>Financiador</th><th>Ingreso</th><th style="text-align:center;">Estado</th><th>Canal</th></tr></thead>
+        <tbody>${filtradas.length === 0 ? '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted);">Sin denuncias con esos filtros.</td></tr>' :
+          filtradas.map(d => `<tr class="clickable" onclick="abrirDenuncia('${d.id}')">
+            <td><code>${d.id}</code></td>
+            <td>${esc(d.paciente)}</td>
+            <td>${hospCorto(d.hospital)}</td>
+            <td>${finNombre(d.financiador)}</td>
+            <td>${fmtDT(d.ingreso)}</td>
+            <td style="text-align:center;">${chipDen(d)}</td>
+            <td style="font-size:12px;color:var(--muted);">${d.canal}</td>
+          </tr>`).join("")}</tbody>
+      </table>
+    </div>`;
+}
+window.exportDenuncias = function() {
+  const rows = [["Denuncia","Paciente","DNI","Afiliado","Hospital","Financiador","Canal","Ingreso","Servicio","Diagnóstico","Enviada","Vence","Estado"]];
+  state.denuncias.forEach(d => rows.push([d.id, d.paciente, d.dni, d.afiliado, hospNombre(d.hospital), finNombre(d.financiador), d.canal, d.ingreso, d.servicio, d.diagnostico, d.enviada, d.vence, DEN_ESTADO[d.estado].txt]));
+  exportCSV("denuncias_internacion.csv", rows);
+};
+// El ministerio filtra la tabla de detalle (typeahead + financiador + estado).
+function wireDenuncias() { wireFiltros('[data-filtro-denuncia]', 'filtroDenuncia', 'filtrosDenuncia'); }
+
 /* ===================== INICIALIZACIÓN ===================== */
 /* Corre una sola vez, después de que están definidos todos los helpers. */
 
@@ -9024,6 +9722,17 @@ state.facturas.forEach(f => {
     if (o.respuestas.filter(r => !r.inicial).length === 0) sintetizarConversacion(f, o);
   });
 });
+
+/* Testigo de AUDITORÍA COMPARTIDA del lado del financiador (pedido en vivo). El rol Hospital está fijado a
+   H001, así que para que una auditoría solicitada por el financiador le llegue al hospital, la factura TIENE
+   que ser de H001. Reservamos 0001-00042190 (H001, esperando_financiador → objeciones `respondido`) para que
+   la semilla de demo (más abajo) NO consuma sus objeciones: queda lista para entrar como financiador, marcar
+   "Ver en auditoría compartida" y solicitarla, y verla después en el rol Hospital. Sin esto, las únicas
+   facturas con objeciones `respondido` quedaban en H002–H005, invisibles para el hospital H001. */
+(() => {
+  const f = state.facturas.find(x => x.nro === "0001-00042190");
+  if (f) f.__slaDemo = "audcompartida";   // excluye de la semilla/mixto que convierten las objeciones `respondido`
+})();
 
 /* Auditorías compartidas del mock: completar las prestaciones a auditar desde las objeciones abiertas de
    su factura (el financiador las eligió; acá las derivamos de las objetadas para que el testigo arranque
