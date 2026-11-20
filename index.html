@@ -437,8 +437,8 @@ const hospPorCuit = (cuit) => HOSPITALES.find(h => h.cuit === (cuit || "").trim(
    ese CUIT más el DNI de la persona responsable / apoderado. Los sin_usuario todavía no lo tienen
    cargado — se ingresa recién en el alta desde el ABM del ministerio. */
 const FINANCIADORES = [
-  { id: "F001", nombre: "IOMA", tipo: "Obra Social Provincial", estado: "activo", alta: "2026-03-02", cuit: "30-62345678-9" },
-  { id: "F002", nombre: "PAMI", tipo: "Obra Social Nacional", estado: "activo", alta: "2026-04-15", cuit: "30-64567890-1" },
+  { id: "F001", nombre: "OSPECON", tipo: "Obra Social Nacional", estado: "activo", alta: "2026-03-02", cuit: "30-62345678-9" },
+  { id: "F002", nombre: "OSMATA", tipo: "Obra Social Nacional", estado: "activo", alta: "2026-04-15", cuit: "30-64567890-1" },
   { id: "F003", nombre: "OSDE", tipo: "Prepaga", estado: "activo", alta: "2026-05-04", cuit: "30-54876543-2" },
   { id: "F004", nombre: "Swiss Medical", tipo: "Prepaga", estado: "activo", alta: "2026-06-01", cuit: "30-59123456-7" },
   { id: "F005", nombre: "OSECAC", tipo: "Obra Social Sindical", estado: "activo", alta: "2026-06-20", cuit: "30-52987654-3" },
@@ -550,13 +550,13 @@ const FACTURAS = [
       { id: "OBJ-2", items: ["I-97-3"], categoria: "Falta autorización previa", detalle: "No consta autorización previa para la cirugía programada.", monto: 620800, fecha: "2026-07-28" }
     ] },
   { nro: "0001-00042194", hospital: "H001", financiador: "F005", fecha: "2026-07-15", monto: 780000, montoPagado: 0, estado: "aceptada", pacientes: 3 },
-  /* Caso testigo del flujo nuevo "solicitar rechazo de factura": IOMA pidió el rechazo total con un
+  /* Caso testigo del flujo nuevo "solicitar rechazo de factura": OSPECON pidió el rechazo total con un
      motivo, y espera resolución de la auditoría central (aprobar / denegar / derivar al hospital). */
   { nro: "0001-00042198", hospital: "H001", financiador: "F001", fecha: "2026-07-30", monto: 680000, montoPagado: 0, estado: "esperando_auditoria", pacientes: 4, montoDebate: 680000,
-    solicitudRechazo: { motivo: "La factura corresponde a un afiliado que no pertenece a IOMA: el padrón no lo registra en ninguna de las fechas de atención. Se solicita el desconocimiento íntegro.", fecha: "2026-07-31", estado: "en_auditoria", adjuntos: [{ nombre: "consulta_padron_ioma_julio.pdf", tipo: "pdf" }] } },
-  // IOMA ya transfirió por esta factura pero no imputó: el hospital puede intimarlo (ver PEF-001)
+    solicitudRechazo: { motivo: "La factura corresponde a un afiliado que no pertenece a OSPECON: el padrón no lo registra en ninguna de las fechas de atención. Se solicita el desconocimiento íntegro.", fecha: "2026-07-31", estado: "en_auditoria", adjuntos: [{ nombre: "consulta_padron_ospecon_julio.pdf", tipo: "pdf" }] } },
+  // OSPECON ya transfirió por esta factura pero no imputó: el hospital puede intimarlo (ver PEF-001)
   { nro: "0001-00042210", hospital: "H001", financiador: "F001", fecha: "2026-06-18", monto: 1750000, montoPagado: 0, estado: "pago_efectuado", pacientes: 8 },
-  // Ya intimada y sin pago: es la que sostiene el par H001–PAMI en el acumulador judicial (18,7 JUS)
+  // Ya intimada y sin pago: es la que sostiene el par H001–OSMATA en el acumulador judicial (18,7 JUS)
   { nro: "0001-00041000", hospital: "H001", financiador: "F002", fecha: "2026-05-15", monto: 2800000, montoPagado: 0, estado: "intimada", pacientes: 11, fechaIntimacion: "2026-07-20" },
   { nro: "0001-00040500", hospital: "H001", financiador: "F003", fecha: "2026-06-01", monto: 1100000, montoPagado: 550000, estado: "pago_parcial", pacientes: 5 },
   { nro: "0001-00040000", hospital: "H001", financiador: "F001", fecha: "2026-04-15", monto: 1200000, montoPagado: 1200000, estado: "cerrada", pacientes: 6 },
@@ -573,8 +573,8 @@ const FACTURAS = [
   { nro: "0001-00042251", hospital: "H001", financiador: "F006", fecha: "2026-08-01", monto: 1180000, montoPagado: 0, estado: "en_cola", pacientes: 6 },
   { nro: "0004-00028310", hospital: "H002", financiador: "F006", fecha: "2026-08-01", monto: 740000, montoPagado: 0, estado: "en_cola", pacientes: 3 },
 
-  /* --- Conciliaciones de IOMA en H002 (Rossi) y H004 (Gutiérrez) ---
-     La operadora restringida de IOMA solo ve H001/H003/H005, así que estos casos NO le aparecen en
+  /* --- Conciliaciones de OSPECON en H002 (Rossi) y H004 (Gutiérrez) ---
+     La operadora restringida de OSPECON solo ve H001/H003/H005, así que estos casos NO le aparecen en
      "Esperan mi respuesta" ni en "Esperando resolución": son los que hacen visible la diferencia entre
      el admin (ve todo) y la operadora restringida. Se cargan con montoDebate para que el init sintetice
      un planteo real sobre prestaciones generadas. */
@@ -589,7 +589,7 @@ const FACTURAS = [
   { nro: "0012-00010222", hospital: "H004", financiador: "F001", fecha: "2026-07-21", monto: 1760000, montoPagado: 0, estado: "esperando_financiador", pacientes: 8, montoDebate: 305600 },
   { nro: "0012-00010223", hospital: "H004", financiador: "F001", fecha: "2026-07-17", monto: 940500, montoPagado: 0, estado: "esperando_financiador", pacientes: 5, montoDebate: 141800 },
 
-  // --- Notificación consolidada del 2026-08-01 a IOMA: recién recibida, ninguna revisada todavía ---
+  // --- Notificación consolidada del 2026-08-01 a OSPECON: recién recibida, ninguna revisada todavía ---
   // Es el lote al que apunta la alerta del panel: todas en "notificada", coherente con que acaba de llegar.
   { nro: "0001-00042195", hospital: "H001", financiador: "F001", fecha: "2026-08-01", monto: 2900220, montoPagado: 0, estado: "notificada", pacientes: 8 },
   { nro: "0001-00042300", hospital: "H001", financiador: "F001", fecha: "2026-08-01", monto: 2150000, montoPagado: 0, estado: "notificada", pacientes: 9 },
@@ -614,7 +614,7 @@ const FACTURAS = [
   // Vigente con nota de crédito parcial — el saldo baja pero el reloj sigue corriendo
   { nro: "0001-00042196", hospital: "H001", financiador: "F005", fecha: "2026-06-20", monto: 1400000, montoPagado: 0, notasCredito: 300000, estado: "aceptada", pacientes: 7 },
 
-  // --- Historial 2025 de IOMA (F001) — alimenta el filtro de temporalidad del panel del financiador ---
+  // --- Historial 2025 de OSPECON (F001) — alimenta el filtro de temporalidad del panel del financiador ---
   { nro: "0001-00038010", hospital: "H001", financiador: "F001", fecha: "2025-03-12", monto: 2450000, montoPagado: 2450000, estado: "cerrada", pacientes: 14 },
   { nro: "0001-00038450", hospital: "H001", financiador: "F001", fecha: "2025-06-20", monto: 1780000, montoPagado: 1780000, estado: "cerrada", pacientes: 9 },
   { nro: "0001-00039100", hospital: "H001", financiador: "F001", fecha: "2025-09-05", monto: 3120000, montoPagado: 3120000, estado: "cerrada", pacientes: 16 },
@@ -622,7 +622,7 @@ const FACTURAS = [
   { nro: "0004-00025900", hospital: "H002", financiador: "F001", fecha: "2025-10-14", monto: 2340000, montoPagado: 2340000, estado: "cerrada", pacientes: 12 },
   { nro: "0012-00008800", hospital: "H004", financiador: "F001", fecha: "2025-07-22", monto: 1420000, montoPagado: 1420000, estado: "cerrada", pacientes: 8 },
   { nro: "0015-00006050", hospital: "H005", financiador: "F001", fecha: "2025-11-03", monto: 1660000, montoPagado: 1660000, estado: "cerrada", pacientes: 10 },
-  // Morosas 2025 del par Evita–IOMA, ya judicializadas en su momento (EXP-2025-0007)
+  // Morosas 2025 del par Evita–OSPECON, ya judicializadas en su momento (EXP-2025-0007)
   { nro: "0007-00017200", hospital: "H003", financiador: "F001", fecha: "2025-04-18", monto: 1650000, montoPagado: 400000, estado: "judicializada", pacientes: 10, fechaIntimacion: "2025-09-05", expediente: "EXP-2025-0007" },
   { nro: "0007-00017450", hospital: "H003", financiador: "F001", fecha: "2025-08-30", monto: 1280000, montoPagado: 0, estado: "judicializada", pacientes: 7, fechaIntimacion: "2025-11-02", expediente: "EXP-2025-0007" },
 ];
@@ -643,7 +643,7 @@ const PREPORTAL_ESTADO_LABEL = {
   judicial: "En gestión judicial (previa)",
 };
 const DEUDA_PREPORTAL = [
-  // --- IOMA (F001) — el actor fijo del rol Financiador: su histórico es el que más se demuestra ---
+  // --- OSPECON (F001) — el actor fijo del rol Financiador: su histórico es el que más se demuestra ---
   { nro: "0001-00031204", financiador: "F001", hospital: "H001", fecha: "2024-09-12", monto: 1980000, saldo: 1980000, estado: "impaga",   gestion: "Reclamo administrativo — nota DPSAMO 2024" },
   { nro: "0001-00032890", financiador: "F001", hospital: "H001", fecha: "2024-11-25", monto: 2450000, saldo: 1200000, estado: "parcial",  gestion: "Convenio de pago parcial (2 cuotas)" },
   { nro: "0001-00034115", financiador: "F001", hospital: "H001", fecha: "2025-02-08", monto: 1670000, saldo: 1670000, estado: "judicial", gestion: "Expediente judicial previo — Juzgado C. y C. N°4 La Plata" },
@@ -749,7 +749,7 @@ function chipPreportal(estado) {
     }
   };
 
-  // ---- IOMA (F001): notificaciones grandes para que el rol Financiador se vea con volumen ----
+  // ---- OSPECON (F001): notificaciones grandes para que el rol Financiador se vea con volumen ----
   generarNotif("F001", "2026-08-01", 30);   // amplía el lote testigo (ya tenía algunas)
   generarNotif("F001", "2026-07-15", 32);   // amplía el testigo
   generarNotif("F001", "2026-07-01", 38);
@@ -779,8 +779,8 @@ function chipPreportal(estado) {
   generarRetenidas("F017", 9);    // Prevención Salud
 
   // ---- Aptas para notificar: cola real del ministerio, muchos financiadores × hospitales ----
-  generarAptas("F001", 18);       // IOMA
-  generarAptas("F002", 22);       // PAMI
+  generarAptas("F001", 18);       // OSPECON
+  generarAptas("F002", 22);       // OSMATA
   generarAptas("F003", 16);       // OSDE
   generarAptas("F004", 12);       // Swiss Medical
   generarAptas("F005", 14);       // OSECAC
@@ -802,34 +802,34 @@ FACTURAS.forEach(f => {
 });
 const ITEMS_FACTURA = {
   "0001-00042189": [
-    { id: "I-89-1", paciente: "González, María", dni: "25.312.***", afiliado: "IOMA 4-501-023***", prestacion: "Interconsulta durante internación", codigo: "420150", fecha: "2026-07-04", monto: 145200 },
-    { id: "I-89-2", paciente: "Pérez, Juan", dni: "30.812.***", afiliado: "IOMA 4-503-819***", prestacion: "Internación clínica 3 días", codigo: "620301", fecha: "2026-07-06", monto: 480500 },
-    { id: "I-89-3", paciente: "Rodríguez, Ana", dni: "42.101.***", afiliado: "IOMA 4-509-102***", prestacion: "Cirugía menor + insumos", codigo: "710422", fecha: "2026-07-08", monto: 620800 },
-    { id: "I-89-4", paciente: "López, Carlos", dni: "28.445.***", afiliado: "IOMA 4-502-777***", prestacion: "Estudios de laboratorio", codigo: "310105", fecha: "2026-07-09", monto: 98400 },
-    { id: "I-89-5", paciente: "Martínez, Elena", dni: "33.222.***", afiliado: "IOMA 4-510-345***", prestacion: "Diagnóstico por imágenes", codigo: "340210", fecha: "2026-07-11", monto: 500420 },
+    { id: "I-89-1", paciente: "González, María", dni: "25.312.***", afiliado: "OSPECON 4-501-023***", prestacion: "Interconsulta durante internación", codigo: "420150", fecha: "2026-07-04", monto: 145200 },
+    { id: "I-89-2", paciente: "Pérez, Juan", dni: "30.812.***", afiliado: "OSPECON 4-503-819***", prestacion: "Internación clínica 3 días", codigo: "620301", fecha: "2026-07-06", monto: 480500 },
+    { id: "I-89-3", paciente: "Rodríguez, Ana", dni: "42.101.***", afiliado: "OSPECON 4-509-102***", prestacion: "Cirugía menor + insumos", codigo: "710422", fecha: "2026-07-08", monto: 620800 },
+    { id: "I-89-4", paciente: "López, Carlos", dni: "28.445.***", afiliado: "OSPECON 4-502-777***", prestacion: "Estudios de laboratorio", codigo: "310105", fecha: "2026-07-09", monto: 98400 },
+    { id: "I-89-5", paciente: "Martínez, Elena", dni: "33.222.***", afiliado: "OSPECON 4-510-345***", prestacion: "Diagnóstico por imágenes", codigo: "340210", fecha: "2026-07-11", monto: 500420 },
   ],
   // Factura con pacientes repetidos y 6 prestaciones del mismo nomenclador (420101):
   // sirve para objetar un ítem suelto de un paciente y para objetar en lote por código.
   "0001-00042195": [
-    { id: "I-95-1", paciente: "González, María", dni: "25.312.***", afiliado: "IOMA 4-501-023***", prestacion: "Consulta guardia", codigo: "420101", fecha: "2026-05-28", monto: 145200 },
-    { id: "I-95-2", paciente: "González, María", dni: "25.312.***", afiliado: "IOMA 4-501-023***", prestacion: "Estudios de laboratorio", codigo: "310105", fecha: "2026-05-28", monto: 98400 },
-    { id: "I-95-3", paciente: "González, María", dni: "25.312.***", afiliado: "IOMA 4-501-023***", prestacion: "Diagnóstico por imágenes", codigo: "340210", fecha: "2026-05-29", monto: 250420 },
-    { id: "I-95-4", paciente: "Pérez, Juan", dni: "30.812.***", afiliado: "IOMA 4-503-819***", prestacion: "Consulta guardia", codigo: "420101", fecha: "2026-05-30", monto: 145200 },
-    { id: "I-95-5", paciente: "Pérez, Juan", dni: "30.812.***", afiliado: "IOMA 4-503-819***", prestacion: "Observación en guardia 24 hs", codigo: "420130", fecha: "2026-05-30", monto: 480500 },
-    { id: "I-95-6", paciente: "Rodríguez, Ana", dni: "42.101.***", afiliado: "IOMA 4-509-102***", prestacion: "Consulta guardia", codigo: "420101", fecha: "2026-06-01", monto: 145200 },
-    { id: "I-95-7", paciente: "López, Carlos", dni: "28.445.***", afiliado: "IOMA 4-502-777***", prestacion: "Consulta guardia", codigo: "420101", fecha: "2026-06-02", monto: 145200 },
-    { id: "I-95-8", paciente: "Martínez, Elena", dni: "33.222.***", afiliado: "IOMA 4-510-345***", prestacion: "Consulta guardia", codigo: "420101", fecha: "2026-06-02", monto: 145200 },
-    { id: "I-95-9", paciente: "Suárez, Roberto", dni: "27.908.***", afiliado: "IOMA 4-504-661***", prestacion: "Consulta guardia", codigo: "420101", fecha: "2026-06-03", monto: 145200 },
-    { id: "I-95-10", paciente: "Suárez, Roberto", dni: "27.908.***", afiliado: "IOMA 4-504-661***", prestacion: "Curación quirúrgica en guardia", codigo: "420110", fecha: "2026-06-04", monto: 620800 },
-    { id: "I-95-11", paciente: "Fernández, Lucía", dni: "35.677.***", afiliado: "IOMA 4-511-208***", prestacion: "Estudios de laboratorio", codigo: "310105", fecha: "2026-06-05", monto: 98400 },
-    { id: "I-95-12", paciente: "Ibáñez, Marta", dni: "31.044.***", afiliado: "IOMA 4-506-914***", prestacion: "Observación en guardia 12 hs", codigo: "420131", fecha: "2026-06-06", monto: 480500 },
+    { id: "I-95-1", paciente: "González, María", dni: "25.312.***", afiliado: "OSPECON 4-501-023***", prestacion: "Consulta guardia", codigo: "420101", fecha: "2026-05-28", monto: 145200 },
+    { id: "I-95-2", paciente: "González, María", dni: "25.312.***", afiliado: "OSPECON 4-501-023***", prestacion: "Estudios de laboratorio", codigo: "310105", fecha: "2026-05-28", monto: 98400 },
+    { id: "I-95-3", paciente: "González, María", dni: "25.312.***", afiliado: "OSPECON 4-501-023***", prestacion: "Diagnóstico por imágenes", codigo: "340210", fecha: "2026-05-29", monto: 250420 },
+    { id: "I-95-4", paciente: "Pérez, Juan", dni: "30.812.***", afiliado: "OSPECON 4-503-819***", prestacion: "Consulta guardia", codigo: "420101", fecha: "2026-05-30", monto: 145200 },
+    { id: "I-95-5", paciente: "Pérez, Juan", dni: "30.812.***", afiliado: "OSPECON 4-503-819***", prestacion: "Observación en guardia 24 hs", codigo: "420130", fecha: "2026-05-30", monto: 480500 },
+    { id: "I-95-6", paciente: "Rodríguez, Ana", dni: "42.101.***", afiliado: "OSPECON 4-509-102***", prestacion: "Consulta guardia", codigo: "420101", fecha: "2026-06-01", monto: 145200 },
+    { id: "I-95-7", paciente: "López, Carlos", dni: "28.445.***", afiliado: "OSPECON 4-502-777***", prestacion: "Consulta guardia", codigo: "420101", fecha: "2026-06-02", monto: 145200 },
+    { id: "I-95-8", paciente: "Martínez, Elena", dni: "33.222.***", afiliado: "OSPECON 4-510-345***", prestacion: "Consulta guardia", codigo: "420101", fecha: "2026-06-02", monto: 145200 },
+    { id: "I-95-9", paciente: "Suárez, Roberto", dni: "27.908.***", afiliado: "OSPECON 4-504-661***", prestacion: "Consulta guardia", codigo: "420101", fecha: "2026-06-03", monto: 145200 },
+    { id: "I-95-10", paciente: "Suárez, Roberto", dni: "27.908.***", afiliado: "OSPECON 4-504-661***", prestacion: "Curación quirúrgica en guardia", codigo: "420110", fecha: "2026-06-04", monto: 620800 },
+    { id: "I-95-11", paciente: "Fernández, Lucía", dni: "35.677.***", afiliado: "OSPECON 4-511-208***", prestacion: "Estudios de laboratorio", codigo: "310105", fecha: "2026-06-05", monto: 98400 },
+    { id: "I-95-12", paciente: "Ibáñez, Marta", dni: "31.044.***", afiliado: "OSPECON 4-506-914***", prestacion: "Observación en guardia 12 hs", codigo: "420131", fecha: "2026-06-06", monto: 480500 },
   ],
   // Factura del caso testigo de la auditoría (dos planteos con distinto destino).
   "0001-00042197": [
-    { id: "I-97-1", paciente: "Ledesma, Hugo", dni: "26.771.***", afiliado: "IOMA 4-507-330***", prestacion: "Interconsulta durante internación", codigo: "420150", fecha: "2026-07-09", monto: 145200 },
-    { id: "I-97-2", paciente: "Sosa, Norma", dni: "24.918.***", afiliado: "IOMA 4-502-118***", prestacion: "Internación clínica 2 días", codigo: "620301", fecha: "2026-07-10", monto: 145200 },
-    { id: "I-97-3", paciente: "Aguirre, Diego", dni: "37.556.***", afiliado: "IOMA 4-512-904***", prestacion: "Cirugía programada + insumos", codigo: "710422", fecha: "2026-07-12", monto: 620800 },
-    { id: "I-97-4", paciente: "Aguirre, Diego", dni: "37.556.***", afiliado: "IOMA 4-512-904***", prestacion: "Estudio de alta complejidad", codigo: "810301", fecha: "2026-07-13", monto: 579200 },
+    { id: "I-97-1", paciente: "Ledesma, Hugo", dni: "26.771.***", afiliado: "OSPECON 4-507-330***", prestacion: "Interconsulta durante internación", codigo: "420150", fecha: "2026-07-09", monto: 145200 },
+    { id: "I-97-2", paciente: "Sosa, Norma", dni: "24.918.***", afiliado: "OSPECON 4-502-118***", prestacion: "Internación clínica 2 días", codigo: "620301", fecha: "2026-07-10", monto: 145200 },
+    { id: "I-97-3", paciente: "Aguirre, Diego", dni: "37.556.***", afiliado: "OSPECON 4-512-904***", prestacion: "Cirugía programada + insumos", codigo: "710422", fecha: "2026-07-12", monto: 620800 },
+    { id: "I-97-4", paciente: "Aguirre, Diego", dni: "37.556.***", afiliado: "OSPECON 4-512-904***", prestacion: "Estudio de alta complejidad", codigo: "810301", fecha: "2026-07-13", monto: 579200 },
   ]
 };
 /* Las facturas cargadas a mano arriba son las de los casos testigo. Para todas las demás, las
@@ -943,12 +943,12 @@ const itemsDe = (nro) => ITEMS_FACTURA[nro] || [];
 const DOCS_PACIENTE = ["Formulario F5", "Formulario F8", "Formulario F9", "Historia clínica", "Epicrisis firmada", "Consentimiento informado", "Autorización previa", "Constancia de afiliación"];
 const THREADS_INITIAL = {
   "0001-00042190": [
-    { who: "financiador", nombre: "IOMA", when: "28/07/2026 14:32", text: "Iniciamos conciliación sobre 1 ítem por afiliado no vigente.",
-      accion: { tipo: "Objeción iniciada", categorias: ["Afiliado no vigente"], detalles: ["Ítem: Internación — Juan Pérez", "N° afiliado: IOMA 4-503-819-2", "Fecha de baja: 30/06/2026"] },
-      adjuntos: [{ nombre: "padron_ioma_junio_2026.pdf", tipo: "pdf" }] },
+    { who: "financiador", nombre: "OSPECON", when: "28/07/2026 14:32", text: "Iniciamos conciliación sobre 1 ítem por afiliado no vigente.",
+      accion: { tipo: "Objeción iniciada", categorias: ["Afiliado no vigente"], detalles: ["Ítem: Internación — Juan Pérez", "N° afiliado: OSPECON 4-503-819-2", "Fecha de baja: 30/06/2026"] },
+      adjuntos: [{ nombre: "padron_ospecon_junio_2026.pdf", tipo: "pdf" }] },
     { who: "hospital", nombre: "Hosp. San Martín", when: "29/07/2026 09:15", text: "Discrepamos. Adjuntamos padrón consultado el día de la atención — cobertura activa.",
       accion: { tipo: "Descargo del hospital", categorias: ["Ratificar cobertura con documentación"], detalles: ["Padrón consultado: 12/07/2026 08:41", "Estado registrado: ACTIVO", "Prestación efectuada: 12/07/2026 10:20"] },
-      adjuntos: [{ nombre: "consulta_padron_ioma_12-07.pdf", tipo: "pdf" }, { nombre: "HC_perez_juan.pdf", tipo: "pdf" }, { nombre: "captura_padron.png", tipo: "img" }] }
+      adjuntos: [{ nombre: "consulta_padron_ospecon_12-07.pdf", tipo: "pdf" }, { nombre: "HC_perez_juan.pdf", tipo: "pdf" }, { nombre: "captura_padron.png", tipo: "img" }] }
   ],
   // Objeción ya auditada y derivada: es el único camino por el que una objeción llega al hospital.
   "0001-00042192": [
@@ -960,24 +960,24 @@ const THREADS_INITIAL = {
       adjuntos: [{ nombre: "respaldo_auditoria_central.pdf", tipo: "pdf" }] }
   ],
   "0001-00042197": [
-    { who: "financiador", nombre: "IOMA", when: "28/07/2026 09:40", text: "Objetamos 2 prestaciones de 2 pacientes por $ 766.000. Queda a resolución de la auditoría central.",
+    { who: "financiador", nombre: "OSPECON", when: "28/07/2026 09:40", text: "Objetamos 2 prestaciones de 2 pacientes por $ 766.000. Queda a resolución de la auditoría central.",
       accion: { tipo: "Objeción por prestación", categorias: ["Afiliado no vigente / no corresponde", "Falta autorización previa"],
         detalles: ["Sosa, Norma — Internación clínica 2 días (620301) $ 145.200", "Aguirre, Diego — Cirugía programada + insumos (710422) $ 620.800"] },
-      adjuntos: [{ nombre: "padron_ioma_julio_2026.pdf", tipo: "pdf" }] }
+      adjuntos: [{ nombre: "padron_ospecon_julio_2026.pdf", tipo: "pdf" }] }
   ],
   "0001-00042193": [
-    { who: "financiador", nombre: "PAMI", when: "25/07/2026 16:45", text: "Diferencia en códigos facturados y documentación incompleta en 3 prestaciones.",
+    { who: "financiador", nombre: "OSMATA", when: "25/07/2026 16:45", text: "Diferencia en códigos facturados y documentación incompleta en 3 prestaciones.",
       accion: { tipo: "Objeción iniciada", categorias: ["Diferencia en código", "Documentación incompleta"], detalles: ["Códigos observados: 340210 → correspondería 340215", "Falta: epicrisis, formulario de autorización"] },
-      adjuntos: [{ nombre: "convenio_pami_2026.pdf", tipo: "pdf" }] }
+      adjuntos: [{ nombre: "convenio_osmata_2026.pdf", tipo: "pdf" }] }
   ],
   "0004-00028112": [
-    { who: "financiador", nombre: "IOMA", when: "24/07/2026", text: "Diferencia de código en 1 prestación.",
+    { who: "financiador", nombre: "OSPECON", when: "24/07/2026", text: "Diferencia de código en 1 prestación.",
       accion: { tipo: "Objeción iniciada", categorias: ["Diferencia en código"], detalles: ["Código 340210 → correspondería 340215"] }, adjuntos: [] },
     { who: "hospital", nombre: "Hosp. Rossi", when: "25/07/2026", text: "Se rectifica. Emitimos nota de crédito.",
       accion: { tipo: "Aceptación con refacturación", categorias: ["Reconocer diferencia"], detalles: ["Se emitirá nota de crédito"] }, adjuntos: [{ nombre: "nota_credito.pdf", tipo: "pdf" }] }
   ],
   "0015-00007712": [
-    { who: "financiador", nombre: "IOMA", when: "26/07/2026", text: "Falta autorización previa en 2 prestaciones de alta complejidad.",
+    { who: "financiador", nombre: "OSPECON", when: "26/07/2026", text: "Falta autorización previa en 2 prestaciones de alta complejidad.",
       accion: { tipo: "Objeción iniciada", categorias: ["Falta autorización previa"], detalles: ["Prestaciones: 710422, 810301"] }, adjuntos: [] }
   ]
 };
@@ -1064,21 +1064,21 @@ let state = {
     { id: "AT-001", factura: "0001-00042197", hospital: "H001", financiador: "F001",
       motivo: "Revisar historias clínicas de las prestaciones trabadas (falta de autorización / afiliado no vigente).",
       fechaSolicitud: "2026-08-01", estado: "solicitada", items: [], resultado: null, motivoNoRealizada: null,
-      mensajes: [ { who: "financiador", nombre: "IOMA", when: "01/08", texto: "Solicitamos coordinar la auditoría. ¿Qué día de la semana próxima les queda bien para recibirnos?" } ],
-      participantes: "Auditoría médica IOMA (2 profesionales)" }
+      mensajes: [ { who: "financiador", nombre: "OSPECON", when: "01/08", texto: "Solicitamos coordinar la auditoría. ¿Qué día de la semana próxima les queda bien para recibirnos?" } ],
+      participantes: "Auditoría médica OSPECON (2 profesionales)" }
   ],
   /* Usuarios de cada financiador (ver helpers arriba). El admin se crea con el alta del financiador.
-     Para poblar la demo, cada financiador con usuario tiene su admin, e IOMA (el actor fijo del rol
+     Para poblar la demo, cada financiador con usuario tiene su admin, e OSPECON (el actor fijo del rol
      Financiador) tiene además operadores — uno con acceso total, otro restringido a 3 hospitales — y
      una solicitud pendiente. Hay otra solicitud pendiente de OSDE para que la bandeja del ministerio
      no arranque vacía. */
   usuariosFin: [
-    { id: "USR-F001-1", financiador: "F001", rol: "admin", nombre: "María", apellido: "González", dni: "24.876.109", mail: "mgonzalez@ioma.gba.gob.ar", telefono: "221-4567890", cargo: "Apoderada / Responsable administrativa", cuit: "30-62345678-9", estado: "activo", fechaSolicitud: "2026-03-02", fechaAlta: "2026-03-02", hospitales: null },
-    { id: "USR-F001-2", financiador: "F001", rol: "operador", nombre: "Jorge", apellido: "Pérez", dni: "28.334.221", mail: "jperez@ioma.gba.gob.ar", telefono: "221-4567891", cargo: "Liquidaciones", estado: "activo", fechaSolicitud: "2026-03-20", fechaAlta: "2026-03-22", hospitales: null },
-    { id: "USR-F001-3", financiador: "F001", rol: "operador", nombre: "Lucía", apellido: "Fernández", dni: "31.902.556", mail: "lfernandez@ioma.gba.gob.ar", telefono: "221-4567892", cargo: "Auditoría médica — zona sur", estado: "activo", fechaSolicitud: "2026-05-11", fechaAlta: "2026-05-13", hospitales: ["H001", "H003", "H005"] },
-    { id: "USR-F001-4", financiador: "F001", rol: "operador", nombre: "Diego", apellido: "Ramírez", dni: "33.120.887", mail: "dramirez@ioma.gba.gob.ar", telefono: "221-4567893", cargo: "Liquidaciones", estado: "pendiente", fechaSolicitud: "2026-08-01", fechaAlta: null, hospitales: null },
-    { id: "USR-F002-1", financiador: "F002", rol: "admin", nombre: "Roberto", apellido: "Suárez", dni: "20.445.318", mail: "rsuarez@pami.org.ar", telefono: "11-43210000", cargo: "Apoderado", cuit: "30-64567890-1", estado: "activo", fechaSolicitud: "2026-04-15", fechaAlta: "2026-04-15", hospitales: null },
-    { id: "USR-F002-2", financiador: "F002", rol: "operador", nombre: "Analía", apellido: "Godoy", dni: "29.556.780", mail: "agodoy@pami.org.ar", telefono: "11-43210001", cargo: "Regularización de deudas", estado: "activo", fechaSolicitud: "2026-04-20", fechaAlta: "2026-04-22", hospitales: null },
+    { id: "USR-F001-1", financiador: "F001", rol: "admin", nombre: "María", apellido: "González", dni: "24.876.109", mail: "mgonzalez@ospecon.gba.gob.ar", telefono: "221-4567890", cargo: "Apoderada / Responsable administrativa", cuit: "30-62345678-9", estado: "activo", fechaSolicitud: "2026-03-02", fechaAlta: "2026-03-02", hospitales: null },
+    { id: "USR-F001-2", financiador: "F001", rol: "operador", nombre: "Jorge", apellido: "Pérez", dni: "28.334.221", mail: "jperez@ospecon.gba.gob.ar", telefono: "221-4567891", cargo: "Liquidaciones", estado: "activo", fechaSolicitud: "2026-03-20", fechaAlta: "2026-03-22", hospitales: null },
+    { id: "USR-F001-3", financiador: "F001", rol: "operador", nombre: "Lucía", apellido: "Fernández", dni: "31.902.556", mail: "lfernandez@ospecon.gba.gob.ar", telefono: "221-4567892", cargo: "Auditoría médica — zona sur", estado: "activo", fechaSolicitud: "2026-05-11", fechaAlta: "2026-05-13", hospitales: ["H001", "H003", "H005"] },
+    { id: "USR-F001-4", financiador: "F001", rol: "operador", nombre: "Diego", apellido: "Ramírez", dni: "33.120.887", mail: "dramirez@ospecon.gba.gob.ar", telefono: "221-4567893", cargo: "Liquidaciones", estado: "pendiente", fechaSolicitud: "2026-08-01", fechaAlta: null, hospitales: null },
+    { id: "USR-F002-1", financiador: "F002", rol: "admin", nombre: "Roberto", apellido: "Suárez", dni: "20.445.318", mail: "rsuarez@osmata.org.ar", telefono: "11-43210000", cargo: "Apoderado", cuit: "30-64567890-1", estado: "activo", fechaSolicitud: "2026-04-15", fechaAlta: "2026-04-15", hospitales: null },
+    { id: "USR-F002-2", financiador: "F002", rol: "operador", nombre: "Analía", apellido: "Godoy", dni: "29.556.780", mail: "agodoy@osmata.org.ar", telefono: "11-43210001", cargo: "Regularización de deudas", estado: "activo", fechaSolicitud: "2026-04-20", fechaAlta: "2026-04-22", hospitales: null },
     { id: "USR-F003-1", financiador: "F003", rol: "admin", nombre: "Carolina", apellido: "Vega", dni: "27.109.664", mail: "cvega@osde.com.ar", telefono: "11-53200000", cargo: "Apoderada", cuit: "30-54876543-2", estado: "activo", fechaSolicitud: "2026-05-04", fechaAlta: "2026-05-04", hospitales: null },
     { id: "USR-F003-2", financiador: "F003", rol: "operador", nombre: "Martín", apellido: "Ibáñez", dni: "30.778.213", mail: "mibanez@osde.com.ar", telefono: "11-53200001", cargo: "Convenios hospitalarios", estado: "pendiente", fechaSolicitud: "2026-08-02", fechaAlta: null, hospitales: null },
     { id: "USR-F004-1", financiador: "F004", rol: "admin", nombre: "Silvina", apellido: "Rossi", dni: "26.554.902", mail: "srossi@swissmedical.com.ar", telefono: "11-51520000", cargo: "Apoderada", cuit: "30-59123456-7", estado: "activo", fechaSolicitud: "2026-06-01", fechaAlta: "2026-06-01", hospitales: null },
@@ -1100,8 +1100,8 @@ let state = {
   cuitsRegistro: [
     { cuit: "20-33813990-0", rol: "ministerio",   habilitado: true,  descripcion: "DRC — Dirección de Recuperación de Costos" },
     { cuit: "20-33813991-1", rol: "ministerio",   habilitado: true,  descripcion: "Auditoría central" },
-    { cuit: "30-62345678-9", rol: "financiador",  habilitado: true,  descripcion: "IOMA (persona jurídica)" },
-    { cuit: "30-64567890-1", rol: "financiador",  habilitado: true,  descripcion: "PAMI (persona jurídica)" },
+    { cuit: "30-62345678-9", rol: "financiador",  habilitado: true,  descripcion: "OSPECON (persona jurídica)" },
+    { cuit: "30-64567890-1", rol: "financiador",  habilitado: true,  descripcion: "OSMATA (persona jurídica)" },
     { cuit: "30-54876543-2", rol: "financiador",  habilitado: true,  descripcion: "OSDE (persona jurídica)" },
     { cuit: "27-30111222-3", rol: null,           habilitado: false, descripcion: "Alta pendiente — sin rol asignado" },
   ],
@@ -1990,11 +1990,11 @@ function kpisHospital() {
 /* ========================================================= SIDEBAR ========================================================= */
 function renderSidebar() {
   const items = navFor(state.role); const sidebar = $("#sidebar");
-  const roleLabel = state.role === 'ministerio' ? 'Ministerio de Salud PBA' : state.role === 'hospital' ? 'Hospital Interzonal San Martín' : 'IOMA';
+  const roleLabel = state.role === 'ministerio' ? 'Ministerio de Salud PBA' : state.role === 'hospital' ? 'Hospital Interzonal San Martín' : 'OSPECON';
   const kFin = state.role === "financiador" ? kpisFinanciador() : null;
   const kHosp = state.role === "hospital" ? kpisHospital() : null;
   const html = [`<div class="section-label">${roleLabel}</div>`];
-  /* Rol Financiador: selector "Ver como usuario". Permite conmutar entre los usuarios activos de IOMA
+  /* Rol Financiador: selector "Ver como usuario". Permite conmutar entre los usuarios activos de OSPECON
      para demostrar la restricción por hospital y qué ve un operador vs. el admin. Va siempre visible
      (incluso impersonando a un operador que no ve Gestión de usuarios) para poder volver al admin. */
   if (state.role === "financiador") {
@@ -2773,18 +2773,18 @@ function viewHospital_DetalleFactura(nro) {
 
 function viewHospital_Conciliacion(subestado) {
   const facts = state.facturas.filter(f => f.hospital === "H001" && (subestado === "yo" ? esConcYo_hosp(f) : esConcOtro_hosp(f)));
-  const titulo = subestado === "yo" ? "Conciliación — Derivadas por la auditoría" : "Conciliación — Esperando resolución";
+  const titulo = subestado === "yo" ? "Conciliación — Esperan mi respuesta" : "Conciliación — Esperando resolución";
   const sub = subestado === "yo"
-    ? "La auditoría central del ministerio revisó la objeción del financiador, la consideró procedente y te la derivó para descargo o nota de crédito."
+    ? "Discrepancias del financiador que te toca responder, directas o derivadas por la auditoría central del ministerio: descargo o nota de crédito."
     : "Ya enviaste tu descargo, o el caso está en manos de la auditoría central. No hay nada pendiente de tu lado.";
   return `
-    <div class="breadcrumb"><a data-nav="panel_hospital">Panel</a> / Conciliación / ${subestado === "yo" ? "Derivadas por la auditoría" : "Esperando resolución"}</div>
+    <div class="breadcrumb"><a data-nav="panel_hospital">Panel</a> / Conciliación / ${subestado === "yo" ? "Esperan mi respuesta" : "Esperando resolución"}</div>
     <div class="page-header">
       <div><h1>${titulo}</h1><div class="sub">${sub}</div></div>
       <button class="btn btn-excel" onclick="exportDiscHosp('${subestado}')">⬇ Excel</button>
     </div>
     ${subestado === "yo"
-      ? `<div class="note"><strong>Solo llegan acá los casos que la auditoría central te deriva.</strong> El financiador no te objeta de forma directa: sus planteos los recibe primero el ministerio, que los desestima o te los deriva. Priorizá por vencimiento — el plazo de 60 días sigue corriendo.</div>
+      ? `<div class="note"><strong>Llegan acá las discrepancias que tenés que responder.</strong> Según el ruteo de tu hospital, el financiador te las plantea directo o pasan primero por la auditoría central del ministerio, que las desestima o te las deriva. Priorizá por vencimiento — el plazo de 60 días sigue corriendo.</div>
          <div class="note note-blue" style="margin-bottom:16px;"><strong>Plazos por turno (SLA):</strong> cada objeción corre su propio reloj de <strong>${DIAS_TURNO_OBJECION} días corridos</strong> desde el último movimiento. Si el hospital no responde en plazo, se le <strong>reconoce el débito al financiador</strong>; si el financiador no responde, se <strong>acepta la respuesta del hospital</strong>. El reloj se topa con el cierre de la factura a los ${DIAS_CIERRE_FACTURA} días. <em>(Resuelve la vieja decisión D1.)</em></div>`
       : `<div class="note note-blue"><strong>Nada pendiente de tu lado.</strong> Las conciliaciones en <em>auditoría</em> todavía no fueron resueltas ni derivadas por el ministerio; las que están en <em>financiador</em> esperan que él re-evalúe tu descargo.</div>`}
     ${facts.length === 0 ? `<div class="card" style="text-align:center;color:var(--muted);padding:40px;">Sin conciliaciones en este subestado.</div>` : `
@@ -2954,11 +2954,11 @@ function viewFinanciador_Panel() {
     + " · " + (fl.periodo === "TODOS" ? "histórico completo" : fl.periodo);
   return `
     <div class="page-header">
-      <div><h1>Panel — IOMA</h1><div class="sub">Situación consolidada de facturación del Ministerio de Salud PBA</div></div>
+      <div><h1>Panel — OSPECON</h1><div class="sub">Situación consolidada de facturación del Ministerio de Salud PBA</div></div>
       <div class="page-actions"><button class="btn btn-excel" onclick="exportPanelFin()">⬇ Descargar Excel</button></div>
     </div>
     ${enModoCombinado() && !tienePlan(usuarioFinActual()?.financiador || "F001")
-      ? `<div class="note"><strong>${finNombre(usuarioFinActual().financiador)} no está en el Plan de Pago.</strong> Ve <strong>solo el circuito de facturación corriente</strong> (no le aparece la sección Plan de Pagos). <em>Nota de demo: los datos de facturas que se muestran son ilustrativos, los de IOMA.</em></div>` : ""}
+      ? `<div class="note"><strong>${finNombre(usuarioFinActual().financiador)} no está en el Plan de Pago.</strong> Ve <strong>solo el circuito de facturación corriente</strong> (no le aparece la sección Plan de Pagos). <em>Nota de demo: los datos de facturas que se muestran son ilustrativos, los de OSPECON.</em></div>` : ""}
     ${notif && notif.sinRevisar > 0 ? `<div class="action-required-banner">
       <div><strong>📬 Recibiste una nueva notificación de facturas a pagar</strong> — ${notif.fecha}: ${notif.lote.length} factura(s) de ${notif.hospitales} hospital(es) por ${money(notif.monto)}. ${notif.sinRevisar} sin revisar.</div>
       <button class="btn btn-danger btn-sm" data-goto="notificaciones">Revisar →</button>
@@ -3033,7 +3033,7 @@ window.exportPanelFin = function() {
   const rows = [["Hospital","Facturas","Pagado","Deuda","En conciliación","Esp. yo","Esp. hosp.","Por vencer","Vencidas"]];
   Object.entries(g).forEach(([hospId, d]) => rows.push([hospNombre(hospId), d.count, d.pagado, d.deudaTotal, d.enConciliacion, d.espYo, d.espHosp, d.porVencer, d.vencidas]));
   const suf = `${fl.hospital === "TODOS" ? "todos" : fl.hospital}_${fl.periodo === "TODOS" ? "historico" : fl.periodo}`;
-  exportCSV(`panel_ioma_por_hospital_${suf}.csv`, rows);
+  exportCSV(`panel_ospecon_por_hospital_${suf}.csv`, rows);
 };
 
 function viewFinanciador_DetalleHospital(hospId) {
@@ -3067,7 +3067,7 @@ window.exportFacturasFin = function() {
   const rows = [["Factura","Hospital","Notificada","Emisión","Estado","Situación","Días","Monto","Pagado","Notas de crédito","Saldo","En debate","Pacientes"]];
   facts.forEach(f => rows.push([f.nro, hospNombre(f.hospital), f.fecha, f.fechaEmision, f.estado, LABEL_SITUACION[situacionFactura(f)] || situacionFactura(f),
     diasRestantes(f.fecha), f.monto, f.montoPagado||0, f.notasCredito||0, saldoPendiente(f), f.montoDebate||0, f.pacientes]));
-  exportCSV("facturas_ioma.csv", rows);
+  exportCSV("facturas_ospecon.csv", rows);
 };
 
 /* Estados agrupados en "situaciones de trabajo": con 200 hospitales, lo que importa no es el estado
@@ -3108,7 +3108,7 @@ function viewFinanciador_Notificaciones() {
   todas.forEach(f => { (lotes[f.fecha] = lotes[f.fecha] || []).push(f); });
   const fechasLote = Object.keys(lotes).sort().reverse();
 
-  // KPIs globales (no dependen de filtros): lo verdaderamente "sin revisar" del universo IOMA.
+  // KPIs globales (no dependen de filtros): lo verdaderamente "sin revisar" del universo OSPECON.
   const notifSinRevisar = fechasLote.filter(fe => lotes[fe].some(f => f.estado === "notificada"));
   const factSinRevisar  = todas.filter(f => f.estado === "notificada");
   const montoSinRevisar = factSinRevisar.reduce((s,f)=>s+saldoPendiente(f),0);
@@ -3274,7 +3274,7 @@ window.exportNotifLote = function(fecha) {
   const rows = [];
   rows.push(["Notificación consolidada", notifId(fecha)]);
   rows.push(["Fecha de notificación", fecha]);
-  rows.push(["Financiador", "IOMA"]);
+  rows.push(["Financiador", "OSPECON"]);
   rows.push(["Facturas incluidas", lote.length]);
   rows.push(["Monto total", lote.reduce((s,f)=>s+f.monto,0)]);
   rows.push(["Vencimiento (60 días)", venceDe(fecha)]);
@@ -3470,7 +3470,7 @@ function viewFinanciador_DeudaPreportal() {
   filas.forEach(d => cuenta[d.estado]++);
   return `
     <div class="page-header">
-      <div><h1>Deuda previa al portal — IOMA</h1><div class="sub">Situación histórica previa a la adhesión al portal — ${filas.length} factura(s), ${money(totalPre)} de saldo</div></div>
+      <div><h1>Deuda previa al portal — OSPECON</h1><div class="sub">Situación histórica previa a la adhesión al portal — ${filas.length} factura(s), ${money(totalPre)} de saldo</div></div>
       <button class="btn btn-excel" onclick="exportDeudaPreportal()">⬇ Excel</button>
     </div>
     <div class="note note-blue" style="margin-bottom:16px;">
@@ -3521,7 +3521,7 @@ window.exportDeudaPreportal = function() {
   const filas = ordenarPreportal(deudaPreportalDe("F001"), state.sortPreportal);
   const rows = [["Factura","Hospital","Fecha","Estado","Gestión","Monto","Saldo adeudado"]];
   filas.forEach(d => rows.push([d.nro, hospNombre(d.hospital), d.fecha, PREPORTAL_ESTADO_LABEL[d.estado], d.gestion, d.monto, d.saldo]));
-  exportCSV("deuda_preportal_ioma.csv", rows);
+  exportCSV("deuda_preportal_ospecon.csv", rows);
 };
 
 function viewFinanciador_DetalleFactura(nro) {
@@ -3866,11 +3866,11 @@ window.confirmarObjecionItems = function(nro) {
       motivos: [motivo], fecha: HOY, estado: estadoDestino, adjuntos: [...adjuntos], respuestas: [] };
     sincronizarObjecion(nuevo);
     f.objeciones = [...objecionesDe(f), nuevo];
-    nuevo.respuestas.push({ who: "financiador", nombre: "IOMA", when: HOY, inicial: true, tipo: "Objeción planteada", texto: `${categoria}: ${detalle}`, adjuntos });
+    nuevo.respuestas.push({ who: "financiador", nombre: "OSPECON", when: HOY, inicial: true, tipo: "Objeción planteada", texto: `${categoria}: ${detalle}`, adjuntos });
     // El ruteo (directo al hospital / vía ministerio) decide el estado destino pero NO se registra en el log:
     // para el financiador es transparente — objeta y alguien (hospital o ministerio) le responde.
     if (!state.threads[nro]) state.threads[nro] = [];
-    state.threads[nro].push({ who: "financiador", nombre: "IOMA", when: "hoy",
+    state.threads[nro].push({ who: "financiador", nombre: "OSPECON", when: "hoy",
       text: `[${nuevo.id}] Objetamos ${i.prestacion} (${i.codigo}) de ${i.paciente} por ${money(i.monto)}.`,
       accion: { tipo: "Objeción por prestación", categorias: [categoria], detalles: [detalle, `${i.prestacion} (${i.codigo}) ${money(i.monto)}`] }, adjuntos });
     creadas++;
@@ -4224,7 +4224,7 @@ window.exportFinObjeciones = function() {
 
 /* ── Soporte / Ayuda ──────────────────────────────────────────────────────────
    Sección de ayuda por rol (financiador y ministerio). Contenido estático de demo:
-   manual (placeholder), FAQ redactado para el idioma de cada rol, glosario de los
+   manual (placeholder), FAQ redactado para el idospecon de cada rol, glosario de los
    términos del portal y datos de contacto. Los datos reales (mail, teléfono, PDF del
    manual, trámite de domicilio) quedan como [completar] bien visibles. El FAQ usa
    <details> nativo (acordeón sin JS). */
@@ -4462,7 +4462,7 @@ window.exportNotasCredito = function() {
   const ncs = state.notasCredito.filter(n => n.financiador === "F001");
   const rows = [["N° NC","Factura","Hospital","Fecha","Tipo","Motivo","Monto acreditado","Estado"]];
   ncs.forEach(n => rows.push([n.id, n.factura, hospNombre(n.hospital), n.fecha, n.tipo, n.motivo, n.monto, n.estado]));
-  exportCSV("notas_credito_ioma.csv", rows);
+  exportCSV("notas_credito_ospecon.csv", rows);
 };
 
 function viewFinanciador_Historial() {
@@ -6137,7 +6137,7 @@ function wireAccionesPlanteo(root = document) {
       onOk: () => {
         os.forEach(o => {
           o.estado = "aceptado";
-          anotarPlanteo(f, o, { who: "financiador", nombre: "IOMA", tipo: "Respuesta aceptada",
+          anotarPlanteo(f, o, { who: "financiador", nombre: "OSPECON", tipo: "Respuesta aceptada",
             texto: `Aceptamos la respuesta. Damos por resuelta la objeción por ${money(o.monto)}.`,
             detalles: ["El monto vuelve a quedar reconocido y cobrable."] });
         });
@@ -6872,7 +6872,7 @@ window.confirmarFinRespuesta = function(nro, objIds, modo) {
   os.forEach(o => {
     o.pedidosInfoFin = (o.pedidosInfoFin || 0) + 1;   // tope de interacciones: a la 2ª vuelta ya no puede pedir info
     o.estado = aMin ? "en_auditoria" : "derivado_hospital";
-    anotarPlanteo(f, o, { who: "financiador", nombre: "IOMA", tipo: "Pedido de información",
+    anotarPlanteo(f, o, { who: "financiador", nombre: "OSPECON", tipo: "Pedido de información",
       texto, detalles: [aMin ? "Vuelve a la auditoría central para su resolución." : "Vuelve al hospital para que amplíe la documentación."] });
   });
   recalcularEstadoFactura(f);
@@ -6910,7 +6910,7 @@ window.confirmarMantenerObjecion = function(nro, objIds) {
     onOk: () => {
       os.forEach(o => {
         o.estado = "sin_acuerdo"; o.resolucion = "sin_acuerdo";
-        anotarPlanteo(f, o, { who: "financiador", nombre: "IOMA", tipo: "Objeción sostenida — cerrada sin acuerdo",
+        anotarPlanteo(f, o, { who: "financiador", nombre: "OSPECON", tipo: "Objeción sostenida — cerrada sin acuerdo",
           texto, detalles: ["Se cierra la conciliación sin acuerdo.", "El monto en disputa se define en la instancia legal al vencer los 60 días desde la notificación."] });
       });
       recalcularEstadoFactura(f);
@@ -6945,7 +6945,7 @@ window.confirmarSolicitarRechazo = function(nro) {
   f.solicitudRechazo = { motivo, fecha: HOY, estado: "en_auditoria", adjuntos };
   f.estado = "esperando_auditoria"; f.rechazoTotal = true; f.montoDebate = saldoPendiente(f);
   if (!state.threads[nro]) state.threads[nro] = [];
-  state.threads[nro].push({ who: "financiador", nombre: "IOMA", when: "hoy",
+  state.threads[nro].push({ who: "financiador", nombre: "OSPECON", when: "hoy",
     text: `Solicitamos el rechazo total de la factura (${money(f.monto)}).`,
     accion: { tipo: "Solicitud de rechazo total", categorias: ["Desconocimiento íntegro de la factura"], detalles: [motivo] }, adjuntos });
   closeModal(); render(); showToast("Solicitud de rechazo elevada a la auditoría central");
@@ -7648,24 +7648,24 @@ function chipCuotaDisplay(c) {
 
 /* Datos mock de planes. Cubren los cuatro caminos de la demo: al día, con cuotas vencidas, con nueva
    deuda intimada, y caduco. `cuotasPagas` controla cuántas cuotas arrancan pagas; generarCuotasPlan()
-   deriva el resto (paga / vencida / pendiente) contra HOY. IOMA (F001) es el actor fijo del rol
+   deriva el resto (paga / vencida / pendiente) contra HOY. OSPECON (F001) es el actor fijo del rol
    Financiador, así que su plan (PLAN-001) es el que se ve en "Mi plan".
    Alcance subjetivo (art. 1 Ley 23.660): en producción el régimen es solo para obras sociales; en la
-   demo se incluye a IOMA para poder recorrer la vista del financiador. */
+   demo se incluye a OSPECON para poder recorrer la vista del financiador. */
 const PLANES_PAGO = [
-  { id:"PLAN-001", financiadorId:"F001", denominacionOS:"IOMA", cuit:"30-62345678-9", rnas:"RNAS 1-0001-0",
+  { id:"PLAN-001", financiadorId:"F001", denominacionOS:"OSPECON", cuit:"30-62345678-9", rnas:"RNAS 1-0001-0",
     deudaTotalRegularizada:8400000, capital:8400000, intereses:0, modalidad:"HASTA_18",
     fechaAdhesion:"2026-04-05", nCuotas:18, cuotasPagas:3, estado:"EN_RIESGO",
-    domicilioElectronico:"ioma@notificaciones.gba.gob.ar",
+    domicilioElectronico:"ospecon@notificaciones.gba.gob.ar",
     // Cuotas al día pero con una deuda POST-ADHESIÓN intimada (caducidad no automática, 10 días hábiles).
-    // Sirve para mostrar la sección "Nuevas deudas intimadas" en la vista del financiador (IOMA es el fijo).
+    // Sirve para mostrar la sección "Nuevas deudas intimadas" en la vista del financiador (OSPECON es el fijo).
     deudaNueva:{ monto:520000, fechaIntimacion:"2026-07-30", diasHabilesRestantes:4,
       hospId:"H003", hospNombre:"Hospital Municipal Evita (Lanús)", hospCuit:"30-99887766-3",
       nroFactura:"0003-00022190", fechaFactura:"2026-07-05" } },
-  { id:"PLAN-002", financiadorId:"F002", denominacionOS:"PAMI (INSSJP)", cuit:"30-64567890-1", rnas:"RNAS 5-0080-0",
+  { id:"PLAN-002", financiadorId:"F002", denominacionOS:"OSMATA", cuit:"30-64567890-1", rnas:"RNAS 5-0080-0",
     deudaTotalRegularizada:15552000, capital:14400000, intereses:1152000, modalidad:"HASTA_24",
     fechaAdhesion:"2026-02-08", nCuotas:24, cuotasPagas:3, estado:"EN_RIESGO",
-    domicilioElectronico:"regularizacion@pami.org.ar", deudaNueva:null },
+    domicilioElectronico:"regularizacion@osmata.org.ar", deudaNueva:null },
   { id:"PLAN-003", financiadorId:"F012", denominacionOS:"OSPRERA", cuit:"30-65432109-8", rnas:"RNAS 1-0270-1",
     deudaTotalRegularizada:5400000, capital:5400000, intereses:0, modalidad:"HASTA_18",
     fechaAdhesion:"2026-03-12", nCuotas:18, cuotasPagas:4, estado:"EN_RIESGO",
@@ -9185,7 +9185,7 @@ const denRelojCorre = (d) => ["PENDIENTE", "INFO_PEDIDA"].includes(d.estado);
 // Financiadores fuera del portal: la denuncia se registra igual pero sale por mail, como hoy (P7.7).
 const finEnPortal = (finId) => { const f = FINANCIADORES.find(x => x.id === finId); return f && f.estado !== "sin_usuario"; };
 
-/* ---- Mock: denuncias de varios hospitales y financiadores (H001 = San Martín, F001 = IOMA) ---- */
+/* ---- Mock: denuncias de varios hospitales y financiadores (H001 = San Martín, F001 = OSPECON) ---- */
 function mkDen(o) {
   const enviada = o.enviada || o.ingreso;
   return Object.assign({ canal: finEnPortal(o.financiador) ? "Domicilio electrónico" : "Mail (fuera del portal)",
@@ -9193,51 +9193,51 @@ function mkDen(o) {
       { who: "hospital", when: enviada, text: `Denuncia enviada al financiador por ${finEnPortal(o.financiador) ? "domicilio electrónico (puesta a disposición)" : "mail"}. Corre el plazo de ${HORAS_DENUNCIA} h.` }] }, o);
 }
 const DENUNCIAS_INICIAL = [
-  mkDen({ id: "DEN-2026-0412", hospital: "H001", financiador: "F001", paciente: "Ferreyra, Marta", dni: "22.418.902", afiliado: "IOMA 4-512-7781",
+  mkDen({ id: "DEN-2026-0412", hospital: "H001", financiador: "F001", paciente: "Ferreyra, Marta", dni: "22.418.902", afiliado: "OSPECON 4-512-7781",
     ingreso: "2026-08-02T21:40", servicio: "Clínica médica", diagnostico: "Neumonía adquirida en la comunidad (J18.9)", practica: "Internación clínica, antibioticoterapia EV", medico: "Dra. Paz", trasladable: "si", estado: "PENDIENTE" }),
-  mkDen({ id: "DEN-2026-0409", hospital: "H001", financiador: "F001", paciente: "Ledesma, Hugo", dni: "26.771.330", afiliado: "IOMA 4-507-3302",
+  mkDen({ id: "DEN-2026-0409", hospital: "H001", financiador: "F001", paciente: "Ledesma, Hugo", dni: "26.771.330", afiliado: "OSPECON 4-507-3302",
     ingreso: "2026-08-01T13:15", servicio: "Unidad coronaria", diagnostico: "Síndrome coronario agudo (I24.9)", practica: "Cinecoronariografía; eventual angioplastia", medico: "Dr. Ruiz", trasladable: "evaluar", estado: "PENDIENTE" }),
-  (() => { const d = mkDen({ id: "DEN-2026-0405", hospital: "H001", financiador: "F001", paciente: "Sosa, Norma", dni: "24.918.118", afiliado: "IOMA 4-502-1187",
+  (() => { const d = mkDen({ id: "DEN-2026-0405", hospital: "H001", financiador: "F001", paciente: "Sosa, Norma", dni: "24.918.118", afiliado: "OSPECON 4-502-1187",
     ingreso: "2026-08-01T19:30", servicio: "Clínica médica", diagnostico: "Insuficiencia cardíaca descompensada (I50.0)", practica: "Internación clínica", medico: "Dr. Benítez", trasladable: "si", estado: "INFO_PEDIDA" });
-    d.respuestaInfo = { fecha: "2026-08-02T11:20", usuario: "Auditoría médica IOMA", texto: "Solicitamos ecocardiograma y laboratorio de ingreso." };
+    d.respuestaInfo = { fecha: "2026-08-02T11:20", usuario: "Auditoría médica OSPECON", texto: "Solicitamos ecocardiograma y laboratorio de ingreso." };
     d.log.push({ who: "financiador", when: "2026-08-02T11:20", text: "Pide información: ecocardiograma y laboratorio de ingreso. El plazo sigue corriendo." }); return d; })(),
-  (() => { const d = mkDen({ id: "DEN-2026-0398", hospital: "H001", financiador: "F001", paciente: "Molina, Ricardo", dni: "18.334.201", afiliado: "IOMA 4-499-2015",
+  (() => { const d = mkDen({ id: "DEN-2026-0398", hospital: "H001", financiador: "F001", paciente: "Molina, Ricardo", dni: "18.334.201", afiliado: "OSPECON 4-499-2015",
     ingreso: "2026-07-31T16:30", servicio: "Traumatología", diagnostico: "Fractura de cadera (S72.0)", practica: "Artroplastia parcial de cadera (programable)", medico: "Dr. Quiroga", trasladable: "si", estado: "DERIV_SOLICITADA" });
-    d.respuesta = { tipo: "derivacion", fecha: "2026-08-01T10:10", usuario: "Auditoría médica IOMA", centro: "Clínica IOMA La Plata", gestiona: "Financiador (ambulancia propia)", retiro: "2026-08-03T16:00", contacto: "Central de traslados IOMA · 0221-480-4410", texto: "Solicitamos derivación a prestador propio para la cirugía." };
-    d.log.push({ who: "financiador", when: "2026-08-01T10:10", text: "Solicita derivación a Clínica IOMA La Plata. Retiro estimado 03/08 16:00 h, a cargo del financiador." }); return d; })(),
-  (() => { const d = mkDen({ id: "DEN-2026-0390", hospital: "H001", financiador: "F001", paciente: "Ojeda, Silvina", dni: "33.102.064", afiliado: "IOMA 4-520-0640",
+    d.respuesta = { tipo: "derivacion", fecha: "2026-08-01T10:10", usuario: "Auditoría médica OSPECON", centro: "Clínica OSPECON La Plata", gestiona: "Financiador (ambulancia propia)", retiro: "2026-08-03T16:00", contacto: "Central de traslados OSPECON · 0221-480-4410", texto: "Solicitamos derivación a prestador propio para la cirugía." };
+    d.log.push({ who: "financiador", when: "2026-08-01T10:10", text: "Solicita derivación a Clínica OSPECON La Plata. Retiro estimado 03/08 16:00 h, a cargo del financiador." }); return d; })(),
+  (() => { const d = mkDen({ id: "DEN-2026-0390", hospital: "H001", financiador: "F001", paciente: "Ojeda, Silvina", dni: "33.102.064", afiliado: "OSPECON 4-520-0640",
     ingreso: "2026-07-30T09:50", servicio: "Cirugía general", diagnostico: "Colecistitis aguda (K81.0)", practica: "Colecistectomía laparoscópica", medico: "Dra. Méndez", trasladable: "si", estado: "DERIV_EN_CURSO" });
-    d.respuesta = { tipo: "derivacion", fecha: "2026-07-31T09:00", usuario: "Auditoría médica IOMA", centro: "Sanatorio IPENSA", gestiona: "Financiador (ambulancia propia)", retiro: "2026-08-03T18:00", contacto: "Traslados IOMA · 0221-480-4410", texto: "Derivamos a prestador de red." };
+    d.respuesta = { tipo: "derivacion", fecha: "2026-07-31T09:00", usuario: "Auditoría médica OSPECON", centro: "Sanatorio IPENSA", gestiona: "Financiador (ambulancia propia)", retiro: "2026-08-03T18:00", contacto: "Traslados OSPECON · 0221-480-4410", texto: "Derivamos a prestador de red." };
     d.derivacion = { confirmada: "2026-07-31T12:30", porQuien: "SAMO Hosp. San Martín" };
     d.log.push({ who: "financiador", when: "2026-07-31T09:00", text: "Solicita derivación a Sanatorio IPENSA. Retiro estimado 03/08 18:00 h." },
                { who: "hospital", when: "2026-07-31T12:30", text: "Confirma que la paciente es trasladable (médico tratante: Dra. Méndez). Queda a la espera del retiro." }); return d; })(),
-  (() => { const d = mkDen({ id: "DEN-2026-0377", hospital: "H001", financiador: "F001", paciente: "González, María", dni: "25.312.023", afiliado: "IOMA 4-501-0231",
+  (() => { const d = mkDen({ id: "DEN-2026-0377", hospital: "H001", financiador: "F001", paciente: "González, María", dni: "25.312.023", afiliado: "OSPECON 4-501-0231",
     ingreso: "2026-07-27T19:00", servicio: "Clínica médica", diagnostico: "Pielonefritis aguda (N10)", practica: "Internación clínica", medico: "Dr. Benítez", trasladable: "si", estado: "ACEPTADA" });
-    d.respuesta = { tipo: "acepta", fecha: "2026-07-28T09:30", usuario: "Auditoría médica IOMA", texto: "Se acepta la internación en el hospital." };
+    d.respuesta = { tipo: "acepta", fecha: "2026-07-28T09:30", usuario: "Auditoría médica OSPECON", texto: "Se acepta la internación en el hospital." };
     d.log.push({ who: "financiador", when: "2026-07-28T09:30", text: "Acepta la internación. Se genera la constancia." }); return d; })(),
-  (() => { const d = mkDen({ id: "DEN-2026-0371", hospital: "H001", financiador: "F001", paciente: "Pérez, Juan", dni: "30.812.819", afiliado: "IOMA 4-503-8193",
+  (() => { const d = mkDen({ id: "DEN-2026-0371", hospital: "H001", financiador: "F001", paciente: "Pérez, Juan", dni: "30.812.819", afiliado: "OSPECON 4-503-8193",
     ingreso: "2026-07-25T02:10", servicio: "Clínica médica", diagnostico: "ACV isquémico (I63.9)", practica: "Internación clínica, TAC de cerebro", medico: "Dra. Paz", trasladable: "no", estado: "ACEPTADA_TACITA" });
     d.log.push({ who: "sistema", when: "2026-07-27T02:10", text: "Vencieron las 48 h sin respuesta: ACEPTACIÓN TÁCITA. Constancia generada automáticamente." }); return d; })(),
-  (() => { const d = mkDen({ id: "DEN-2026-0360", hospital: "H001", financiador: "F001", paciente: "Romero, Elsa", dni: "14.556.905", afiliado: "IOMA 4-488-9050",
+  (() => { const d = mkDen({ id: "DEN-2026-0360", hospital: "H001", financiador: "F001", paciente: "Romero, Elsa", dni: "14.556.905", afiliado: "OSPECON 4-488-9050",
     ingreso: "2026-07-21T11:45", servicio: "Unidad de terapia intensiva", diagnostico: "Sepsis de foco abdominal (A41.9)", practica: "Internación en UTI", medico: "Dr. Ruiz", trasladable: "si", estado: "DERIV_FALLIDA" });
-    d.respuesta = { tipo: "derivacion", fecha: "2026-07-22T08:20", usuario: "Auditoría médica IOMA", centro: "Clínica IOMA La Plata", gestiona: "Financiador", retiro: "2026-07-22T18:00", contacto: "Traslados IOMA", texto: "Derivamos a UTI de prestador propio." };
+    d.respuesta = { tipo: "derivacion", fecha: "2026-07-22T08:20", usuario: "Auditoría médica OSPECON", centro: "Clínica OSPECON La Plata", gestiona: "Financiador", retiro: "2026-07-22T18:00", contacto: "Traslados OSPECON", texto: "Derivamos a UTI de prestador propio." };
     d.derivacion = { confirmada: "2026-07-22T10:00", porQuien: "SAMO Hosp. San Martín", fallida: "2026-07-23T08:00", motivo: "El financiador no retiró al paciente en el plazo acordado." };
-    d.log.push({ who: "financiador", when: "2026-07-22T08:20", text: "Solicita derivación a Clínica IOMA La Plata." },
+    d.log.push({ who: "financiador", when: "2026-07-22T08:20", text: "Solicita derivación a Clínica OSPECON La Plata." },
                { who: "hospital", when: "2026-07-23T08:00", text: "Retiro no concretado en plazo: la denuncia se da por aceptada y el paciente sigue internado en el hospital." }); return d; })(),
-  (() => { const d = mkDen({ id: "DEN-2026-0352", hospital: "H001", financiador: "F001", paciente: "Vera, Tomás", dni: "40.221.117", afiliado: "IOMA 4-530-1170",
+  (() => { const d = mkDen({ id: "DEN-2026-0352", hospital: "H001", financiador: "F001", paciente: "Vera, Tomás", dni: "40.221.117", afiliado: "OSPECON 4-530-1170",
     ingreso: "2026-07-18T22:30", servicio: "Traumatología", diagnostico: "Fractura expuesta de tibia (S82.2)", practica: "Osteosíntesis", medico: "Dr. Quiroga", trasladable: "si", estado: "DERIVADO" });
-    d.respuesta = { tipo: "derivacion", fecha: "2026-07-19T09:00", usuario: "Auditoría médica IOMA", centro: "Sanatorio IPENSA", gestiona: "Financiador", retiro: "2026-07-19T15:00", contacto: "Traslados IOMA", texto: "Derivación a prestador de red." };
-    d.derivacion = { confirmada: "2026-07-19T10:30", porQuien: "SAMO Hosp. San Martín", retiro: "2026-07-19T14:40", retiradoPor: "Ambulancia IOMA móvil 12" };
-    d.log.push({ who: "hospital", when: "2026-07-19T14:40", text: "Paciente retirado por ambulancia IOMA móvil 12. Derivación concretada." }); return d; })(),
+    d.respuesta = { tipo: "derivacion", fecha: "2026-07-19T09:00", usuario: "Auditoría médica OSPECON", centro: "Sanatorio IPENSA", gestiona: "Financiador", retiro: "2026-07-19T15:00", contacto: "Traslados OSPECON", texto: "Derivación a prestador de red." };
+    d.derivacion = { confirmada: "2026-07-19T10:30", porQuien: "SAMO Hosp. San Martín", retiro: "2026-07-19T14:40", retiradoPor: "Ambulancia OSPECON móvil 12" };
+    d.log.push({ who: "hospital", when: "2026-07-19T14:40", text: "Paciente retirado por ambulancia OSPECON móvil 12. Derivación concretada." }); return d; })(),
   // Otros hospitales y financiadores (alimentan solo el seguimiento del Ministerio)
-  mkDen({ id: "DEN-2026-0410", hospital: "H002", financiador: "F002", paciente: "Ibarra, Rosa", dni: "11.903.774", afiliado: "PAMI 15-0099021", ingreso: "2026-08-02T08:00", servicio: "Clínica médica", diagnostico: "EPOC reagudizado (J44.1)", practica: "Internación clínica", medico: "—", trasladable: "si", estado: "PENDIENTE" }),
+  mkDen({ id: "DEN-2026-0410", hospital: "H002", financiador: "F002", paciente: "Ibarra, Rosa", dni: "11.903.774", afiliado: "OSMATA 15-0099021", ingreso: "2026-08-02T08:00", servicio: "Clínica médica", diagnostico: "EPOC reagudizado (J44.1)", practica: "Internación clínica", medico: "—", trasladable: "si", estado: "PENDIENTE" }),
   Object.assign(mkDen({ id: "DEN-2026-0402", hospital: "H002", financiador: "F003", paciente: "Luna, Pablo", dni: "35.670.118", afiliado: "OSDE 210-4471", ingreso: "2026-07-31T20:00", servicio: "Cirugía general", diagnostico: "Apendicitis aguda (K35.8)", practica: "Apendicectomía", medico: "—", trasladable: "si", estado: "DERIVADO" }), { respuesta: { tipo: "derivacion", fecha: "2026-08-01T07:00" } }),
   Object.assign(mkDen({ id: "DEN-2026-0396", hospital: "H003", financiador: "F003", paciente: "Paz, Andrea", dni: "29.004.550", afiliado: "OSDE 210-9930", ingreso: "2026-07-30T10:00", servicio: "Obstetricia", diagnostico: "Amenaza de parto pretérmino (O60.0)", practica: "Internación obstétrica", medico: "—", trasladable: "no", estado: "ACEPTADA" }), { respuesta: { tipo: "acepta", fecha: "2026-07-30T18:00" } }),
   mkDen({ id: "DEN-2026-0388", hospital: "H003", financiador: "F005", paciente: "Correa, Luis", dni: "20.114.332", afiliado: "OSECAC 55012", ingreso: "2026-07-29T05:30", servicio: "Clínica médica", diagnostico: "Diabetes descompensada (E11.6)", practica: "Internación clínica", medico: "—", trasladable: "si", estado: "ACEPTADA_TACITA" }),
-  mkDen({ id: "DEN-2026-0385", hospital: "H005", financiador: "F002", paciente: "Aguirre, Delia", dni: "09.877.401", afiliado: "PAMI 15-0102118", ingreso: "2026-07-28T14:00", servicio: "Unidad coronaria", diagnostico: "Fibrilación auricular (I48)", practica: "Internación en UCO", medico: "—", trasladable: "si", estado: "ACEPTADA_TACITA" }),
+  mkDen({ id: "DEN-2026-0385", hospital: "H005", financiador: "F002", paciente: "Aguirre, Delia", dni: "09.877.401", afiliado: "OSMATA 15-0102118", ingreso: "2026-07-28T14:00", servicio: "Unidad coronaria", diagnostico: "Fibrilación auricular (I48)", practica: "Internación en UCO", medico: "—", trasladable: "si", estado: "ACEPTADA_TACITA" }),
   mkDen({ id: "DEN-2026-0381", hospital: "H004", financiador: "F014", paciente: "Rivas, Mario", dni: "17.445.209", afiliado: "OSDOP 44120", ingreso: "2026-07-28T09:00", servicio: "Clínica médica", diagnostico: "Neumonía (J18.9)", practica: "Internación clínica", medico: "—", trasladable: "si", estado: "ACEPTADA_TACITA" }),
   Object.assign(mkDen({ id: "DEN-2026-0379", hospital: "H005", financiador: "F004", paciente: "Funes, Clara", dni: "31.660.773", afiliado: "SMG 88120", ingreso: "2026-07-27T23:00", servicio: "Traumatología", diagnostico: "Fractura de radio (S52.5)", practica: "Osteosíntesis", medico: "—", trasladable: "si", estado: "ACEPTADA_ALCANCE" }), { respuesta: { tipo: "alcance", fecha: "2026-07-28T12:00" } }),
-  Object.assign(mkDen({ id: "DEN-2026-0368", hospital: "H002", financiador: "F001", paciente: "Toledo, Ana", dni: "27.889.012", afiliado: "IOMA 4-515-7781", ingreso: "2026-07-24T07:00", servicio: "Clínica médica", diagnostico: "Celulitis (L03.1)", practica: "Internación clínica", medico: "—", trasladable: "si", estado: "DERIV_FALLIDA" }), { respuesta: { tipo: "derivacion", fecha: "2026-07-24T15:00" } }),
+  Object.assign(mkDen({ id: "DEN-2026-0368", hospital: "H002", financiador: "F001", paciente: "Toledo, Ana", dni: "27.889.012", afiliado: "OSPECON 4-515-7781", ingreso: "2026-07-24T07:00", servicio: "Clínica médica", diagnostico: "Celulitis (L03.1)", practica: "Internación clínica", medico: "—", trasladable: "si", estado: "DERIV_FALLIDA" }), { respuesta: { tipo: "derivacion", fecha: "2026-07-24T15:00" } }),
 ];
 state.denuncias = JSON.parse(JSON.stringify(DENUNCIAS_INICIAL));
 state.filtrosDenuncia = { estado: "TODOS", financiador: "TODOS", q: "" };
@@ -9391,7 +9391,7 @@ window.openModalResponderDenuncia = function(id) {
     <div id="den-blk-alcance" style="display:none;"><label>Qué autorizás y qué no</label><textarea id="den-alc" placeholder="Ej: autorizamos la internación clínica; la angioplastia requiere autorización previa."></textarea></div>
     <div id="den-blk-deriv" style="display:none;">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <div><label>Centro receptor</label><input id="den-centro" placeholder="Ej: Clínica IOMA La Plata"></div>
+        <div><label>Centro receptor</label><input id="den-centro" placeholder="Ej: Clínica OSPECON La Plata"></div>
         <div><label>Quién gestiona el traslado</label><select id="den-gest"><option>Financiador (ambulancia propia)</option><option>Financiador (servicio contratado)</option><option>Centro receptor</option></select></div>
         <div><label>Retiro estimado</label><input id="den-retiro" type="datetime-local" value="${addHoras(AHORA_DEN, 6)}"></div>
         <div><label>Contacto para coordinar</label><input id="den-cont" placeholder="Ej: Central de traslados 0221-..."></div>
@@ -9412,7 +9412,7 @@ window.cambiaRespDen = function() {
 window.confirmarRespuestaDenuncia = function(id) {
   const d = denPor(id); if (!d) return;
   const t = $("#den-resp").value; const txt = ($("#den-txt").value || "").trim();
-  const usr = usuarioFinActual(); const quien = usr ? `${usr.nombre} ${usr.apellido} (IOMA)` : "IOMA";
+  const usr = usuarioFinActual(); const quien = usr ? `${usr.nombre} ${usr.apellido} (OSPECON)` : "OSPECON";
   if (t === "info") {
     if (!txt) { showToast("⚠ Indicá qué información necesitás"); return; }
     d.estado = "INFO_PEDIDA"; d.respuestaInfo = { fecha: AHORA_DEN, usuario: quien, texto: txt };
@@ -9464,7 +9464,7 @@ window.denConfirmarTraslado = function(id, ok) {
 window.denRegistrarRetiro = function(id, ok) {
   const d = denPor(id); if (!d) return;
   if (ok) {
-    const quien = prompt("¿Quién retiró al paciente?", "Ambulancia IOMA"); if (quien === null) return;
+    const quien = prompt("¿Quién retiró al paciente?", "Ambulancia OSPECON"); if (quien === null) return;
     d.estado = "DERIVADO"; Object.assign(d.derivacion = d.derivacion || {}, { retiro: AHORA_DEN, retiradoPor: quien });
     d.log.push({ who: "hospital", when: AHORA_DEN, text: `Paciente retirado (${quien}). Derivación concretada.` });
   } else {
@@ -9758,7 +9758,7 @@ state.facturas.forEach(f => {
     o.turnoDesde = sumarDias(HOY, -(s % 10));   // 0..9 días atrás → 1..10 de plazo
   });
 });
-// Testigo: una objeción de IOMA derivada al hospital con el turno YA vencido → el SLA la reconoce por
+// Testigo: una objeción de OSPECON derivada al hospital con el turno YA vencido → el SLA la reconoce por
 // silencio al cargar (queda a_acreditar, con el movimiento de sistema en el registro). Demuestra la penalización.
 (() => {
   const f = state.facturas.find(x => x.financiador === "F001" && isImpaga(x) && !esMorosa(x) &&
@@ -9766,7 +9766,7 @@ state.facturas.forEach(f => {
   const o = f && objecionesDe(f).find(o => o.estado === "derivado_hospital" && !o.enAuditoriaCompartida);
   if (o) { o.turnoDesde = sumarDias(HOY, -(DIAS_TURNO_OBJECION + 2)); f.__slaDemo = "penal"; }  // vencido hace 2 días
 })();
-// Testigo: una objeción de IOMA en turno del financiador a punto de vencer (rojo) → cuenta regresiva en vivo.
+// Testigo: una objeción de OSPECON en turno del financiador a punto de vencer (rojo) → cuenta regresiva en vivo.
 (() => {
   const f = state.facturas.find(x => x.financiador === "F001" && isImpaga(x) && !esMorosa(x) &&
     objecionesDe(x).some(o => o.estado === "respondido" && !o.enAuditoriaCompartida));
@@ -9774,7 +9774,7 @@ state.facturas.forEach(f => {
   if (o) o.turnoDesde = sumarDias(HOY, -(DIAS_TURNO_OBJECION - 2));  // vence en 2 días
 })();
 // Semilla de demo para el panel de KPIs por objeción: resuelve/vence determinísticamente un puñado de
-// objeciones de IOMA en cada desenlace, para que "Estado de las objeciones" no quede casi todo "en proceso".
+// objeciones de OSPECON en cada desenlace, para que "Estado de las objeciones" no quede casi todo "en proceso".
 (() => {
   const pares = [];
   state.facturas.forEach(f => { if (f.financiador === "F001" && isImpaga(f) && !esMorosa(f) && !f.__slaDemo)
@@ -9789,7 +9789,7 @@ state.facturas.forEach(f => {
       if (o) { o.__demoSeed = 1; o.estado = "en_auditoria"; o.turnoDesde = sumarDias(HOY, -(DIAS_TURNO_OBJECION + 1)); n++; } } }
   tomar(o => o.estado === "respondido" && !o.enAuditoriaCompartida, 2).forEach(([f, o]) => { o.turnoDesde = sumarDias(HOY, -(DIAS_TURNO_OBJECION + 1)); });   // vence al financiador
 })();
-// Testigo MIXTO (tu caso): una factura de IOMA donde el hospital ya respondió ALGUNAS objeciones y otras
+// Testigo MIXTO (tu caso): una factura de OSPECON donde el hospital ya respondió ALGUNAS objeciones y otras
 // siguen de su lado → aparece en los DOS subestados del financiador y el desglose de pelota lo muestra.
 (() => {
   const f = state.facturas.find(x => x.financiador === "F001" && isImpaga(x) && !esMorosa(x) && !x.__slaDemo &&
